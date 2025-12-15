@@ -6,7 +6,7 @@ export default {
     name: "BullSignalsAI",
     slug: "bullsignalsai",
     owner: "bullsignalsai",
-    scheme: "bullsignalsai",  // ✅ REQUIRED FOR DEV CLIENT LAN MODE
+    scheme: "bullsignalsai",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -44,6 +44,16 @@ export default {
       "expo-asset",
       "expo-notifications",
     ],
+
+    // ✅ ADD THIS BLOCK
+    updates: {
+      url: "https://u.expo.dev/2bfff8b1-676c-461b-a991-ed884e800110",
+    },
+
+    // ✅ ADD THIS BLOCK
+    runtimeVersion: {
+      policy: "appVersion",
+    },
 
     extra: {
       eas: {
