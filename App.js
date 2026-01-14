@@ -26,6 +26,8 @@ import NotificationsScreen from "./screens/NotificationsScreen"; // ✅ new
 import EditPositionScreen from "./screens/EditPositionScreen"; // ✅ new
 import PortfolioScreen from "./screens/PortfolioScreen"; // ✅ new
 import AddPositionScreen from "./screens/AddPositionScreen"; // ✅ new
+import FullPatternDetailScreen from "./screens/FullPatternDetailScreen"; // ✅ new
+import FullTechnicalDetailScreen from "./screens/FullTechnicalDetailScreen"; // ✅ new
 
 // Services
 import { registerPushToken } from "./services/notifications"; // ✅ new import
@@ -159,6 +161,48 @@ export default function App() {
           options={{
             headerShown: true,
             title: "Stock Details",
+            headerStyle: { backgroundColor: "#000" },
+            headerTintColor: "#00E396",
+            headerBackTitleVisible: false,
+            headerBackTitle: false,
+            headerBackImage: () => (
+              <Ionicons
+                name="chevron-back-outline"
+                size={24}
+                color="#00E396"
+                style={{ marginLeft: 10 }}
+              />
+            ),
+          }}
+        />
+
+        <Stack.Screen
+          name="FullPatternDetailScreen"
+          component={FullPatternDetailScreen}
+          options={{
+            headerShown: true,
+            title: "Pattern Details",
+            headerStyle: { backgroundColor: "#000" },
+            headerTintColor: "#00E396",
+            headerBackTitleVisible: false,
+            headerBackTitle: false,
+            headerBackImage: () => (
+              <Ionicons
+                name="chevron-back-outline"
+                size={24}
+                color="#00E396"
+                style={{ marginLeft: 10 }}
+              />
+            ),
+          }}
+        />
+
+                  <Stack.Screen
+          name="FullTechnicalDetailScreen"
+          component={FullTechnicalDetailScreen}
+          options={{
+            headerShown: true,
+            title: "Technical Details",
             headerStyle: { backgroundColor: "#000" },
             headerTintColor: "#00E396",
             headerBackTitleVisible: false,

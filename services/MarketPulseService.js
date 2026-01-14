@@ -2,7 +2,8 @@
 import { API_BASE_URL } from "../config/apiKeys";
 
 /* ---------------------------------------------------------
-   1) Fetch /market-pulse  (News + Overview)
+   1) Fetch Market Pulse (Highlights + News)
+   🔥 Firestore-backed, fast
 --------------------------------------------------------- */
 export async function getMarketPulse() {
   try {
@@ -17,21 +18,13 @@ export async function getMarketPulse() {
 
     const json = await res.json();
 
-    console.log(
-      "🔥 Backend delivered grouped market news:",
-      Object.values(json.news_grouped || {}).reduce(
-        (a, b) => a + b.length,
-        0
-      )
-    );
-
     // Safety defaults
-    const overview = json.market_overview || {};
     const highlights = json.highlights_grouped || {
       bullish: [],
       neutral: [],
       bearish: [],
     };
+
     const grouped = json.news_grouped || {
       today: [],
       yesterday: [],
@@ -39,7 +32,7 @@ export async function getMarketPulse() {
       older: [],
     };
 
-    // Normalized timestamps (backend already returns ET)
+    // Normalize timestamps for UI
     const normalizeGroup = (arr) =>
       arr.map((n) => {
         const clean = { ...n };
@@ -65,8 +58,12 @@ export async function getMarketPulse() {
       });
 
     return {
-      market_overview: overview,
       highlights_grouped: highlights,
+      highlights_numeric: json.highlights_numeric || {
+        bull: 0,
+        neutral: 0,
+        bear: 0,
+      },
       news_grouped: {
         today: normalizeGroup(grouped.today),
         yesterday: normalizeGroup(grouped.yesterday),
@@ -82,7 +79,29 @@ export async function getMarketPulse() {
 }
 
 /* ---------------------------------------------------------
-   2) Fetch Hotlist (Fast — Backend returns Firestore results)
+   2) Fetch Market Overview (Live snapshot)
+   🔥 Firestore-backed, very fast
+--------------------------------------------------------- */
+export async function getMarketOverview() {
+  try {
+    const url = `${API_BASE_URL}/market-overview`;
+    console.log("📡 Fetching Market Overview:", url);
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn("❌ Market Overview fetch failed:", res.status);
+      return null;
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.warn("❌ getMarketOverview error:", err.message);
+    return null;
+  }
+}
+
+/* ---------------------------------------------------------
+   3) Fetch Hotlist (Fast — Firestore)
 --------------------------------------------------------- */
 export async function getHotlist() {
   try {
@@ -95,7 +114,7 @@ export async function getHotlist() {
       return null;
     }
 
-    const json = await res.json(); // { count, hotlist }
+    const json = await res.json();
     console.log(`🔥 Hotlist received (${json.count} items)`);
 
     return json;
@@ -106,7 +125,7 @@ export async function getHotlist() {
 }
 
 /* ---------------------------------------------------------
-   3) Fetch BearWatch (Fast — Backend returns Firestore results)
+   4) Fetch BearWatch (Fast — Firestore)
 --------------------------------------------------------- */
 export async function getBearwatch() {
   try {
@@ -119,7 +138,7 @@ export async function getBearwatch() {
       return null;
     }
 
-    const json = await res.json(); // { count, bearwatch }
+    const json = await res.json();
     console.log(`🔥 BearWatch received (${json.count} items)`);
 
     return json;

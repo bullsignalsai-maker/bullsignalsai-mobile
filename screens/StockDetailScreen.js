@@ -12,10 +12,13 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
-import { Svg, Path } from "react-native-svg";
+import { LinearGradient as SvgLinearGradient, Svg, Path, Defs, Stop } from "react-native-svg";
+import { LinearGradient as ExpoLinearGradient } from "expo-linear-gradient";
 import { API_BASE_URL } from "../config/apiKeys"; // ✅ backend base URL
 import SmartPatternCard from "../components/SmartPatternCard";
+import { getStockDetail } from "../services/stockDetailService";
+import { SafeAreaView } from "react-native";
+
 
 // === Brand palette ===
 const BRAND = {
@@ -54,6 +57,17 @@ function timeAgo(tsMs) {
   const days = Math.floor(hrs / 24);
   return `${days}d ago`;
 }
+
+function GreenBullets({ items = [] }) {
+  if (!items.length) return null;
+  return items.map((line, idx) => (
+    <View key={`gb-${idx}`} style={styles.bulletRow}>
+      <Text style={styles.bulletDot}>•</Text>
+      <Text style={styles.bulletText}>{line}</Text>
+    </View>
+  ));
+}
+
 
 function formatNewsTime(pubDate) {
   if (!pubDate) return "";
@@ -242,6 +256,55 @@ function formatPercent(n, digits = 1) {
   return n.toFixed(digits) + "%";
 }
 
+function buildHybridOneLiner(signal, probUp, technical, bullbrain) {
+  if (!signal) return "Hybrid AI is evaluating current conditions.";
+
+  const parts = [];
+
+  if (technical?.trend?.summary)
+    parts.push(technical.trend.summary.toLowerCase());
+
+  if (bullbrain?.confidence != null)
+    parts.push(`AI confidence ~${bullbrain.confidence.toFixed(0)}%`);
+
+  if (probUp != null)
+    parts.push(`${Math.round(probUp * 100)}% upside probability`);
+
+  return parts.slice(0, 2).join(" • ");
+}
+
+function buildHybridSignalSummary({ hybridSignal, hybridProbUp, technical, bullbrain }) {
+  if (!hybridSignal) return "AI model is evaluating current conditions.";
+
+  const bullets = [];
+
+  // Trend
+  if (technical?.trend?.summary) {
+    bullets.push(technical.trend.summary);
+  }
+
+  // Momentum
+  if (technical?.momentum?.summary_rsi || technical?.momentum?.summary_macd) {
+    bullets.push(
+      technical.momentum.summary_rsi ||
+      technical.momentum.summary_macd
+    );
+  }
+
+  // AI probability
+  if (hybridProbUp != null) {
+    bullets.push(`${Math.round(hybridProbUp * 100)}% probability of upside`);
+  }
+
+  // Fallback to BullBrain
+  if (!bullets.length && bullbrain?.confidence != null) {
+    bullets.push(`BullBrain confidence ${bullbrain.confidence.toFixed(0)}%`);
+  }
+
+  return bullets.slice(0, 2).join(" • ");
+}
+
+
 // Build narrative explaining why the hybrid signal is what it is
 function buildHybridNarrative(hybridSignal, technical, bullbrain) {
   const parts = [];
@@ -349,23 +412,7 @@ function buildHybridNarrative(hybridSignal, technical, bullbrain) {
   return parts.join(" ");
 }
 
-// ================================
-//   STOCKDETAIL BACKEND CALL
-// ================================
-async function fetchStockDetail(symbol) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/stockdetail/${symbol}`);
-    const json = await res.json();
-    if (!res.ok || json?.error) {
-      console.warn("stockdetail backend error:", json?.error || res.status);
-      return null;
-    }
-    return json;
-  } catch (err) {
-    console.warn("fetchStockDetail error:", err);
-    return null;
-  }
-}
+
 
 // ================================
 //   GROK CACHE HELPERS (frontend)
@@ -437,76 +484,96 @@ async function fetchGrokAnalysis(symbol, force = false) {
   }
 }
 
-// ================
-//   MINI CHART
-// ================
-function MiniChart({ candles, rangeKey }) {
-  const data = useMemo(() => {
-    if (!candles || !candles.length) return [];
-    const total = candles.length;
-    let keep = 0;
-    switch (rangeKey) {
-      case "1D":
-        keep = 1;
-        break;
-      case "5D":
-        keep = 5;
-        break;
-      case "1M":
-        keep = 22;
-        break;
-      case "6M":
-        keep = 126;
-        break;
-      case "1Y":
-        keep = 252;
-        break;
-      default:
-        keep = 60;
-    }
-    if (keep >= total) return candles;
-    return candles.slice(total - keep);
-  }, [candles, rangeKey]);
+function smoothPath(path) {
+  if (!path || typeof path !== "string") return path;
 
-  if (!data || data.length < 2) {
+  // Extract all x,y pairs like "12.3,45.6"
+  const matches = path.match(/(\d+(\.\d+)?),(\d+(\.\d+)?)/g);
+  if (!matches || matches.length < 3) return path;
+
+  const points = matches.map(pair => {
+    const [x, y] = pair.split(",").map(Number);
+    return { x, y };
+  });
+
+  let d = `M ${points[0].x},${points[0].y}`;
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const p0 = points[i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+
+    const cx = (p1.x + p2.x) / 2;
+    const cy = (p1.y + p2.y) / 2;
+
+    d += ` Q ${p1.x},${p1.y} ${cx},${cy}`;
+  }
+
+  const last = points[points.length - 1];
+  d += ` L ${last.x},${last.y}`;
+
+  return d;
+}
+
+
+
+function PriceSparkline({ sparkline }) {
+  if (!sparkline?.path) {
     return (
       <View style={styles.chartPlaceholder}>
-        <Text style={styles.chartPlaceholderText}>Chart data unavailable</Text>
+        <Text style={styles.chartPlaceholderText}>Chart unavailable</Text>
       </View>
     );
   }
 
-  const prices = data.map((c) => c.close);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const range = max - min || 1;
-  const width = 100;
-  const height = 40;
+  const isUp = sparkline.direction === "up";
 
-  let d = "";
-  data.forEach((c, idx) => {
-    const x = (idx / (data.length - 1)) * width;
-    const y = height - ((c.close - min) / range) * height;
-    d += `${idx === 0 ? "M" : "L"}${x},${y} `;
-  });
-
-  const first = prices[0];
-  const last = prices[prices.length - 1];
-  const isUp = last >= first;
+  const stroke = isUp ? BRAND.accent : BRAND.red;
+  const gradientId = isUp ? "gradUp" : "gradDown";
 
   return (
-    <View style={styles.chartContainer}>
-      <Svg width="100%" height={height}>
+    <View style={styles.sparklineWrap}>
+      <Svg viewBox="0 0 100 30" width="100%" height={60}>
+
+
+        <Defs>
+          <SvgLinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor={stroke} stopOpacity="0.25" />
+            <Stop offset="60%" stopColor={stroke} stopOpacity="0.08" />
+            <Stop offset="100%" stopColor={stroke} stopOpacity="0" />
+          </SvgLinearGradient>
+        </Defs>
+
+        {/* Area fill (very soft) */}
         <Path
-          d={d.trim()}
-          stroke={isUp ? BRAND.accent : BRAND.red}
-          strokeWidth={1.8}
-          fill="none"
+          d={`${smoothPath(sparkline.path)} L 100,30 L 0,30 Z`}
+          fill={`url(#${gradientId})`}
         />
+
+        {/* Main line (thin & clean) */}
+        <Path
+          d={sparkline.path}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={1.15}
+          strokeLinecap="round"
+          strokeLinejoin="bevel"
+        />
+
       </Svg>
+
+      <View style={styles.sparklineMeta}>
+        <Text style={styles.sparklineMetaText}>
+          Low ${sparkline.min.toFixed(2)}
+        </Text>
+        <Text style={styles.sparklineMetaText}>
+          High ${sparkline.max.toFixed(2)}
+        </Text>
+      </View>
     </View>
   );
 }
+
 
 // =======================
 //   COMPONENT
@@ -515,7 +582,9 @@ export default function StockDetailScreen({ route, navigation }) {
   const {
     symbol: initialSymbol = "TSLA",
     name: initialName = "Tesla Inc.",
+    source, // ✅ ADD THIS
   } = route.params || {};
+
 
   const [symbol] = useState(initialSymbol);
   const [detail, setDetail] = useState(null);
@@ -526,12 +595,14 @@ export default function StockDetailScreen({ route, navigation }) {
   const [loadingGrok, setLoadingGrok] = useState(true);
 
   const [refreshing, setRefreshing] = useState(false);
-  const [chartRange, setChartRange] = useState("1M");
+ 
 
   const loadAll = useCallback(
     async (forceGrok = false) => {
       setLoadingDetail(true);
-      const sd = await fetchStockDetail(symbol);
+      const sd = await getStockDetail(symbol, {fromUI: source === "ui",});
+
+
       setDetail(sd);
       setLoadingDetail(false);
 
@@ -559,6 +630,7 @@ export default function StockDetailScreen({ route, navigation }) {
   const quote = detail?.quote;
   const candles = detail?.candles?.candles || [];
   const bullbrain = detail?.bullbrain;
+  const patternInsight = detail?.patternInsight || null;
   // ---- SMART PATTERN (from /stockdetail) ----
 const smartPattern = detail?.smartPattern;
 const patternDates = detail?.patternDates || [];
@@ -569,6 +641,17 @@ const patternStats = detail?.patternStats;
   const technical = detail?.technical;
   const tickerNews = detail?.news || [];
   const structuredGrok = detail?.grok || {};
+  const technicalOutlook =
+  detail?.explanations?.groups?.technical_outlook || null;
+  const risksOpportunities =
+  detail?.explanations?.groups?.risks_opportunities || null;
+
+  const tradeIdea =
+  detail?.explanations?.groups?.trade_idea || null;
+  const finalRecommendation =
+  detail?.explanations?.groups?.final_recommendation || null;
+
+
   const hybridSignal = detail?.hybridSignal;
   const hybridProbUp = detail?.hybridProbUp;
   const hybridScore = detail?.hybridScore;
@@ -589,22 +672,20 @@ const patternStats = detail?.patternStats;
     [grokSections.predictions]
   );
 
-  const shortTermOutlook =
-    structuredGrok.short_term || predictionsFromEssay.shortTerm || "";
-  const mediumTermOutlook =
-    structuredGrok.medium_term || predictionsFromEssay.mediumTerm || "";
-  const longTermOutlook =
-    structuredGrok.long_term || predictionsFromEssay.longTerm || "";
+const outlookBullets = detail?.insights?.combinedTechnicalSummary
+  ? detail.insights.combinedTechnicalSummary
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  : [];
+
 
   const hybridNarrative = useMemo(
     () => buildHybridNarrative(hybridSignal, technical, bullbrain),
     [hybridSignal, technical, bullbrain]
   );
 
-  const hasTradeIdea =
-    grokSections.tradeIdea &&
-    grokSections.tradeIdea.toLowerCase() !== "none" &&
-    grokSections.tradeIdea.trim().length > 0;
+
 
   return (
     <ScrollView
@@ -619,10 +700,11 @@ const patternStats = detail?.patternStats;
       }
     >
       {/* HEADER: Price & Basic Info */}
-      <LinearGradient
+      <ExpoLinearGradient
         colors={["#0f172a", "#020617"]}
         style={styles.headerCard}
       >
+
         {loadingDetail ? (
           <ActivityIndicator color={BRAND.accent} />
         ) : quote ? (
@@ -715,7 +797,7 @@ const patternStats = detail?.patternStats;
         ) : (
           <Text style={{ color: BRAND.sub }}>Failed to load quote.</Text>
         )}
-      </LinearGradient>
+      </ExpoLinearGradient>
 
       {/* MINI CHART + TIMEFRAMES */}
       <View style={styles.card}>
@@ -723,64 +805,38 @@ const patternStats = detail?.patternStats;
           <View style={styles.sectionAccent} />
           <Text style={styles.sectionTitle}>Price Chart</Text>
           <View style={{ flex: 1 }} />
-          <View style={styles.timeframeRow}>
-            {["1D", "5D", "1M", "6M", "1Y"].map((tf) => (
-              <TouchableOpacity
-                key={tf}
-                onPress={() => setChartRange(tf)}
-                style={[
-                  styles.timeframePill,
-                  chartRange === tf && styles.timeframePillActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.timeframeText,
-                    chartRange === tf && styles.timeframeTextActive,
-                  ]}
-                >
-                  {tf}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
-
-        <MiniChart candles={candles} rangeKey={chartRange} />
-
+        <PriceSparkline sparkline={detail?.sparkline} />
         <View style={styles.chartFooterRow}>
           <Text style={styles.chartSourceText}></Text>
-          <TouchableOpacity
+
+        <TouchableOpacity
           style={styles.chartButton}
-          onPress={() => {
-            navigation.navigate("FullChartScreen", {
-              symbol: detail?.symbol,
-              candles: detail?.candles?.candles || [],
-              price: detail?.price || 0,
-              name: detail?.companyName || detail?.symbol,
-              // ✅ pass these so FullChartScreen has data
-              quote: detail?.quote || null,
-              features: detail?.features || null,
-              technical: detail?.technical || null,
-              bullbrain: detail?.bullbrain || null,
-              hybridProbUp: detail?.hybridProbUp ?? null,
-              hybridSignal: detail?.hybridSignal ?? null,
-              hybridScore: detail?.hybridScore ?? null,
-              grok: detail?.grok || null,
-            });
-          }}
+          onPress={() =>
+        navigation.navigate("FullChartScreen", {
+          symbol: detail?.symbol,
+          companyName: detail?.companyName || detail?.symbol,
+          quote: detail?.quote || null,
+          bullbrain: detail?.bullbrain || null,
+          hybridSignal: detail?.hybridSignal ?? null,
+          hybridScore: detail?.hybridScore ?? null,
+
+          // optional flags
+          isPremium: true,
+        })
+      }
         >
           <Text style={styles.chartButtonText}>View Full Chart</Text>
-        </TouchableOpacity>
- </View>
-</View>
+      </TouchableOpacity>
+      </View>
+      </View>
 
       {/* AI HYBRID SIGNAL */}
       <View style={styles.card}>
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionAccent} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>AI Hybrid Signal</Text>
+            <Text style={styles.sectionTitle}>AI Hybrid Signal</Text>
             <Text style={styles.cardSubText}>
               Powered by BullsignalsAI •{" "}
               {hybridUpdatedTs
@@ -853,163 +909,156 @@ const patternStats = detail?.patternStats;
           </View>
 
           {/* Narrative */}
+        
           <View style={styles.hybridNarrativeBox}>
-            <Text style={styles.hybridNarrativeText}>{hybridNarrative}</Text>
+            <Text style={styles.hybridNarrativeText}>
+              {buildHybridSignalSummary({
+                hybridSignal,
+                hybridProbUp,
+                technical,
+                bullbrain,
+              })}
+            </Text>
           </View>
+
         </View>
       </View>
 
-    {/* SMART PATTERN ALERT */}
-      {smartPattern && (
-          <SmartPatternCard
-            patternData={{
-              pattern: smartPattern?.pattern,
-              headline: smartPattern?.headline,
-              winRate: smartPattern?.winRate,
-              occurrences: smartPattern?.occurrences ?? 0,
-              samples: smartPattern?.samples ?? [],
-              forwardReturns: smartPattern?.forwardReturns ?? {},
-              dates: patternDates,
-            }}
-          />
+                    {/* SMART PATTERN (SUMMARY ONLY) */}
+        {patternInsight && (
+          <View style={styles.card}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionAccent} />
+              <Text style={styles.sectionTitle}>Smart Pattern</Text>
+            </View>
+
+            <Text style={styles.patternTitle}>
+              {patternInsight.pattern}
+            </Text>
+
+            {patternInsight.confidencePct != null && (
+              <Text style={styles.patternMeta}>
+                Confidence:{" "}
+                <Text
+                  style={{
+                    fontWeight: "800",
+                    color:
+                      patternInsight.confidencePct >= 65
+                        ? BRAND.accent
+                        : BRAND.amber,
+                  }}
+                >
+                  {patternInsight.confidencePct}%
+                </Text>{" "}
+                • {patternInsight.label}
+              </Text>
+            )}
+
+            <Text style={styles.patternExplanation}>
+              {patternInsight.explanation}
+            </Text>
+
+            {/* CTA */}
+            <TouchableOpacity
+              style={styles.patternButton}
+              onPress={() =>
+                navigation.navigate("FullPatternDetailScreen", {
+                symbol: detail.symbol,
+                companyName: detail.companyName,
+                quote: detail.quote,
+                patternInsight: detail.patternInsight,
+                smartPattern: detail.smartPattern,       // ✅ add this
+                patternStats: detail.patternStats,       // ✅ already
+                probabilityCone: detail.probabilityCone, // ✅ already
+                isPremium: true,                         // later wire from user profile
+              })
+              }
+            >
+              <Text style={styles.patternButtonText}>
+                View Full Pattern Details
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
 
-
       {/* OUTLOOK CARD: Short / Medium / Long */}
-      {(shortTermOutlook || mediumTermOutlook || longTermOutlook) && (
+     {outlookBullets.length > 0 && (
+
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionAccent} />
             <Text style={styles.sectionTitle}>Outlook</Text>
           </View>
-          <View style={styles.outlookRow}>
-            {shortTermOutlook ? (
-              <View style={styles.outlookCol}>
-                <Text style={styles.outlookLabel}>Short-term (1–6 wks)</Text>
-                <Text style={styles.outlookText}>{shortTermOutlook}</Text>
-              </View>
-            ) : null}
-            {mediumTermOutlook ? (
-              <View style={styles.outlookCol}>
-                <Text style={styles.outlookLabel}>Medium-term (6–12 mo)</Text>
-                <Text style={styles.outlookText}>{mediumTermOutlook}</Text>
-              </View>
-            ) : null}
-            {longTermOutlook ? (
-              <View style={styles.outlookCol}>
-                <Text style={styles.outlookLabel}>Long-term (1–3 yrs)</Text>
-                <Text style={styles.outlookText}>{longTermOutlook}</Text>
-              </View>
-            ) : null}
-          </View>
+          <View style={{ marginTop: 4 }}>
+  <Text style={styles.sectionBody}>
+    Near- and long-term expectations based on fundamentals, technicals, and macro assumptions.
+  </Text>
+
+      <View style={{ marginTop: 6 }}>
+        <GreenBullets items={outlookBullets} />
+
+      </View>
+
+    </View>
+
         </View>
       )}
-
       {/* TECHNICAL SNAPSHOT: Trend, Momentum, Volatility, Volume */}
-      {technical && (
+      {detail?.technical && (
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionAccent} />
             <Text style={styles.sectionTitle}>Technical Snapshot</Text>
           </View>
-          <View style={styles.snapshotGrid}>
-            {/* Trend */}
-            <View style={styles.snapshotItem}>
-              <Text style={styles.snapshotLabel}>Trend</Text>
-              <Text style={styles.snapshotStatus}>
-                {technical.trend?.summary || "N/A"}
-              </Text>
-              <Text style={styles.snapshotSubtext}>
-                {technical.trend?.price_vs_sma20_pct != null ||
-                technical.trend?.distance_from_20d_high != null
-                  ? `Price is around ${
-                      technical.trend?.price_vs_sma20_pct != null
-                        ? Math.abs(
-                            technical.trend.price_vs_sma20_pct
-                          ).toFixed(1) +
-                          "% " +
-                          (technical.trend.price_vs_sma20_pct < 0
-                            ? "below"
-                            : "above") +
-                          " its 20D average"
-                        : ""
-                    }${
-                      technical.trend?.distance_from_20d_high != null
-                        ? (technical.trend?.price_vs_sma20_pct != null
-                            ? ", "
-                            : "") +
-                          `${Math.abs(
-                            technical.trend.distance_from_20d_high
-                          ).toFixed(1)}% off recent 20D high`
-                        : ""
-                    }.`
-                  : "Short-term direction based on moving averages and recent highs/lows."}
-              </Text>
-            </View>
 
-            {/* Momentum */}
-            <View style={styles.snapshotItem}>
-              <Text style={styles.snapshotLabel}>Momentum</Text>
-              <Text style={styles.snapshotStatus}>
-                {technical.momentum?.summary_rsi ||
-                technical.momentum?.summary_macd
-                  ? `${technical.momentum.summary_rsi || ""}${
-                      technical.momentum.summary_rsi &&
-                      technical.momentum.summary_macd
-                        ? " • "
-                        : ""
-                    }${technical.momentum.summary_macd || ""}`.trim()
-                  : "N/A"}
-              </Text>
-              <Text style={styles.snapshotSubtext}>
-                {technical.momentum?.rsi14 != null
-                  ? `RSI around ${technical.momentum.rsi14.toFixed(
-                      1
-                    )} with MACD and stochastic levels shaping short-term swings.`
-                  : "Relative strength, MACD, and stochastics describe buying vs selling pressure."}
-              </Text>
-            </View>
+          <View style={{ marginTop: 4 }}>
+        <Text style={styles.sectionBody}>
+          {detail.technical?.summary ||
+            "Technical indicators summarize trend, momentum, volume, and volatility conditions."}
+        </Text>
 
-            {/* Volatility */}
-            <View style={styles.snapshotItem}>
-              <Text style={styles.snapshotLabel}>Volatility</Text>
-              <Text style={styles.snapshotStatus}>
-                {technical.volatility?.summary || "N/A"}
-              </Text>
-              <Text style={styles.snapshotSubtext}>
-                {technical.volatility?.atr14 != null
-                  ? `ATR near ${technical.volatility.atr14.toFixed(
-                      2
-                    )} points highlights typical daily swing size.`
-                  : "Measures how wide the average daily price range has been recently."}
-              </Text>
-            </View>
-
-            {/* Volume */}
-            <View style={styles.snapshotItem}>
-              <Text style={styles.snapshotLabel}>Volume</Text>
-              <Text style={styles.snapshotStatus}>
-                {technical.volume?.summary || "N/A"}
-              </Text>
-              <Text style={styles.snapshotSubtext}>
-                {technical.volume?.volume_vs_ma20_pct != null
-                  ? `Volume is about ${Math.abs(
-                      technical.volume.volume_vs_ma20_pct
-                    ).toFixed(1)}% ${
-                      technical.volume.volume_vs_ma20_pct > 0
-                        ? "above"
-                        : "below"
-                    } its 20D average, reflecting ${
-                      technical.volume.volume_vs_ma20_pct > 0
-                        ? "active interest"
-                        : "quieter trading"
-                    }.`
-                  : "Compares current trading activity to typical recent levels."}
-              </Text>
-            </View>
-          </View>
+        <View style={{ marginTop: 6 }}>
+          <GreenBullets
+            items={[
+              detail.technical.trend?.summary &&
+                `Trend: ${detail.technical.trend.summary}`,
+              (detail.technical.momentum?.summary_rsi ||
+                detail.technical.momentum?.summary_macd) &&
+                `Momentum: ${
+                  detail.technical.momentum.summary_rsi ||
+                  detail.technical.momentum.summary_macd
+                }`,
+              detail.technical.volatility?.summary &&
+                `Volatility: ${detail.technical.volatility.summary}`,
+              detail.technical.volume?.summary &&
+                `Volume: ${detail.technical.volume.summary}`,
+            ].filter(Boolean)}
+          />
         </View>
-      )}
+
+      </View>
+
+
+    {/* TECHNICAL CTA */}
+    <TouchableOpacity
+      style={styles.techButton}
+      onPress={() =>
+        navigation.navigate("FullTechnicalDetailScreen", {
+          symbol: detail.symbol,
+          companyName: detail.companyName,
+          quote: detail.quote,
+          technical: detail.technical,
+          featuresMeta: detail.featuresMeta,
+        })
+      }
+    >
+      <Text style={styles.techButtonText}>
+        View Full Technical Analysis
+      </Text>
+    </TouchableOpacity>
+  </View>
+)}
+
 
       {/* PRICE ACTION TODAY */}
       {technical?.candle && (
@@ -1123,117 +1172,218 @@ const patternStats = detail?.patternStats;
           );
         })()}
 
-      {/* TECHNICAL OUTLOOK (Grok narrative) */}
-      {grokSections.tech && (
-        <View style={styles.card}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionAccent} />
-            <Text style={styles.sectionTitle}>Technical Outlook</Text>
-          </View>
-          <Text style={styles.sectionBody}>{grokSections.tech}</Text>
-        </View>
-      )}
-
-      {/* NEWS & MARKET SENTIMENT (ticker-specific) */}
-      {(tickerNews.length > 0 || grokSections.sentiment) && (
-        <View style={styles.card}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionAccent} />
-            <Text style={styles.sectionTitle}>News & Market Sentiment</Text>
-          </View>
-
-          {/* News headlines from /stockdetail */}
-          {tickerNews.slice(0, 5).map((n, idx) => (
-            <View key={`news-${idx}`} style={{ marginBottom: 6 }}>
-              <Text style={styles.newsTitle}>{n.title}</Text>
-              <Text style={styles.newsMeta}>
-                {(n.source || "News") +
-                  (n.pubDate ? ` • ${formatNewsTime(n.pubDate)}` : "")}
-              </Text>
-            </View>
-          ))}
-
-          {/* Grok sentiment bullets */}
-          {grokSections.sentiment &&
-            formatSentimentAsBullets(grokSections.sentiment).map(
-              (line, idx) => (
-                <View key={`sent-${idx}`} style={styles.bulletRow}>
-                  <Text style={styles.bulletDot}>•</Text>
-                  <Text style={styles.bulletText}>{line}</Text>
-                </View>
-              )
-            )}
-        </View>
-      )}
-
-      {/* RISKS & OPPORTUNITIES */}
-      {grokSections.risks &&
-        (() => {
-          const { risks, opportunities } = splitRisksAndOpportunities(
-            grokSections.risks
-          );
-          return (
+     
+          {/* TECHNICAL OUTLOOK */}
+          {(technicalOutlook || grokSections.tech) && (
             <View style={styles.card}>
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.sectionAccent} />
-                <Text style={styles.sectionTitle}>Risks & Opportunities</Text>
+                <Text style={styles.sectionTitle}>Technical Outlook</Text>
               </View>
 
-              {risks.length > 0 && (
-                <>
-                  <Text style={styles.subSectionLabelRisk}>Risks</Text>
-                  {risks.map((s, idx) => (
-                    <View key={`risk-${idx}`} style={styles.bulletRow}>
-                      <Text style={styles.bulletDot}>•</Text>
-                      <Text style={styles.bulletText}>{s}</Text>
-                    </View>
-                  ))}
-                </>
-              )}
+              {/* ✅ Preferred: backend explanations */}
+              {technicalOutlook ? (
+                <View style={{ marginTop: 4 }}>
+                  {/* Long explanation (primary) */}
+                  {Array.isArray(technicalOutlook.long) &&
+                    technicalOutlook.long.length > 0 &&
+                    technicalOutlook.long.map((line, idx) => (
+                      <Text
+                        key={`tech-long-${idx}`}
+                        style={styles.sectionBody}
+                      >
+                        {line}
+                      </Text>
+                    ))}
 
-              {opportunities.length > 0 && (
-                <>
-                  <Text style={styles.subSectionLabelOpportunity}>
-                    Opportunities
-                  </Text>
-                  {opportunities.map((s, idx) => (
-                    <View key={`opp-${idx}`} style={styles.bulletRow}>
-                      <Text style={styles.bulletDot}>•</Text>
-                      <Text style={styles.bulletText}>{s}</Text>
-                    </View>
-                  ))}
-                </>
+                  {/* Bullet summary */}
+                  {Array.isArray(technicalOutlook.bullets) &&
+                    technicalOutlook.bullets.length > 0 && (
+                      <View style={{ marginTop: 6 }}>
+                        <GreenBullets items={technicalOutlook.bullets} />
+                      </View>
+                    )}
+
+                  {/* Fallback if long missing */}
+                  {!technicalOutlook.long?.length &&
+                    (technicalOutlook.medium || technicalOutlook.short) && (
+                      <Text style={styles.sectionBody}>
+                        {technicalOutlook.medium || technicalOutlook.short}
+                      </Text>
+                    )}
+                </View>
+              ) : (
+                /* 🛟 Temporary fallback: Grok */
+                <Text style={styles.sectionBody}>{grokSections.tech}</Text>
               )}
             </View>
-          );
-        })()}
+          )}
 
-      {/* TRADE IDEA (ticker specific) */}
-      {hasTradeIdea && (
-        <View style={styles.card}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionAccent} />
-            <Text style={styles.sectionTitle}>Trade Idea</Text>
-          </View>
-          <View style={styles.tradeBox}>
-            <Text style={styles.sectionBody}>{grokSections.tradeIdea}</Text>
-            <Text style={styles.tradeDisclaimer}>
-              Not financial advice. Do your own research and manage risk.
-            </Text>
-          </View>
-        </View>
-      )}
 
-      {/* FINAL RECOMMENDATION */}
-      {grokSections.recommendation && (
-        <View style={[styles.card, styles.finalCard]}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionAccent} />
-            <Text style={styles.sectionTitle}>Final Recommendation</Text>
-          </View>
-          <Text style={styles.sectionBody}>{grokSections.recommendation}</Text>
-        </View>
-      )}
+                    {/* NEWS */}
+                    {tickerNews.length > 0 && (
+                      <View style={styles.card}>
+                        <View style={styles.sectionHeaderRow}>
+                          <View style={styles.sectionAccent} />
+                          <Text style={styles.sectionTitle}>Latest News</Text>
+                        </View>
+
+                        {tickerNews.slice(0, 5).map((n, idx) => (
+                          <View key={`news-${idx}`} style={{ marginBottom: 8 }}>
+                            <Text style={styles.newsTitle}>{n.title}</Text>
+                            <Text style={styles.newsMeta}>
+                              {(n.source || "News") +
+                                (n.pubDate ? ` • ${formatNewsTime(n.pubDate)}` : "")}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+
+              {risksOpportunities && (
+                <View style={styles.card}>
+                  <View style={styles.sectionHeaderRow}>
+                    <View style={styles.sectionAccent} />
+                    <Text style={styles.sectionTitle}>Risks & Opportunities</Text>
+                  </View>
+
+                  {/* Short summary */}
+                  {risksOpportunities.short && (
+                    <Text style={styles.sectionBody}>
+                      {risksOpportunities.short}
+                    </Text>
+                  )}
+
+                  {/* Medium summary */}
+                  {risksOpportunities.medium && (
+                    <Text style={[styles.sectionBody, { marginTop: 6 }]}>
+                      {risksOpportunities.medium}
+                    </Text>
+                  )}
+
+                  {/* Risks */}
+                  {Array.isArray(risksOpportunities.risks) &&
+                    risksOpportunities.risks.length > 0 && (
+                      <>
+                        <Text style={styles.subSectionLabelRisk}>Risks</Text>
+                        {risksOpportunities.risks.map((r, idx) => (
+                          <View key={`risk-${idx}`} style={styles.bulletRow}>
+                            <Text style={styles.bulletDot}>•</Text>
+                            <Text style={styles.bulletText}>{r}</Text>
+                          </View>
+                        ))}
+                      </>
+                    )}
+
+                  {/* Opportunities */}
+                  {Array.isArray(risksOpportunities.opportunities) &&
+                    risksOpportunities.opportunities.length > 0 && (
+                      <>
+                        <Text style={styles.subSectionLabelOpportunity}>
+                          Opportunities
+                        </Text>
+                        {risksOpportunities.opportunities.map((o, idx) => (
+                          <View key={`opp-${idx}`} style={styles.bulletRow}>
+                            <Text style={styles.bulletDot}>•</Text>
+                            <Text style={styles.bulletText}>{o}</Text>
+                          </View>
+                        ))}
+                      </>
+                    )}
+                </View>
+              )}
+
+              {tradeIdea && (
+                <View style={styles.card}>
+                  <View style={styles.sectionHeaderRow}>
+                    <View style={styles.sectionAccent} />
+                    <Text style={styles.sectionTitle}>Trade Idea</Text>
+                  </View>
+
+                  {/* Stance */}
+                  {tradeIdea.stance && (
+                    <Text
+                      style={[
+                        styles.sectionBody,
+                        {
+                          fontWeight: "700",
+                          marginBottom: 6,
+                        },
+                      ]}
+                    >
+                      {tradeIdea.stance}
+                    </Text>
+                  )}
+
+                  {/* Summary */}
+                  {tradeIdea.summary && (
+                    <Text style={styles.sectionBody}>
+                      {tradeIdea.summary}
+                    </Text>
+                  )}
+
+                  {/* Note / disclaimer */}
+                  {tradeIdea.note && (
+                    <Text style={styles.tradeDisclaimer}>
+                      {tradeIdea.note}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+
+            {finalRecommendation && (
+              <View style={[styles.card, styles.finalCard]}>
+                <View style={styles.sectionHeaderRow}>
+                  <View style={styles.sectionAccent} />
+                  <Text style={styles.sectionTitle}>Final Recommendation</Text>
+                </View>
+
+                {/* Signal + Confidence */}
+                {(finalRecommendation.signal || finalRecommendation.confidence != null) && (
+                  <View style={{ flexDirection: "row", marginBottom: 6 }}>
+                    {finalRecommendation.signal && (
+                      <Text
+                        style={{
+                          color: getSignalColor(finalRecommendation.signal),
+                          fontWeight: "800",
+                          marginRight: 8,
+                        }}
+                      >
+                        {finalRecommendation.signal}
+                      </Text>
+                    )}
+
+                    {finalRecommendation.confidence != null && (
+                      <Text style={{ color: BRAND.sub }}>
+                        ({finalRecommendation.confidence.toFixed(1)}%)
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Trend context */}
+                {finalRecommendation.trend && (
+                  <Text
+                    style={[
+                      styles.sectionBody,
+                      { marginBottom: 4, color: BRAND.sub },
+                    ]}
+                  >
+                    Trend: {finalRecommendation.trend}
+                  </Text>
+                )}
+
+                {/* Recommendation text */}
+                {finalRecommendation.text && (
+                  <Text style={styles.sectionBody}>
+                    {finalRecommendation.text}
+                  </Text>
+                )}
+              </View>
+            )}
+
 
       {/* RISK NOTE / FOOTER */}
       {structuredGrok.risk_note && (
@@ -1350,31 +1500,6 @@ const styles = StyleSheet.create({
     padding: 6,
   },
 
-  // Chart
-  timeframeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    columnGap: 4,
-  },
-  timeframePill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  timeframePillActive: {
-    borderColor: BRAND.accent,
-    backgroundColor: "#022c22",
-  },
-  timeframeText: {
-    color: BRAND.sub,
-    fontSize: 10,
-  },
-  timeframeTextActive: {
-    color: BRAND.accent,
-    fontWeight: "600",
-  },
   chartContainer: {
     marginTop: 6,
     height: 40,
@@ -1733,5 +1858,71 @@ whyText: {
   fontSize: 13,
   lineHeight: 18,
 },
+patternTitle: {
+  color: BRAND.text,
+  fontSize: 16,
+  fontWeight: "800",
+  marginBottom: 4,
+},
+
+patternMeta: {
+  color: BRAND.sub,
+  fontSize: 13,
+  marginBottom: 6,
+},
+
+patternExplanation: {
+  color: BRAND.text,
+  fontSize: 13.5,
+  lineHeight: 19,
+  marginBottom: 10,
+},
+
+patternButton: {
+  marginTop: 6,
+  paddingVertical: 10,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: BRAND.accent,
+  alignItems: "center",
+},
+
+patternButtonText: {
+  color: BRAND.accent,
+  fontSize: 14,
+  fontWeight: "700",
+},
+techButton: {
+  marginTop: 6,
+  paddingVertical: 10,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: BRAND.accent,
+  alignItems: "center",
+},
+techButtonText: {
+  color: BRAND.accent,
+  fontSize: 14,
+  fontWeight: "700",
+},
+sparklineWrap: {
+  marginTop: 10,
+  paddingHorizontal: 4,
+  alignItems: "center",
+},
+
+sparklineMeta: {
+  marginTop: 6,
+  width: "100%",
+  flexDirection: "row",
+  justifyContent: "space-between",
+},
+
+sparklineMetaText: {
+  color: BRAND.sub,
+  fontSize: 11,
+  opacity: 0.85,
+},
+
 
 });

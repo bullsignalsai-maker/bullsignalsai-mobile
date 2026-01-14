@@ -13,14 +13,38 @@ import {
 
 import {
   getMarketPulse,
+  getMarketOverview,
   getHotlist,
   getBearwatch,
 } from "../services/MarketPulseService";
+
 import LiveMarketStatus from "../components/LiveMarketStatus";
 
-// —————————————————————————————————————
-// U.S. MARKET HOURS
-// —————————————————————————————————————
+function timeAgoFromUtc(isoString) {
+  if (!isoString || typeof isoString !== "string") return "Just now";
+
+  const parsed = new Date(isoString);
+  if (isNaN(parsed.getTime())) return "Just now";
+
+  const diffMs = Date.now() - parsed.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+
+  if (diffSec < 30) return "Just now";
+  if (diffSec < 60) return `${diffSec}s ago`;
+
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} min ago`;
+
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr} hr ago`;
+
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
+}
+
+/* ---------------------------------------------------------
+   Market Hours (unchanged)
+--------------------------------------------------------- */
 function isMarketOpen() {
   const now = new Date();
   const est = new Date(
@@ -37,7 +61,9 @@ function isMarketOpen() {
 }
 
 export default function MarketScreen({ navigation }) {
+  const [overview, setOverview] = useState(null);
   const [pulse, setPulse] = useState(null);
+
   const [news, setNews] = useState({
     today: [],
     yesterday: [],
@@ -45,7 +71,6 @@ export default function MarketScreen({ navigation }) {
     older: [],
   });
 
-  // 🔥 BullBrain AI lists from Firestore (via service)
   const [hotlist, setHotlist] = useState([]);
   const [bearwatch, setBearwatch] = useState([]);
 
@@ -56,7 +81,9 @@ export default function MarketScreen({ navigation }) {
     isMarketOpen() ? "Open" : "Closed"
   );
 
-  // Update Open/Closed badge every minute
+  /* ---------------------------------------------------------
+     Market open badge refresh
+  --------------------------------------------------------- */
   useEffect(() => {
     const interval = setInterval(() => {
       setMarketStatus(isMarketOpen() ? "Open" : "Closed");
@@ -64,62 +91,44 @@ export default function MarketScreen({ navigation }) {
     return () => clearInterval(interval);
   }, []);
 
-  // ————————————————————————————————————
-  // FETCH MARKET PULSE + NEWS + AI LISTS
-  // ————————————————————————————————————
+  /* ---------------------------------------------------------
+     LOAD DATA (Firestore-first)
+  --------------------------------------------------------- */
   const loadPulse = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
 
-      // Fetch core pulse + AI rankings in parallel
-      const [data, hotData, bearData] = await Promise.all([
-        getMarketPulse(),
-        getHotlist(),
-        getBearwatch(),
-      ]);
+      const [pulseData, overviewData, hotData, bearData] =
+        await Promise.all([
+          getMarketPulse(),
+          getMarketOverview(),
+          getHotlist(),
+          getBearwatch(),
+        ]);
 
-      if (!data) throw new Error("No market pulse data");
+      if (!pulseData) throw new Error("No market pulse data");
 
-      // MARKET OVERVIEW + HIGHLIGHTS
       setPulse({
-        overview: data.market_overview || {},
-        highlights_grouped: data.highlights_grouped || {
+        highlights_grouped: pulseData.highlights_grouped || {
           bullish: [],
           neutral: [],
           bearish: [],
         },
       });
 
-      // NEWS (grouped in backend)
-      setNews(
-        data.news_grouped || {
-          today: [],
-          yesterday: [],
-          week: [],
-          older: [],
-        }
-      );
-
-      // 🔥 AI HOTLIST / BEARWATCH (safe defaults)
+      setOverview(overviewData || {});
+      setNews(pulseData.news_grouped || {});
       setHotlist(hotData?.hotlist || []);
       setBearwatch(bearData?.bearwatch || []);
 
-      // UPDATED TIME (UTC → ET)
-      const updatedIso = data.updated_at || new Date().toISOString();
-      const updatedEt = new Date(
-        new Date(updatedIso).toLocaleString("en-US", {
-          timeZone: "America/New_York",
-        })
-      );
+          const updatedLabel = timeAgoFromUtc(
+            pulseData?.updated_at || overviewData?.updated_at
+            );
+          setLastUpdated(updatedLabel);
 
-      const formatted = updatedEt.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      setLastUpdated(formatted);
+      
     } catch (err) {
-      console.warn("Pulse load error:", err.message);
+      console.warn("MarketScreen load error:", err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -130,11 +139,8 @@ export default function MarketScreen({ navigation }) {
     loadPulse(false);
   }, [loadPulse]);
 
-  // Auto refresh (keeps market news fresh; Hotlist/BearWatch cached by Firestore)
   useEffect(() => {
-    const interval = setInterval(() => {
-      loadPulse(true);
-    }, 45000);
+    const interval = setInterval(() => loadPulse(true), 45000);
     return () => clearInterval(interval);
   }, [loadPulse]);
 
@@ -143,86 +149,90 @@ export default function MarketScreen({ navigation }) {
     await loadPulse(true);
   };
 
-  // ————————————————————————————————————
-  // RENDER NEWS ITEM (uses timeFormatted + dateFormatted)
-  // ————————————————————————————————————
-  const renderNewsItem = (n, i) => {
-    const catColor =
-      n.category === "Earnings"
-        ? "#00E396"
-        : n.category === "Fed / Macro"
-        ? "#D4A017"
-        : n.category === "M&A"
-        ? "#3B82F6"
-        : n.category === "Tech / AI"
-        ? "#8B5CF6"
-        : "#9CA3AF";
+  // ---------------------------------------------------------
+// RENDER NEWS ITEM
+// ---------------------------------------------------------
+const renderNewsItem = (n, i) => {
+  const catColor =
+    n.category === "Earnings"
+      ? "#00E396"
+      : n.category === "Fed / Macro"
+      ? "#D4A017"
+      : n.category === "M&A"
+      ? "#3B82F6"
+      : n.category === "Tech / AI"
+      ? "#8B5CF6"
+      : "#9CA3AF";
 
-    return (
-      <TouchableOpacity
-        key={i}
-        style={styles.newsItem}
-        onPress={() => navigation.navigate("NewsDetailScreen", { item: n })}
-      >
-        <Text style={styles.newsTitle}>{n.title}</Text>
+  return (
+    <TouchableOpacity
+      key={i}
+      style={styles.newsItem}
+      onPress={() =>
+        navigation.navigate("NewsDetailScreen", { item: n })
+      }
+    >
+      <Text style={styles.newsTitle}>{n.title}</Text>
+
+      {n.summary ? (
         <Text style={styles.newsSummary}>{n.summary}</Text>
+      ) : null}
 
-        <View style={styles.newsMetaRow}>
+      <View style={styles.newsMetaRow}>
+        {n.source ? (
           <Text style={styles.newsSource}>{n.source}</Text>
+        ) : null}
 
-          {n.category ? (
-            <>
-              <Text style={styles.newsDot}> • </Text>
-              <Text style={[styles.newsCategory, { color: catColor }]}>
-                {n.category}
-              </Text>
-            </>
-          ) : null}
+        {n.category ? (
+          <>
+            <Text style={styles.newsDot}> • </Text>
+            <Text style={[styles.newsCategory, { color: catColor }]}>
+              {n.category}
+            </Text>
+          </>
+        ) : null}
 
-          {n.ticker ? (
-            <>
-              <Text style={styles.newsDot}> • </Text>
-              <Text style={styles.newsTicker}>{n.ticker}</Text>
-            </>
-          ) : null}
+        {n.ticker ? (
+          <>
+            <Text style={styles.newsDot}> • </Text>
+            <Text style={styles.newsTicker}>{n.ticker}</Text>
+          </>
+        ) : null}
 
-          {/* TIME FROM BACKEND (ALREADY ET) */}
-          <Text style={styles.newsDot}> • </Text>
-          <Text style={styles.newsTime}>
-            {n.timeFormatted} — {n.dateFormatted}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+        {(n.timeFormatted || n.dateFormatted) && (
+          <>
+            <Text style={styles.newsDot}> • </Text>
+            <Text style={styles.newsTime}>
+              {n.timeFormatted} — {n.dateFormatted}
+            </Text>
+          </>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+};
 
-  // LOADING VIEW
-  if (loading || !pulse) {
+  /* ---------------------------------------------------------
+     LOADING STATE
+  --------------------------------------------------------- */
+  if (loading || !pulse || !overview) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator color="#00E396" size="large" />
-        <Text style={styles.loadingText}>Analyzing market pulse...</Text>
+        <ActivityIndicator size="large" color="#00E396" />
+        <Text style={styles.loadingText}>Analyzing market pulse…</Text>
       </View>
     );
   }
 
-  // SAFE extracting backend data
-  const overview = pulse.overview || {};
-  const highlights = pulse.highlights_grouped || {
-    bullish: [],
-    neutral: [],
-    bearish: [],
-  };
-  const { bullish, neutral, bearish } = highlights;
+  const { bullish, neutral, bearish } = pulse.highlights_grouped || {};
 
-  // ————————————————————————————
-  // MAIN UI
-  // ————————————————————————————
+  /* ---------------------------------------------------------
+     UI
+  --------------------------------------------------------- */
   return (
     <View style={styles.wrapper}>
       <StatusBar backgroundColor="#000" barStyle="light-content" />
 
-      {/* Sticky Header */}
       <View style={styles.stickyHeader}>
         <Text style={styles.headerTitle}>Market Insights</Text>
         <Text style={styles.updatedTime}>Updated {lastUpdated} ET</Text>
@@ -239,6 +249,7 @@ export default function MarketScreen({ navigation }) {
           />
         }
       >
+
         {/* ————————— MARKET OVERVIEW ————————— */}
         <View style={styles.overviewBox}>
           <View style={styles.marketHeaderRow}>
@@ -300,7 +311,7 @@ export default function MarketScreen({ navigation }) {
 
         {/* ————————— AI HOTLIST (BullBrain v2) ————————— */}
         <View style={styles.aiBox}>
-          <Text style={styles.sectionTitle}>🔥 BullBrain Hotlist</Text>
+          <Text style={styles.sectionTitle}>BullBrain Hotlist</Text>
           <Text style={styles.aiSubText}>
             Top AI-ranked watchlist BUY setups across the S&P 500.
           </Text>
@@ -373,7 +384,7 @@ export default function MarketScreen({ navigation }) {
 
         {/* ————————— BEARWATCH (BullBrain v2) ————————— */}
         <View style={styles.aiBox}>
-          <Text style={styles.sectionTitle}>🩸 BearWatch Radar</Text>
+          <Text style={styles.sectionTitle}>BearWatch Radar</Text>
           <Text style={styles.aiSubText}>
             AI-flagged downside risk zones — SELL / HOLD candidates.
           </Text>

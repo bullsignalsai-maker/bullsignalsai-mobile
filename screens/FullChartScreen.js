@@ -1,18 +1,28 @@
 // screens/FullChartScreen.js
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Dimensions,
   TouchableOpacity,
+  Animated,
+  Easing,
+  Modal,
+  Pressable,
+  PanResponder,
+  ActivityIndicator,
+  Share,
+  Platform,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { Svg, Polyline, Defs, LinearGradient, Stop, Rect } from "react-native-svg";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import Svg, { Path, Line, Circle, Rect } from "react-native-svg";
+import { getFullYearCandles } from "../services/candleService";
+import { StatusBar } from "react-native";
 
-// === Brand palette (same as other screens) ===
+
+/* ================= BRAND ================= */
 const BRAND = {
   bg: "#000000",
   card: "#111827",
@@ -22,783 +32,978 @@ const BRAND = {
   accent: "#00E396",
   red: "#EF4444",
   amber: "#FACC15",
+  blue: "#60A5FA",
 };
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CHART_HORIZONTAL_PADDING = 24;
-const CHART_WIDTH = SCREEN_WIDTH - CHART_HORIZONTAL_PADDING * 2;
-const CHART_HEIGHT = 220;
+/* ================= HELPERS ================= */
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
+const pct = (n, d = 2) => (n == null ? "—" : `${Number(n).toFixed(d)}%`);
+const safeNum = (n) => (Number.isFinite(Number(n)) ? Number(n) : null);
 
-// --- Helpers ---
-function formatNumberShort(n) {
-  if (n === null || n === undefined || isNaN(n)) return "N/A";
-  if (n >= 1e12) return (n / 1e12).toFixed(2).replace(/\.0+$/, "") + "T";
-  if (n >= 1e9) return (n / 1e9).toFixed(2).replace(/\.0+$/, "") + "B";
-  if (n >= 1e6) return (n / 1e6).toFixed(2).replace(/\.0+$/, "") + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(2).replace(/\.0+$/, "") + "K";
-  return n.toString();
+function colorFromSigned(v) {
+  if (v == null) return BRAND.sub;
+  return v >= 0 ? BRAND.accent : BRAND.red;
 }
 
-function formatPct(v) {
-  if (v === null || v === undefined || isNaN(v)) return "—";
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${v.toFixed(2)}%`;
+function signalPillColor(signal) {
+  const s = String(signal || "").toUpperCase();
+  if (s.includes("BUY")) return BRAND.accent;
+  if (s.includes("SELL")) return BRAND.red;
+  if (s.includes("HOLD")) return BRAND.amber;
+  return BRAND.sub;
 }
 
-function formatDateLabel(isoString) {
-  if (!isoString) return "";
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return "";
+function formatDateShort(iso) {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return "—";
+  const d = new Date(ms);
+  const m = d.toLocaleString("en-US", { month: "short" });
+  const day = d.getDate();
+  return `${m} ${day}`;
+}
+
+function stdev(arr) {
+  if (!arr || arr.length < 2) return null;
+  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+  const v =
+    arr.reduce((a, b) => a + (b - mean) * (b - mean), 0) / (arr.length - 1);
+  return Math.sqrt(v);
+}
+
+function corr(x, y) {
+  if (!x || !y || x.length !== y.length || x.length < 3) return null;
+  const mx = x.reduce((a, b) => a + b, 0) / x.length;
+  const my = y.reduce((a, b) => a + b, 0) / y.length;
+  let num = 0;
+  let dx = 0;
+  let dy = 0;
+  for (let i = 0; i < x.length; i++) {
+    const a = x[i] - mx;
+    const b = y[i] - my;
+    num += a * b;
+    dx += a * a;
+    dy += b * b;
   }
+  const den = Math.sqrt(dx * dy);
+  if (!den) return null;
+  return num / den;
 }
 
-// Map BullBrain / Hybrid signal to pill color
-function resolveSignal(signalRaw) {
-  const s = (signalRaw || "HOLD").toUpperCase();
-  if (s.includes("STRONG BUY")) return { label: "STRONG BUY", color: BRAND.accent };
-  if (s.includes("BUY")) return { label: "BUY", color: BRAND.accent };
-  if (s.includes("STRONG SELL")) return { label: "STRONG SELL", color: BRAND.red };
-  if (s.includes("SELL")) return { label: "SELL", color: BRAND.red };
-  if (s.includes("HOLD") || s.includes("NEUTRAL"))
-    return { label: "HOLD", color: BRAND.amber };
-  return { label: s, color: BRAND.amber };
+function linearSlope(y) {
+  // slope of y vs index (0..n-1)
+  if (!y || y.length < 2) return null;
+  const n = y.length;
+  const xMean = (n - 1) / 2;
+  const yMean = y.reduce((a, b) => a + b, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = i - xMean;
+    num += dx * (y[i] - yMean);
+    den += dx * dx;
+  }
+  if (!den) return null;
+  return num / den;
 }
 
-// --- Build polyline points from candle closes ---
-function buildChartPoints(candlesSlice) {
-  if (!candlesSlice || candlesSlice.length === 0) return "";
-  const closes = candlesSlice.map((c) => c.close).filter((v) => v != null);
-
-  if (!closes.length) return "";
-
-  const min = Math.min(...closes);
-  const max = Math.max(...closes);
-  const span = max - min || 1;
-
-  const n = closes.length;
-  return closes
-    .map((price, idx) => {
-      const x = (idx / (n - 1 || 1)) * CHART_WIDTH;
-      const y = CHART_HEIGHT - ((price - min) / span) * CHART_HEIGHT;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+function buildPath(points) {
+  if (!points || points.length === 0) return "";
+  const [p0] = points;
+  let d = `M ${p0.x.toFixed(2)} ${p0.y.toFixed(2)}`;
+  for (let i = 1; i < points.length; i++) {
+    const p = points[i];
+    d += ` L ${p.x.toFixed(2)} ${p.y.toFixed(2)}`;
+  }
+  return d;
 }
 
-// --- Slice candles by range (just by count; they are already sorted) ---
-function sliceByRange(candles, range) {
-  if (!candles || candles.length === 0) return [];
-  const n = candles.length;
+/* ================= TOOLTIP COPY ================= */
+const TOOLTIP = {
+  VOL: {
+    title: "Volatility (Realized)",
+    body:
+      "This screen estimates realized volatility from daily returns. Higher volatility means wider swings and wider risk bands.",
+  },
+  DD: {
+    title: "Drawdown",
+    body:
+      "Drawdown measures the peak-to-trough decline during the period. Bigger drawdowns mean deeper pullbacks from highs.",
+  },
+  VOLCONF: {
+    title: "Volume Confirmation",
+    body:
+      "Volume can confirm price moves: higher volume on breakouts supports conviction. Falling price on rising volume can signal distribution.",
+  },
+};
 
-  const rangeMap = {
-    "1D": 1,
-    "5D": 5,
-    "1M": 22,
-    "6M": 120,
-    "1Y": 252,
-    MAX: n,
-  };
+/* ================= COMPONENT ================= */
+export default function FullChartScreen({ route, navigation }) {
+  const params = route?.params || {};
+  const symbol = String(params.symbol || "").toUpperCase();
+  const companyName = params.companyName || params.name || symbol || "—";
+  const quote = params.quote || null;
+  const bullbrain = params.bullbrain || null;
 
-  const count = rangeMap[range] || n;
-  const startIndex = Math.max(0, n - count);
-  return candles.slice(startIndex);
-}
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(10)).current;
 
-// Infer regime / risk labels from technical snapshot
-function deriveRegime(technical, features) {
-  const trendText = technical?.trend?.summary || "";
-  const volText = technical?.volatility?.summary || "";
-  const vol20 = technical?.volatility?.volatility_20d ?? features?.volatility_20d;
-  const intraday = features?.intraday_range_pct ?? technical?.candle?.intraday_range_pct;
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [payload, setPayload] = useState(null);
 
-  let regime = "Neutral";
-  const t = trendText.toLowerCase();
-  if (t.includes("down")) regime = "Bearish";
-  else if (t.includes("up") || t.includes("uptrend")) regime = "Bullish";
+  const [tipKey, setTipKey] = useState(null);
+  const openTip = useCallback((k) => setTipKey(k), []);
+  const closeTip = useCallback(() => setTipKey(null), []);
+  const tip = tipKey ? TOOLTIP[tipKey] : null;
+const [chartTouch, setChartTouch] = useState(false);
 
-  let volZone = "Normal";
-  const v = volText.toLowerCase();
-  if (v.includes("elevated") || v.includes("high")) volZone = "High";
-  if (v.includes("low")) volZone = "Low";
+  // tooltip interaction
+  const [activeIdx, setActiveIdx] = useState(null);
 
-  let heat = "Warm";
-  if (volZone === "High") heat = "Hot";
-  else if (volZone === "Low") heat = "Cool";
+  // ✅ NEW: chart width measured at runtime so drag index math is correct
+  const [chartW, setChartW] = useState(360);
 
-  const expectedMove =
-    typeof vol20 === "number"
-      ? Math.max(Math.min(vol20, 40), 0) // clamp 0–40% just for display
-      : null;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade, {
+        toValue: 1,
+        duration: 420,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(slide, {
+        toValue: 0,
+        duration: 420,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fade, slide]);
 
-  let risk = "Moderate";
-  if (volZone === "High" || (intraday && intraday > 5)) risk = "High";
-  if (volZone === "Low") risk = "Low";
+  const load = useCallback(async () => {
+    if (!symbol) {
+      setErr("Missing symbol");
+      setLoading(false);
+      return;
+    }
 
-  return { regime, volZone, heat, expectedMove, risk };
-}
+    setLoading(true);
+    setErr(null);
 
-export default function FullChartScreen() {
-  const navigation = useNavigation();
-  const route = useRoute();
+    try {
+      const res = await getFullYearCandles(symbol);
+      setPayload(res);
+    } catch (e) {
+      setErr(e?.message || "Failed to load chart data");
+    } finally {
+      setLoading(false);
+    }
+  }, [symbol]);
 
-  // ✅ avoid features = null crash by handling params first
-  const params = route.params || {};
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const {
-    symbol = "TSLA",
-    name,
-    candles: rawCandles = [],
-    quote = null,
-    technical = null,
-    bullbrain = null,
-    hybridProbUp = null,
-    hybridSignal = null,
-    hybridScore = null,
-    news = [],
-    grok = null,
-  } = params;
+  const candles = payload?.candles || [];
 
-  const features = params.features || {};
+  const derived = useMemo(() => {
+    if (!candles.length) {
+      return {
+        last: null,
+        first: null,
+        high: null,
+        low: null,
+        highIdx: null,
+        lowIdx: null,
+        ret1yPct: null,
+        volAnn: null,
+        maxDrawdownPct: null,
+        trendLabel: "—",
+        trendNote: "No price history available.",
+        volumeNote: "No volume history available.",
+        volumeUpDownRatio: null,
+        volAbsRetCorr: null,
+      };
+    }
 
-  const candles = Array.isArray(rawCandles) ? rawCandles : rawCandles.candles || [];
+    const closes = candles.map((c) => safeNum(c.close)).filter((x) => x != null);
 
-  // Timeframe
-  const [range, setRange] = useState("6M");
+    const first = candles[0]?.close ?? null;
+    const last = candles[candles.length - 1]?.close ?? null;
 
-  const slicedCandles = useMemo(
-    () => sliceByRange(candles, range),
-    [candles, range]
+    let hi = -Infinity;
+    let lo = Infinity;
+    let hiIdx = null;
+    let loIdx = null;
+
+    for (let i = 0; i < candles.length; i++) {
+      const c = safeNum(candles[i]?.close);
+      if (c == null) continue;
+      if (c > hi) {
+        hi = c;
+        hiIdx = i;
+      }
+      if (c < lo) {
+        lo = c;
+        loIdx = i;
+      }
+    }
+
+    const ret1yPct =
+      first != null && last != null && first !== 0 ? ((last - first) / first) * 100 : null;
+
+    // daily returns
+    const rets = [];
+    const absRets = [];
+    for (let i = 1; i < candles.length; i++) {
+      const p0 = safeNum(candles[i - 1]?.close);
+      const p1 = safeNum(candles[i]?.close);
+      if (p0 == null || p1 == null || p0 === 0) continue;
+      const r = (p1 - p0) / p0;
+      rets.push(r);
+      absRets.push(Math.abs(r));
+    }
+
+    const volDaily = stdev(rets);
+    const volAnn = volDaily == null ? null : volDaily * Math.sqrt(252) * 100;
+
+    // max drawdown
+    let peak = -Infinity;
+    let maxDD = 0;
+    for (let i = 0; i < closes.length; i++) {
+      const p = closes[i];
+      peak = Math.max(peak, p);
+      const dd = peak === 0 ? 0 : (p - peak) / peak; // negative
+      maxDD = Math.min(maxDD, dd);
+    }
+    const maxDrawdownPct = maxDD * 100;
+
+    // trend: slope of closes
+    const slope = linearSlope(closes);
+    let trendLabel = "Sideways";
+    if (slope != null) {
+      // normalize slope vs price level
+      const level = closes.reduce((a, b) => a + b, 0) / closes.length;
+      const norm = level ? slope / level : 0;
+      if (norm > 0.00035) trendLabel = "Uptrend";
+      else if (norm < -0.00035) trendLabel = "Downtrend";
+      else trendLabel = "Sideways";
+    }
+
+    const volState =
+      volAnn == null ? "unknown" : volAnn >= 60 ? "high" : volAnn >= 35 ? "moderate" : "low";
+
+    const trendNote =
+      trendLabel === "Uptrend"
+        ? `Price has generally climbed over the last year with ${volState} volatility. Pullbacks were present, but trend direction stayed constructive.`
+        : trendLabel === "Downtrend"
+        ? `Price has generally declined over the last year with ${volState} volatility. Rallies have struggled to hold, suggesting weaker structure.`
+        : `Price has been range-bound overall with ${volState} volatility. Breakouts may need volume confirmation to be trusted.`;
+
+    // volume confirmation
+    const upVol = [];
+    const downVol = [];
+    const absRetForCorr = [];
+    const volForCorr = [];
+    for (let i = 1; i < candles.length; i++) {
+      const p0 = safeNum(candles[i - 1]?.close);
+      const p1 = safeNum(candles[i]?.close);
+      const v = safeNum(candles[i]?.volume);
+      if (p0 == null || p1 == null || v == null || p0 === 0) continue;
+      const r = (p1 - p0) / p0;
+      if (r >= 0) upVol.push(v);
+      else downVol.push(v);
+      absRetForCorr.push(Math.abs(r));
+      volForCorr.push(v);
+    }
+
+    const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+    const upAvg = avg(upVol);
+    const downAvg = avg(downVol);
+
+    const volumeUpDownRatio =
+      upAvg != null && downAvg != null && downAvg !== 0 ? upAvg / downAvg : null;
+
+    const volAbsRetCorr = corr(absRetForCorr, volForCorr);
+
+    let volumeNote = "Volume data is limited for this period.";
+    if (volumeUpDownRatio != null) {
+      if (volumeUpDownRatio > 1.08) {
+        volumeNote =
+          "Volume tends to be heavier on up days than down days, which can support bullish follow-through when price breaks higher.";
+      } else if (volumeUpDownRatio < 0.92) {
+        volumeNote =
+          "Volume tends to be heavier on down days than up days, which can be a caution sign (distribution) if price starts slipping.";
+      } else {
+        volumeNote =
+          "Volume is fairly balanced between up and down days, so price trend (and breakouts) may need extra confirmation.";
+      }
+    }
+
+    // add volatility confirmation sentence
+    if (volAbsRetCorr != null) {
+      if (volAbsRetCorr > 0.25) {
+        volumeNote += " Also, bigger moves often come with higher volume (strong participation).";
+      } else if (volAbsRetCorr < -0.15) {
+        volumeNote += " Interestingly, bigger moves are not consistently supported by volume (mixed participation).";
+      } else {
+        volumeNote += " Participation is inconsistent — not every big move is strongly backed by volume.";
+      }
+    }
+
+    return {
+      last,
+      first,
+      high: hi === -Infinity ? null : hi,
+      low: lo === Infinity ? null : lo,
+      highIdx: hiIdx,
+      lowIdx: loIdx,
+      ret1yPct,
+      volAnn,
+      maxDrawdownPct,
+      trendLabel,
+      trendNote,
+      volumeNote,
+      volumeUpDownRatio,
+      volAbsRetCorr,
+    };
+  }, [candles]);
+
+  // Chart geometry (✅ CHART_W now dynamic, CHART_H unchanged)
+  const CHART_W = chartW;
+  const CHART_H = 170;
+  const PAD_X = 8;
+  const PAD_Y = 10;
+
+  const chart = useMemo(() => {
+    if (!candles.length) return null;
+
+    const closes = candles.map((c) => safeNum(c.close)).map((v) => (v == null ? 0 : v));
+    const vols = candles.map((c) => safeNum(c.volume)).map((v) => (v == null ? 0 : v));
+
+    let min = Infinity;
+    let max = -Infinity;
+
+    for (let i = 0; i < closes.length; i++) {
+      const v = closes[i];
+      if (!Number.isFinite(v)) continue;
+      min = Math.min(min, v);
+      max = Math.max(max, v);
+    }
+
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+      min = min === Infinity ? 0 : min - 1;
+      max = max === -Infinity ? 1 : max + 1;
+    }
+
+    const innerW = CHART_W - PAD_X * 2;
+    const innerH = CHART_H - PAD_Y * 2;
+
+    const points = closes.map((v, i) => {
+      const x = PAD_X + (i / Math.max(1, closes.length - 1)) * innerW;
+      const y = PAD_Y + (1 - (v - min) / (max - min)) * innerH;
+      return { x, y, v, i };
+    });
+
+    const path = buildPath(points);
+
+    const maxVol = Math.max(...vols, 1);
+    const volBars = vols.map((v, i) => {
+      const x = PAD_X + (i / Math.max(1, vols.length - 1)) * innerW;
+      const h = (v / maxVol) * 46; // small histogram height
+      return { x, h };
+    });
+
+    return { min, max, points, path, volBars, innerW, innerH };
+  }, [candles, CHART_W]);
+
+  // ✅ drag crosshair (keep your logic, but improve UX)
+  const xToIndex = useCallback(
+    (x) => {
+      if (!chart || !candles.length || !Number.isFinite(x)) return null;
+      const innerW = CHART_W - PAD_X * 2;
+      const rel = clamp((x - PAD_X) / innerW, 0, 1);
+      const idx = Math.round(rel * (candles.length - 1));
+      return clamp(idx, 0, candles.length - 1);
+    },
+    [chart, candles.length, CHART_W, PAD_X]
   );
 
-  const chartPoints = useMemo(
-    () => buildChartPoints(slicedCandles),
-    [slicedCandles]
-  );
+        const pan = useRef(
+        PanResponder.create({
+          onStartShouldSetPanResponder: () => true,
+          onMoveShouldSetPanResponder: () => true,
+          onStartShouldSetPanResponderCapture: () => true,
+          onMoveShouldSetPanResponderCapture: () => true,
+          onPanResponderTerminationRequest: () => false,
 
-  const lastCandle = candles.length ? candles[candles.length - 1] : null;
-  const prevCandle = candles.length > 1 ? candles[candles.length - 2] : null;
+          onPanResponderGrant: (evt) => {
+            setChartTouch(true);
+            const x = evt.nativeEvent.locationX;
+            setActiveIdx(xToIndex(x));
+          },
+          onPanResponderMove: (evt) => {
+            const x = evt.nativeEvent.locationX;
+            setActiveIdx(xToIndex(x));
+          },
+          onPanResponderRelease: () => {
+            setChartTouch(false);
+          },
+          onPanResponderTerminate: () => {
+            setChartTouch(false);
+          },
+        })
+      ).current;
 
-  const lastClose =
-    quote?.current ??
-    features?.close ??
-    (lastCandle ? lastCandle.close : null);
 
-  const dayChange =
-    quote?.change ??
-    (lastCandle && prevCandle ? lastCandle.close - prevCandle.close : null);
+  const active = useMemo(() => {
+    if (activeIdx == null || !chart) return null;
+    const p = chart.points[activeIdx];
+    const c = candles[activeIdx];
+    if (!p || !c) return null;
+    return {
+      idx: activeIdx,
+      x: p.x,
+      y: p.y,
+      close: c.close ?? null,
+      open: c.open ?? null,
+      high: c.high ?? null,
+      low: c.low ?? null,
+      volume: c.volume ?? null,
+      t: c.t,
+    };
+  }, [activeIdx, chart, candles]);
 
-  const dayChangePct =
-    quote?.changePct ??
-    (lastCandle && prevCandle && prevCandle.close
-      ? ((lastCandle.close - prevCandle.close) / prevCandle.close) * 100
-      : null);
+  const onShare = useCallback(async () => {
+    const msg =
+      `${symbol} — 1Y Chart Summary\n` +
+      `Return: ${derived.ret1yPct == null ? "—" : pct(derived.ret1yPct)}\n` +
+      `High: ${money(derived.high)} • Low: ${money(derived.low)}\n` +
+      `Trend: ${derived.trendLabel}\n` +
+      `Volatility: ${derived.volAnn == null ? "—" : pct(derived.volAnn)}\n` +
+      `Drawdown: ${derived.maxDrawdownPct == null ? "—" : pct(derived.maxDrawdownPct)}\n\n` +
+      `Educational only.`;
 
-  // 52w range from all candles
-  const allHighs = candles.map((c) => c.high).filter((v) => v != null);
-  const allLows = candles.map((c) => c.low).filter((v) => v != null);
-  const high52 = allHighs.length ? Math.max(...allHighs) : null;
-  const low52 = allLows.length ? Math.min(...allLows) : null;
-
-  // Avg volume (30 most recent candles)
-  const volSlice = candles.slice(-30).map((c) => c.volume).filter((v) => v != null);
-  const avgVol30 =
-    volSlice.length > 0
-      ? volSlice.reduce((sum, v) => sum + v, 0) / volSlice.length
-      : null;
-
-  const intradayRangePct =
-    typeof features?.intraday_range_pct === "number"
-      ? features.intraday_range_pct
-      : lastCandle && lastCandle.low && lastCandle.high
-      ? ((lastCandle.high - lastCandle.low) / lastCandle.low) * 100
-      : null;
-
-  // Returns from features if present (already % from backend)
-  const return1d =
-    typeof features?.return_1d === "number" ? features.return_1d : null;
-  const return5d =
-    typeof features?.return_5d === "number" ? features.return_5d : null;
-  const return10d =
-    typeof features?.return_10d === "number" ? features.return_10d : null;
-
-  // AI & Hybrid
-  const hybridUpsidePct =
-    hybridProbUp != null
-      ? hybridProbUp * 100
-      : bullbrain?.probabilities?.BUY
-      ? bullbrain.probabilities.BUY * 100
-      : null;
-
-  const bbSignal = bullbrain?.signal || hybridSignal || "HOLD";
-  const { label: signalLabel, color: signalColor } = resolveSignal(bbSignal);
-
-  const bbConfidence = bullbrain?.confidence ?? null;
-  const probBuy = bullbrain?.probabilities?.BUY ?? null;
-  const probHold = bullbrain?.probabilities?.HOLD ?? null;
-  const probSell = bullbrain?.probabilities?.SELL ?? null;
-
-  const trendSummary = technical?.trend?.summary || "No clear trend";
-  const momentumSummary =
-    technical?.momentum?.summary_rsi ||
-    technical?.momentum?.summary_macd ||
-    null;
-  const volatilitySummary = technical?.volatility?.summary || null;
-  const volumeSummary = technical?.volume?.summary || null;
-  const rsiValue =
-    typeof technical?.momentum?.rsi14 === "number"
-      ? technical.momentum.rsi14
-      : typeof features?.rsi14 === "number"
-      ? features.rsi14
-      : null;
-
-  const priceActionSummary = useMemo(() => {
-    if (!technical?.candle) return null;
-    const bodyPct = technical.candle.body_pct;
-    const rangePct = technical.candle.intraday_range_pct;
-
-    if (rangePct > 5 && Math.abs(bodyPct) < 1.5) {
-      return "Wide intraday swings with indecision candle.";
+    try {
+      await Share.share({ title: `${symbol} Full Chart`, message: msg });
+    } catch {
+      // ignore
     }
-    if (bodyPct > 2) {
-      return "Strong bullish candle with solid body.";
-    }
-    if (bodyPct < -2) {
-      return "Strong bearish candle with solid body.";
-    }
-    return "Balanced price action with typical daily range.";
-  }, [technical]);
+  }, [symbol, derived]);
 
-  const riskNote =
-    grok?.risk_note ||
-    "Stock prices are volatile and past performance does not guarantee future results. Always manage position size and risk.";
-
-  // Market regime derived values
-  const { regime, volZone, heat, expectedMove, risk } = deriveRegime(
-    technical,
-    features
-  );
-
-  // First & last date labels for the active range
-  const startLabel = slicedCandles.length
-    ? formatDateLabel(slicedCandles[0].t)
-    : "";
-  const endLabel = slicedCandles.length
-    ? formatDateLabel(slicedCandles[slicedCandles.length - 1].t)
-    : "";
+  const headerPrice = quote?.current ?? derived.last ?? null;
+  const headerChangePct = quote?.changePct ?? null;
+  const signal = bullbrain?.signal ?? params.hybridSignal ?? null;
+  const confidence = bullbrain?.confidence ?? params.hybridScore ?? null;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
-    >
-      {/* Header */}
-      <View style={styles.headerRow}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} scrollEnabled={!chartTouch}>
+      {/* ✅ NEW: Top spacing + back row like you asked */}
+      <View style={styles.topBar}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
+          style={styles.backBtn}
+          activeOpacity={0.85}
         >
-          <Ionicons name="chevron-back" size={22} color={BRAND.text} />
+          <Ionicons name="chevron-back" size={22} color={BRAND.accent} />
         </TouchableOpacity>
-
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerSymbol}>{symbol}</Text>
-          <Text style={styles.headerName}>
-            {name || "Full chart & AI analysis"}
-          </Text>
-        </View>
-
-        {lastClose != null && (
-          <View style={styles.headerPriceBlock}>
-            <Text style={styles.headerPrice}>${lastClose.toFixed(2)}</Text>
-            {dayChangePct != null && (
-              <Text
-                style={[
-                  styles.headerChange,
-                  dayChangePct >= 0 ? styles.positive : styles.negative,
-                ]}
-              >
-                {dayChangePct >= 0 ? "▲ " : "▼ "}
-                {dayChangePct.toFixed(2)}%
-              </Text>
-            )}
-          </View>
-        )}
+        <Text style={styles.topBarTitle}>Full Chart Details</Text>
+        <View style={{ width: 44 }} />
       </View>
 
-      {/* AI Signal Summary */}
-      <View style={styles.card}>
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.sectionAccent} />
-          <Text style={styles.cardTitle}>AI Hybrid Signal</Text>
-        </View>
-
-        <View style={styles.aiRow}>
-          <View style={styles.aiLeft}>
-            <View style={[styles.signalPill, { backgroundColor: signalColor }]}>
-              <Text style={styles.signalPillText}>{signalLabel}</Text>
-            </View>
-            <Text style={styles.aiSubtitle}>
-              Blended view from BullBrain model v2.
-            </Text>
-          </View>
-
-          <View style={styles.aiRight}>
-            {bbConfidence != null && (
-              <Text style={styles.aiMetric}>
-                Confidence{" "}
-                <Text style={styles.aiMetricValue}>
-                  {bbConfidence.toFixed(1)}%
-                </Text>
-              </Text>
-            )}
-
-            {hybridUpsidePct != null && (
-              <Text style={styles.aiMetric}>
-                Upside odds{" "}
-                <Text style={styles.aiMetricValue}>
-                  {hybridUpsidePct.toFixed(1)}%
-                </Text>
-              </Text>
-            )}
-
-            {hybridScore != null && (
-              <Text style={styles.aiMetric}>
-                Hybrid score{" "}
-                <Text style={styles.aiMetricValue}>
-                  {hybridScore.toFixed(1)}/100
-                </Text>
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {(probBuy != null || probHold != null || probSell != null) && (
-          <View style={styles.aiProbRow}>
-            <View style={styles.aiProbCol}>
-              <Text style={styles.aiProbLabel}>BUY</Text>
-              <Text style={styles.aiProbValue}>
-                {probBuy != null ? (probBuy * 100).toFixed(1) + "%" : "—"}
+      <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }}>
+        {/* ===== HEADER ===== */}
+        <LinearGradient colors={["#0f172a", "#020617"]} style={styles.headerCard}>
+          <View style={styles.headerTopRow}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.symbol}>{symbol || "—"}</Text>
+              <Text style={styles.name} numberOfLines={1}>
+                {companyName || "—"}
               </Text>
             </View>
-            <View style={styles.aiProbCol}>
-              <Text style={styles.aiProbLabel}>HOLD</Text>
-              <Text style={styles.aiProbValue}>
-                {probHold != null ? (probHold * 100).toFixed(1) + "%" : "—"}
-              </Text>
-            </View>
-            <View style={styles.aiProbCol}>
-              <Text style={styles.aiProbLabel}>SELL</Text>
-              <Text style={styles.aiProbValue}>
-                {probSell != null ? (probSell * 100).toFixed(1) + "%" : "—"}
+
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={styles.price}>{money(headerPrice)}</Text>
+              <Text style={[styles.change, headerChangePct >= 0 ? styles.pos : styles.neg]}>
+                {headerChangePct == null
+                  ? "—"
+                  : `${headerChangePct >= 0 ? "+" : ""}${Number(headerChangePct).toFixed(2)}%`}
               </Text>
             </View>
           </View>
-        )}
-      </View>
 
-      {/* Chart Card */}
-      <View style={styles.card}>
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.sectionAccent} />
-          <Text style={styles.cardTitle}>Price Chart</Text>
-          <View style={{ flex: 1 }} />
-          {startLabel && endLabel && (
-            <Text style={styles.dateRangeLabel}>
-              {startLabel} – {endLabel}
-            </Text>
-          )}
-        </View>
+          <View style={styles.headerActionsRow}>
+            <View style={styles.premiumBadge}>
+              <Ionicons name="analytics-outline" size={14} color={BRAND.accent} />
+              <Text style={styles.premiumBadgeText}>Premium • Full Chart</Text>
+            </View>
 
-        {/* Timeframe tabs */}
-        <View style={styles.rangeTabsRow}>
-          {["1D", "5D", "1M", "6M", "1Y", "MAX"].map((r) => (
-            <TouchableOpacity
-              key={r}
-              onPress={() => setRange(r)}
-              style={[
-                styles.rangeTab,
-                range === r && styles.rangeTabActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.rangeTabText,
-                  range === r && styles.rangeTabTextActive,
-                ]}
-              >
-                {r}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Chart */}
-        <View style={styles.chartWrapper}>
-          <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
-            {/* Background */}
-            <Defs>
-              <LinearGradient
-                id="bgGradient"
-                x1="0"
-                y1="0"
-                x2="0"
-                y2={CHART_HEIGHT}
-              >
-                <Stop offset="0" stopColor="#111827" stopOpacity="1" />
-                <Stop offset="1" stopColor="#020617" stopOpacity="1" />
-              </LinearGradient>
-
-              <LinearGradient
-                id="lineGradient"
-                x1="0"
-                y1="0"
-                x2="1"
-                y2="0"
-              >
-                <Stop offset="0" stopColor="#00E396" stopOpacity="1" />
-                <Stop offset="1" stopColor="#22C55E" stopOpacity="1" />
-              </LinearGradient>
-            </Defs>
-
-            <Rect
-              x="0"
-              y="0"
-              width={CHART_WIDTH}
-              height={CHART_HEIGHT}
-              fill="url(#bgGradient)"
-              rx="12"
-              ry="12"
-            />
-
-            {chartPoints ? (
-              <Polyline
-                points={chartPoints}
-                fill="none"
-                stroke="url(#lineGradient)"
-                strokeWidth={2}
-              />
+            {signal ? (
+              <View style={[styles.signalPill, { borderColor: signalPillColor(signal) }]}>
+                <Ionicons name="sparkles-outline" size={14} color={signalPillColor(signal)} />
+                <Text style={[styles.signalPillText, { color: signalPillColor(signal) }]}>
+                  {String(signal).toUpperCase()}
+                  {confidence != null ? ` • ${Number(confidence).toFixed(1)}%` : ""}
+                </Text>
+              </View>
             ) : null}
-          </Svg>
-        </View>
-      </View>
 
-      {/* Technical Snapshot */}
-      <View style={styles.card}>
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.sectionAccent} />
-          <Text style={styles.cardTitle}>Technical Snapshot</Text>
-        </View>
-
-        {/* Quick numbers row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statsCol}>
-            <Text style={styles.statsLabel}>52W High</Text>
-            <Text style={styles.statsValue}>
-              {high52 != null ? `$${high52.toFixed(2)}` : "—"}
-            </Text>
+            <TouchableOpacity onPress={onShare} style={styles.shareBtn} activeOpacity={0.85}>
+              <Ionicons name="share-outline" size={16} color={BRAND.text} />
+              <Text style={styles.shareBtnText}>Share</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.statsCol}>
-            <Text style={styles.statsLabel}>52W Low</Text>
-            <Text style={styles.statsValue}>
-              {low52 != null ? `$${low52.toFixed(2)}` : "—"}
-            </Text>
-          </View>
-        </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statsCol}>
-            <Text style={styles.statsLabel}>Avg Vol (30d)</Text>
-            <Text style={styles.statsValue}>
-              {avgVol30 != null ? formatNumberShort(avgVol30) : "—"}
-            </Text>
-          </View>
-          <View style={styles.statsCol}>
-            <Text style={styles.statsLabel}>Day Range</Text>
-            <Text style={styles.statsValue}>
-              {lastCandle?.low != null && lastCandle?.high != null
-                ? `$${lastCandle.low.toFixed(2)} – $${lastCandle.high.toFixed(
-                    2
-                  )}`
-                : "—"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statsCol}>
-            <Text style={styles.statsLabel}>Intraday Range</Text>
-            <Text style={styles.statsValue}>
-              {intradayRangePct != null
-                ? intradayRangePct.toFixed(1) + "%"
-                : "—"}
-            </Text>
-          </View>
-          <View style={styles.statsCol}>
-            <Text style={styles.statsLabel}>Today Change</Text>
-            <Text
-              style={[
-                styles.statsValue,
-                dayChangePct >= 0 ? styles.positive : styles.negative,
-              ]}
-            >
-              {dayChange != null ? `$${dayChange.toFixed(2)} ` : ""}
-              {dayChangePct != null ? `(${dayChangePct.toFixed(2)}%)` : ""}
-            </Text>
-          </View>
-        </View>
-
-        {/* Current conditions header */}
-        <View style={styles.currentHeaderRow}>
-          <Text style={styles.currentHeaderText}>Current Conditions</Text>
-        </View>
-
-        {/* Compact 3x2 grid */}
-        <View style={styles.conditionsGrid}>
-          <ConditionPill
-            label="Trend"
-            icon="trending-down-outline"
-            value={trendSummary}
-            tone="trend"
-          />
-          <ConditionPill
-            label="Momentum"
-            icon="pulse-outline"
-            value={momentumSummary || "Neutral momentum"}
-            tone="momentum"
-          />
-          <ConditionPill
-            label="Volatility"
-            icon="stats-chart-outline"
-            value={volatilitySummary || "Normal volatility"}
-            tone="vol"
-          />
-          <ConditionPill
-            label="Volume"
-            icon="bar-chart-outline"
-            value={volumeSummary || "Normal volume"}
-            tone="volume"
-          />
-          <ConditionPill
-            label="RSI (14)"
-            icon="speedometer-outline"
-            value={
-              rsiValue != null
-                ? `${rsiValue.toFixed(1)}${
-                    rsiValue < 30
-                      ? " (Oversold)"
-                      : rsiValue > 70
-                      ? " (Overbought)"
-                      : " (Neutral)"
-                  }`
-                : "N/A"
-            }
-            tone="rsi"
-          />
-          <ConditionPill
-            label="Price Action"
-            icon="swap-vertical-outline"
-            value={priceActionSummary || "Typical daily candle"}
-            tone="price"
-          />
-        </View>
-      </View>
-
-      {/* Returns Card */}
-      <View style={styles.card}>
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.sectionAccent} />
-          <Text style={styles.cardTitle}>Returns Snapshot</Text>
-        </View>
-        <View style={styles.returnsRow}>
-          <ReturnStat label="1D" value={return1d} />
-          <ReturnStat label="5D" value={return5d} />
-          <ReturnStat label="10D" value={return10d} />
-        </View>
-        <Text style={styles.returnsNote}>
-          Short-term returns are based on recent closing prices and can change
-          quickly with market moves.
-        </Text>
-      </View>
-
-      {/* Market Regime & Volatility Zones */}
-      <View style={styles.card}>
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.sectionAccent} />
-          <Text style={styles.cardTitle}>Market Regime & Volatility Zones</Text>
-        </View>
-
-        <View style={styles.regimeRow}>
-          <View style={styles.regimeCol}>
-            <Text style={styles.regimeLabel}>Regime</Text>
-            <Text style={[styles.regimeValue, styles.regimeEmphasis]}>
-              {regime}
-            </Text>
-          </View>
-          <View style={styles.regimeCol}>
-            <Text style={styles.regimeLabel}>Volatility Zone</Text>
-            <Text style={[styles.regimeValue, styles.regimeEmphasis]}>
-              {volZone}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.regimeRow}>
-          <View style={styles.regimeCol}>
-            <Text style={styles.regimeLabel}>Heat Level</Text>
-            <Text style={styles.regimeValue}>{heat}</Text>
-          </View>
-          <View style={styles.regimeCol}>
-            <Text style={styles.regimeLabel}>Expected Move</Text>
-            <Text style={styles.regimeValue}>
-              {expectedMove != null ? `±${expectedMove.toFixed(1)}%` : "—"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.regimeRow}>
-          <View style={styles.regimeCol}>
-            <Text style={styles.regimeLabel}>Risk Level</Text>
-            <Text
-              style={[
-                styles.regimeValue,
-                risk === "High"
-                  ? styles.negative
-                  : risk === "Low"
-                  ? styles.positive
-                  : null,
-              ]}
-            >
-              {risk}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Risk Note */}
-      <View style={styles.card}>
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.sectionAccent} />
-          <Text style={styles.cardTitle}>Risk Note</Text>
-        </View>
-        <Text style={styles.riskText}>{riskNote}</Text>
-      </View>
-
-      {/* Footer */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Powered by{" "}
-          <Text style={{ color: BRAND.accent, fontWeight: "600" }}>
-            BullSignalsAI
+          <Text style={styles.summary}>
+            {candles.length
+              ? `Showing ~1 year of daily candles (${candles.length} sessions). Drag on the chart to inspect price.`
+              : `Chart data will load when this screen opens.`}
           </Text>
-        </Text>
-      </View>
+        </LinearGradient>
+
+        {/* ===== CHART CARD ===== */}
+        <View style={styles.card}>
+          <View style={styles.sectionRow}>
+            {/* ✅ renamed title */}
+            <Text style={styles.section}>Price Chart (1Y)</Text>
+            <TouchableOpacity onPress={load} style={styles.refreshBtn} activeOpacity={0.85}>
+              <Ionicons name="refresh-outline" size={16} color={BRAND.sub} />
+            </TouchableOpacity>
+          </View>
+
+          {loading ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator />
+              <Text style={styles.loadingText}>Loading candles…</Text>
+            </View>
+          ) : err ? (
+            <View style={styles.errorBox}>
+              <Ionicons name="alert-circle-outline" size={18} color={BRAND.red} />
+              <Text style={styles.errorText}>{err}</Text>
+              <TouchableOpacity onPress={load} style={styles.retryBtn} activeOpacity={0.85}>
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : !chart ? (
+            <Text style={styles.note}>No chart points available.</Text>
+          ) : (
+            // ✅ IMPORTANT: Measure width on layout so drag index is accurate
+            <View
+              style={styles.chartWrap}
+              onLayout={(e) => {
+                const w = Math.max(240, Math.floor(e.nativeEvent.layout.width) - 20); // minus padding
+                if (Number.isFinite(w) && w > 0 && w !== chartW) setChartW(w);
+              }}
+              
+            >
+              {/* Tooltip (top) */}
+              {active ? (
+                <View style={styles.tooltip}>
+                  <Text style={styles.tooltipTitle}>
+                    {formatDateShort(active.t)} • {money(active.close)}
+                  </Text>
+                  <Text style={styles.tooltipSub}>
+                    O {money(active.open)}  H {money(active.high)}  L {money(active.low)}  V{" "}
+                    {active.volume == null ? "—" : `${Math.round(active.volume).toLocaleString()}`}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.tooltipMuted}>
+                  <Text style={styles.tooltipMutedText}>Drag to inspect price</Text>
+                </View>
+              )}
+
+              <View style={{ position: "relative" }}>
+              {/* SVG = visual only */}
+              <Svg
+                width={CHART_W}
+                height={CHART_H}
+                pointerEvents="none"
+              >
+                {/* baseline */}
+                <Line
+                  x1={PAD_X}
+                  y1={CHART_H - PAD_Y}
+                  x2={CHART_W - PAD_X}
+                  y2={CHART_H - PAD_Y}
+                  stroke="rgba(148,163,184,0.20)"
+                  strokeWidth="1"
+                />
+
+                {/* price line */}
+                <Path
+                  d={chart.path}
+                  stroke="rgba(0,227,150,0.95)"
+                  strokeWidth="2.2"
+                  fill="none"
+                />
+
+                {/* crosshair */}
+                {active && (
+                  <>
+                    <Line
+                      x1={active.x}
+                      y1={PAD_Y}
+                      x2={active.x}
+                      y2={CHART_H - PAD_Y}
+                      stroke="rgba(255,255,255,0.22)"
+                      strokeWidth="1"
+                    />
+                    <Circle
+                      cx={active.x}
+                      cy={active.y}
+                      r="4.2"
+                      fill="rgba(255,255,255,0.9)"
+                    />
+                  </>
+                )}
+
+                {/* volume bars */}
+                {chart.volBars.map((b, i) => {
+                  const w =
+                    (CHART_W - PAD_X * 2) /
+                    Math.max(1, chart.volBars.length);
+                  const x = clamp(b.x - w / 2, PAD_X, CHART_W - PAD_X);
+                  const h = clamp(b.h, 0, 46);
+                  const y = CHART_H - PAD_Y - h;
+
+                  return (
+                    <Rect
+                      key={`v_${i}`}
+                      x={x}
+                      y={y}
+                      width={Math.max(1, w * 0.75)}
+                      height={h}
+                      fill="rgba(96,165,250,0.18)"
+                    />
+                  );
+                })}
+              </Svg>
+
+              {/* 🔥 TOUCH CAPTURE LAYER */}
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    zIndex: 10,
+                    backgroundColor: "transparent",
+                  },
+                ]}
+                pointerEvents="box-only"
+
+                onStartShouldSetResponderCapture={() => true}
+                onMoveShouldSetResponderCapture={() => true}
+
+                onTouchStart={(e) => {
+                  setChartTouch(true);
+                  const x = e.nativeEvent.locationX;
+                  setActiveIdx(xToIndex(x));
+                }}
+
+                onTouchMove={(e) => {
+                  const x = e.nativeEvent.locationX;
+                  setActiveIdx(xToIndex(x));
+                }}
+
+                onTouchEnd={() => {
+                  setChartTouch(false);
+                }}
+
+                {...pan.panHandlers}
+              />
+
+            </View>
+
+
+              {/* Range labels */}
+              <View style={styles.rangeRow}>
+                <Text style={styles.rangeText}>Low: {money(chart.min)}</Text>
+                <Text style={styles.rangeText}>High: {money(chart.max)}</Text>
+              </View>
+            </View>
+          )}
+
+        </View>
+
+        {/* ===== BEHAVIOR ===== */}
+        <View style={styles.card}>
+          {/* ✅ renamed title */}
+          <SectionHeader title="Performance Snapshot" />
+          <View style={styles.row}>
+            <Metric label="1Y Return" value={derived.ret1yPct} suffix="%" color={colorFromSigned(derived.ret1yPct)} />
+            <Metric label="Volatility" value={derived.volAnn} suffix="%" color={BRAND.sub} onInfo={() => openTip("VOL")} />
+            <Metric label="Max Drawdown" value={derived.maxDrawdownPct} suffix="%" color={BRAND.sub} onInfo={() => openTip("DD")} />
+          </View>
+          <Text style={styles.note}>{derived.trendNote}</Text>
+        </View>
+
+        {/* ===== HIGHS / LOWS ===== */}
+        <View style={styles.card}>
+          {/* ✅ renamed title */}
+          <SectionHeader title="Key Highs & Lows" />
+          <View style={styles.row}>
+            <Metric label="1Y High" value={derived.high} prefix="$" color={BRAND.text} formatMoney />
+            <Metric label="1Y Low" value={derived.low} prefix="$" color={BRAND.text} formatMoney />
+          </View>
+
+          {candles.length ? (
+            <View style={styles.semanticRow}>
+              <Pill
+                label={
+                  derived.highIdx == null
+                    ? "High date: —"
+                    : `High: ${formatDateShort(candles[derived.highIdx]?.t)}`
+                }
+                color={BRAND.accent}
+                icon="arrow-up-outline"
+              />
+              <Pill
+                label={
+                  derived.lowIdx == null
+                    ? "Low date: —"
+                    : `Low: ${formatDateShort(candles[derived.lowIdx]?.t)}`
+                }
+                color={BRAND.blue}
+                icon="arrow-down-outline"
+              />
+              <Pill label={`Trend: ${derived.trendLabel}`} color={BRAND.amber} icon="trending-up-outline" />
+            </View>
+          ) : null}
+
+          <Text style={styles.note}>
+            Key highs/lows help you spot where price previously met strong resistance (highs) or support (lows). If price revisits
+            those zones, reactions often matter more than the exact number.
+          </Text>
+        </View>
+
+        {/* ===== TREND QUALITY ===== */}
+        <View style={styles.card}>
+          {/* ✅ renamed title */}
+          <SectionHeader title="Trend Quality" />
+          <View style={styles.semanticRow}>
+            <Pill
+              label={derived.trendLabel === "Uptrend" ? "Healthy / Constructive" : derived.trendLabel === "Downtrend" ? "Breaking Down" : "Range / Mixed"}
+              color={derived.trendLabel === "Uptrend" ? BRAND.accent : derived.trendLabel === "Downtrend" ? BRAND.red : BRAND.amber}
+              icon="pulse-outline"
+            />
+            <Pill
+              label={
+                derived.volAnn == null
+                  ? "Volatility: —"
+                  : derived.volAnn >= 60
+                  ? "Volatility: High"
+                  : derived.volAnn >= 35
+                  ? "Volatility: Moderate"
+                  : "Volatility: Low"
+              }
+              color={derived.volAnn == null ? BRAND.sub : derived.volAnn >= 60 ? BRAND.red : derived.volAnn >= 35 ? BRAND.amber : BRAND.accent}
+              icon="analytics-outline"
+            />
+          </View>
+
+          <Text style={styles.note}>
+            {derived.trendLabel === "Uptrend"
+              ? "An uptrend is healthiest when pullbacks are controlled and recoveries happen on meaningful participation."
+              : derived.trendLabel === "Downtrend"
+              ? "Downtrends often keep rejecting rallies. Watch for a series of higher lows and stronger up-move volume to signal recovery."
+              : "Sideways regimes can produce fakeouts. Wait for a clean break and volume confirmation."}
+          </Text>
+        </View>
+
+        {/* ===== VOLUME CONFIRMATION ===== */}
+        <View style={styles.card}>
+          <View style={styles.sectionRow}>
+            {/* ✅ renamed title */}
+            <Text style={styles.section}>Volume Confirmation</Text>
+            <TouchableOpacity onPress={() => openTip("VOLCONF")} style={styles.infoBtn} activeOpacity={0.85}>
+              <Ionicons name="help-circle-outline" size={18} color={BRAND.sub} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.row}>
+            <Metric
+              label="Up/Down Volume"
+              value={derived.volumeUpDownRatio == null ? null : derived.volumeUpDownRatio}
+              color={derived.volumeUpDownRatio == null ? BRAND.sub : derived.volumeUpDownRatio >= 1 ? BRAND.accent : BRAND.red}
+              format={(v) => (v == null ? "—" : `${v.toFixed(2)}x`)}
+            />
+            <Metric
+              label="Vol ↔ Move Corr"
+              value={derived.volAbsRetCorr}
+              color={derived.volAbsRetCorr == null ? BRAND.sub : derived.volAbsRetCorr >= 0 ? BRAND.accent : BRAND.red}
+              format={(v) => (v == null ? "—" : v.toFixed(2))}
+            />
+          </View>
+
+          <Text style={styles.note}>{derived.volumeNote}</Text>
+        </View>
+      </Animated.View>
+
+      {/* ===== TOOLTIP MODAL ===== */}
+      <Modal visible={!!tip} transparent animationType="fade" onRequestClose={closeTip}>
+        <Pressable style={styles.modalBackdrop} onPress={closeTip}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <View style={styles.modalHeader}>
+              <Ionicons name="information-circle-outline" size={20} color={BRAND.accent} />
+              <Text style={styles.modalTitle}>{tip?.title || ""}</Text>
+              <TouchableOpacity onPress={closeTip} hitSlop={10}>
+                <Ionicons name="close-outline" size={22} color={BRAND.sub} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalBody}>{tip?.body || ""}</Text>
+            <Text style={styles.modalFoot}>Educational only • Not financial advice</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
 
-// --- Small subcomponents ---
-
-function ReturnStat({ label, value }) {
-  const has = value !== null && value !== undefined && !isNaN(value);
-  const pctStr = has ? formatPct(value) : "—";
-
-  let styleExtra = {};
-  if (has && value > 0) styleExtra = styles.positive;
-  if (has && value < 0) styleExtra = styles.negative;
-
+/* ================= SUB COMPONENTS ================= */
+const SectionHeader = React.memo(function SectionHeader({ title }) {
   return (
-    <View style={styles.returnStatBox}>
-      <Text style={styles.returnLabel}>{label}</Text>
-      <Text style={[styles.returnValue, styleExtra]}>{pctStr}</Text>
+    <View style={styles.sectionRow}>
+      <Text style={styles.section}>{title}</Text>
     </View>
   );
-}
+});
 
-function ConditionPill({ label, icon, value, tone }) {
-  const text = value || "—";
-
-  let borderColor = BRAND.border;
-  if (tone === "trend" && text.toLowerCase().includes("down"))
-    borderColor = BRAND.red;
-  if (tone === "trend" && text.toLowerCase().includes("up"))
-    borderColor = BRAND.accent;
-
-  if (tone === "vol" && text.toLowerCase().includes("high"))
-    borderColor = BRAND.red;
-  if (tone === "vol" && text.toLowerCase().includes("low"))
-    borderColor = BRAND.accent;
-
-  if (tone === "rsi" && text.toLowerCase().includes("oversold"))
-    borderColor = BRAND.accent;
-  if (tone === "rsi" && text.toLowerCase().includes("overbought"))
-    borderColor = BRAND.red;
+const Metric = React.memo(function Metric({
+  label,
+  value,
+  suffix = "",
+  prefix = "",
+  color,
+  format,
+  onInfo,
+  formatMoney,
+}) {
+  const display = useMemo(() => {
+    if (format) return format(value);
+    if (formatMoney) return value == null ? "—" : `$${Number(value).toFixed(2)}`;
+    if (value == null) return "—";
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    return `${prefix}${n.toFixed(2)}${suffix}`;
+  }, [value, suffix, prefix, format, formatMoney]);
 
   return (
-    <View style={[styles.conditionPill, { borderColor }]}>
-      <View style={styles.conditionHeader}>
-        <Ionicons name={icon} size={13} color={BRAND.sub} style={{ marginRight: 4 }} />
-        <Text style={styles.conditionLabel}>{label}</Text>
+    <View style={styles.metric}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Text style={styles.metricLabel}>{label}</Text>
+        {onInfo ? (
+          <TouchableOpacity onPress={onInfo} hitSlop={10} activeOpacity={0.85}>
+            <Ionicons name="help-circle-outline" size={16} color={BRAND.sub} />
+          </TouchableOpacity>
+        ) : null}
       </View>
-      <Text style={styles.conditionValue} numberOfLines={2}>
-        {text}
+      <Text style={[styles.metricValue, { color: color || BRAND.text }]}>{display}</Text>
+    </View>
+  );
+});
+
+const Pill = React.memo(function Pill({ label, color, icon }) {
+  return (
+    <View style={[styles.pill, { borderColor: color || BRAND.border }]}>
+      <Ionicons name={icon} size={14} color={color || BRAND.sub} />
+      <Text style={[styles.pillText, { color: color || BRAND.sub }]} numberOfLines={1}>
+        {label}
       </Text>
     </View>
   );
-}
+});
 
-// --- Styles ---
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BRAND.bg,
-    paddingHorizontal: 16,
-    paddingTop: 75,
+  container: { flex: 1, backgroundColor: BRAND.bg, paddingHorizontal: 16, paddingBottom: 16 },
+
+  // ✅ NEW: top space + back arrow
+  topBar: {
+  paddingTop: Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 16,
+  paddingBottom: 10,
+  marginBottom: 10,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+},
+
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  topBarTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: 0.3,
   },
 
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  backButton: {
-    width: 32,
-    height: 32,
+  headerCard: {
     borderRadius: 16,
     borderWidth: 1,
     borderColor: BRAND.border,
+    padding: 14,
+  },
+  headerTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  symbol: { color: BRAND.text, fontSize: 26, fontWeight: "900" },
+  name: { color: BRAND.sub, fontSize: 13, marginTop: 2 },
+  price: { color: BRAND.text, fontSize: 22, fontWeight: "800" },
+  change: { fontSize: 13, fontWeight: "700", marginTop: 2 },
+  pos: { color: BRAND.accent },
+  neg: { color: BRAND.red },
+
+  headerActionsRow: { flexDirection: "row", alignItems: "center", marginTop: 10, gap: 10, flexWrap: "wrap" },
+  premiumBadge: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    marginRight: 8,
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    backgroundColor: "#020617",
   },
-  headerSymbol: {
-    color: BRAND.text,
-    fontSize: 20,
-    fontWeight: "800",
+  premiumBadgeText: { color: BRAND.text, fontSize: 12, fontWeight: "800" },
+
+  signalPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    backgroundColor: "rgba(2,6,23,0.75)",
   },
-  headerName: {
+  signalPillText: { fontSize: 12, fontWeight: "900" },
+
+  shareBtn: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  shareBtnText: { color: BRAND.text, fontSize: 12, fontWeight: "900" },
+
+  summary: {
+    marginTop: 10,
     color: BRAND.sub,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  headerPriceBlock: {
-    alignItems: "flex-end",
-    marginLeft: 8,
-  },
-  headerPrice: {
-    color: BRAND.text,
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  headerChange: {
-    fontSize: 12,
-    marginTop: 2,
-    fontWeight: "600",
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   card: {
@@ -806,258 +1011,145 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: BRAND.border,
-    padding: 12,
-    marginTop: 10,
+    padding: 14,
+    marginTop: 12,
   },
 
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  sectionAccent: {
-    width: 4,
-    height: 16,
-    borderRadius: 2,
-    backgroundColor: BRAND.accent,
-    marginRight: 8,
-  },
-  cardTitle: {
-    color: BRAND.text,
+  sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  section: {
+    color: BRAND.accent,
     fontSize: 15,
-    fontWeight: "700",
-  },
-  dateRangeLabel: {
-    color: BRAND.sub,
-    fontSize: 11,
-  },
-
-  // AI section
-  aiRow: {
-    flexDirection: "row",
-    marginTop: 6,
-  },
-  aiLeft: {
-    flex: 1,
-    paddingRight: 6,
-  },
-  aiRight: {
-    flex: 1,
-    paddingLeft: 6,
-    borderLeftWidth: 1,
-    borderLeftColor: BRAND.border,
-  },
-  signalPill: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  signalPillText: {
-    color: "#000",
-    fontSize: 11,
     fontWeight: "800",
-  },
-  aiSubtitle: {
-    color: BRAND.sub,
-    fontSize: 11,
-    marginTop: 6,
-  },
-  aiMetric: {
-    color: BRAND.sub,
-    fontSize: 11,
-    marginBottom: 2,
-  },
-  aiMetricValue: {
-    color: BRAND.text,
-    fontWeight: "600",
-  },
-  aiProbRow: {
-    flexDirection: "row",
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: BRAND.border,
-    paddingTop: 6,
-  },
-  aiProbCol: {
+    marginBottom: 6,
     flex: 1,
-    alignItems: "center",
-  },
-  aiProbLabel: {
-    color: BRAND.sub,
-    fontSize: 11,
-    marginBottom: 2,
-  },
-  aiProbValue: {
-    color: BRAND.text,
-    fontSize: 12,
-    fontWeight: "600",
+    paddingRight: 8,
   },
 
-  // Chart
-  rangeTabsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 4,
-    marginBottom: 10,
-  },
-  rangeTab: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
+  infoBtn: { paddingLeft: 8, paddingBottom: 6 },
+
+  row: { flexDirection: "row", gap: 10, marginTop: 8 },
+
+  metric: {
+    flex: 1,
     borderWidth: 1,
     borderColor: BRAND.border,
-    marginHorizontal: 2,
-  },
-  rangeTabActive: {
+    borderRadius: 10,
+    padding: 10,
     backgroundColor: "#020617",
-    borderColor: BRAND.accent,
+    minWidth: 0,
   },
-  rangeTabText: {
-    fontSize: 11,
+  metricLabel: {
     color: BRAND.sub,
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
   },
-  rangeTabTextActive: {
-    color: BRAND.accent,
-    fontWeight: "600",
-  },
-  chartWrapper: {
+  metricValue: { marginTop: 6, fontSize: 15, fontWeight: "900" },
+
+  note: { marginTop: 8, color: BRAND.sub, fontSize: 12.5, lineHeight: 18 },
+
+  semanticRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+
+  pill: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    marginTop: 4,
-  },
-
-  // Stats & technical snapshot
-  statsRow: {
-    flexDirection: "row",
-    marginTop: 6,
-  },
-  statsCol: {
-    flex: 1,
-  },
-  statsLabel: {
-    color: BRAND.sub,
-    fontSize: 11,
-  },
-  statsValue: {
-    color: BRAND.text,
-    fontSize: 13,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-
-  currentHeaderRow: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: BRAND.border,
-    paddingTop: 8,
-  },
-  currentHeaderText: {
-    color: BRAND.sub,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  conditionsGrid: {
-    marginTop: 6,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-  },
-  conditionPill: {
-    width: "48%",
+    gap: 8,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 8,
+    borderRadius: 999,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    marginBottom: 8,
+    backgroundColor: "rgba(2,6,23,0.75)",
+    maxWidth: "100%",
+  },
+  pillText: { fontSize: 12, fontWeight: "800" },
+
+  chartWrap: {
+    marginTop: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BRAND.border,
     backgroundColor: "#020617",
-  },
-  conditionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 3,
-  },
-  conditionLabel: {
-    color: BRAND.sub,
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  conditionValue: {
-    color: BRAND.text,
-    fontSize: 12,
-    lineHeight: 16,
+    padding: 10,
+    overflow: "hidden",
   },
 
-  // Returns
-  returnsRow: {
-    flexDirection: "row",
-    marginTop: 8,
+  tooltip: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(2,6,23,0.92)",
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 10,
   },
-  returnStatBox: {
+  tooltipTitle: { color: BRAND.text, fontSize: 13, fontWeight: "900" },
+  tooltipSub: { marginTop: 2, color: BRAND.sub, fontSize: 11.5, fontWeight: "700" },
+
+  tooltipMuted: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(2,6,23,0.65)",
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  tooltipMutedText: { color: BRAND.sub, fontSize: 12, fontWeight: "800" },
+
+  rangeRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
+  rangeText: { color: BRAND.sub, fontSize: 11.5, fontWeight: "800" },
+
+  foot: { marginTop: 10, color: BRAND.sub, fontSize: 11, opacity: 0.85 },
+
+  refreshBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+
+  loadingBox: { paddingVertical: 18, alignItems: "center", gap: 10 },
+  loadingText: { color: BRAND.sub, fontWeight: "800" },
+
+  errorBox: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.35)",
+    backgroundColor: "rgba(239,68,68,0.06)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  errorText: { color: BRAND.text, flex: 1, fontSize: 12.5, fontWeight: "800" },
+  retryBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  retryText: { color: BRAND.text, fontWeight: "900", fontSize: 12 },
+
+  // Tooltip modal
+  modalBackdrop: {
     flex: 1,
-    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    padding: 18,
   },
-  returnLabel: {
-    color: BRAND.sub,
-    fontSize: 11,
-    marginBottom: 2,
+  modalCard: {
+    backgroundColor: "rgba(2, 6, 23, 0.96)",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    padding: 14,
   },
-  returnValue: {
-    color: BRAND.text,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  returnsNote: {
-    color: BRAND.sub,
-    fontSize: 11,
-    marginTop: 8,
-  },
-
-  // Market Regime
-  regimeRow: {
-    flexDirection: "row",
-    marginTop: 6,
-  },
-  regimeCol: {
-    flex: 1,
-    marginBottom: 4,
-  },
-  regimeLabel: {
-    color: BRAND.sub,
-    fontSize: 11,
-  },
-  regimeValue: {
-    color: BRAND.text,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  regimeEmphasis: {
-    fontWeight: "600",
-  },
-
-  // Risk
-  riskText: {
-    color: BRAND.text,
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 2,
-  },
-
-  // Colors
-  positive: {
-    color: BRAND.accent,
-  },
-  negative: {
-    color: BRAND.red,
-  },
-
-  footer: {
-    marginTop: 16,
-    alignItems: "center",
-  },
-  footerText: {
-    color: BRAND.sub,
-    fontSize: 11,
-  },
+  modalHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+  modalTitle: { color: BRAND.text, fontSize: 14.5, fontWeight: "900", flex: 1 },
+  modalBody: { marginTop: 10, color: BRAND.sub, fontSize: 13, lineHeight: 18 },
+  modalFoot: { marginTop: 12, color: BRAND.sub, fontSize: 11, opacity: 0.85 },
 });
