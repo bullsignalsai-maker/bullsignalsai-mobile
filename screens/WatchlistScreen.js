@@ -22,8 +22,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-import Svg, { Polyline } from "react-native-svg";
 import { Swipeable } from "react-native-gesture-handler";
 
 import { auth } from "../firebaseConfig";
@@ -31,10 +29,11 @@ import { API_BASE_URL } from "../config/apiKeys";
 import ToastMessage from "../components/ToastMessage";
 
 import {
-  fetchWatchlist,
+  getWatchlistScreen,
   addToWatchlist,
   removeFromWatchlist,
 } from "../services/watchlistService";
+
 
 /* ================= BRAND ================= */
 const BRAND = {
@@ -70,62 +69,36 @@ const fmtDateTime = (ts) => {
   }
 };
 
-
-
 const signalColor = (signal) =>
   signal === "BUY" ? BRAND.accent : signal === "SELL" ? BRAND.red : BRAND.amber;
 
-/* ================= MINI SPARKLINE =================
-   Expects item.sparkline: number[]  (optional)
-   If missing, we just don't render it (safe).
-*/
-function MiniSparkline({ data = [], width = 56, height = 18, color = BRAND.sub }) {
-  if (!Array.isArray(data) || data.length < 6) return null;
 
-  // normalize into polyline points
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
+const fmtChange = (v) =>
+  typeof v === "number" && !Number.isNaN(v)
+    ? `${v >= 0 ? "+" : ""}$${Math.abs(v).toFixed(2)}`
+    : "--";
 
-  const stepX = width / (data.length - 1);
-  const pts = data
-    .map((v, i) => {
-      const x = i * stepX;
-      const y = height - ((v - min) / range) * height;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-
-  return (
-    <Svg width={width} height={height} style={{ marginLeft: 8, opacity: 0.95 }}>
-      <Polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-    </Svg>
-  );
+    function getPatternColor(winRate) {
+  if (typeof winRate !== "number") return "#374151"; // neutral gray
+  if (winRate >= 0.7) return "#16A34A"; // strong green
+  if (winRate >= 0.6) return "#22C55E"; // green
+  if (winRate >= 0.5) return "#FACC15"; // yellow
+  return "#EF4444"; // red
 }
 
-const getSessionTextStyle = (session, isUp) => {
-  if (session === "LIVE") {
-    return { color: isUp ? BRAND.accent : BRAND.red };
+function formatPatternLabel(pattern, winRate) {
+  if (!pattern) return "NO CLEAR PATTERN";
+  if (typeof winRate === "number") {
+    return `${pattern} ${Math.round(winRate * 100)}%`;
   }
-  // AH / PRE → muted
-  return { color: BRAND.sub, opacity: 0.75 };
-};
-
-const getMarketSession = (ts) => {
-  if (!ts) return null;
-
-  const d = new Date(ts);
-  const h = d.getHours(); // local time is fine for UX
-
-  if (h < 9 || (h === 9 && d.getMinutes() < 30)) return "PRE";
-  if (h >= 16) return "AH";
-  return "LIVE";
-};
+  return pattern;
+}
 
 
 export default function WatchlistScreen({ navigation }) {
   const user = auth.currentUser;
   const priceFlash = useRef({}).current;
+  const prevPrices = useRef({}).current;
 
   const [items, setItems] = useState([]);
   const [newSymbol, setNewSymbol] = useState("");
@@ -194,31 +167,55 @@ const loadWatchlist = async ({ silent = false } = {}) => {
   if (!user) return;
 
   try {
-    if (!silent) setRefreshing(true); // 👈 only show spinner for manual refresh
+    if (!silent) setRefreshing(true);
 
-    const res = await fetchWatchlist(user.uid);
-    setItems(res.watchlist || []);
-    setLastSync(new Date());
+    const res = await getWatchlistScreen(user.uid);
+    const list = res?.items || [];
 
-    // 🔥 trigger price flash
-    (res.watchlist || []).forEach((it) => {
-      const anim = priceFlash[it.symbol];
-      if (!anim) return;
+    setItems(list);
 
-      anim.setValue(1);
-      Animated.timing(anim, {
-        toValue: 0,
-        duration: 900,
-        useNativeDriver: false,
-      }).start();
-    });
+// 🔥 allow render to commit before animating
+requestAnimationFrame(() => {
+  list.forEach((it) => {
+    const sym = it.symbol;
+    const price = it.price;
+
+    if (!priceFlash[sym]) {
+      priceFlash[sym] = new Animated.Value(0);
+    }
+
+    if (it.needs_refresh) {
+      prevPrices[sym] = price;
+      return;
+    }
+
+    if (prevPrices[sym] == null) {
+      prevPrices[sym] = price;
+      return;
+    }
+
+    // 👇 tolerance instead of strict equality
+    if (Math.abs(price - prevPrices[sym]) < 0.005) return;
+
+    priceFlash[sym].setValue(1);
+    Animated.timing(priceFlash[sym], {
+      toValue: 0,
+      duration: 900,
+      useNativeDriver: false,
+    }).start();
+
+    prevPrices[sym] = price;
+  });
+});
+
 
   } catch {
-    if (!silent) showToast("Failed to load watchlist");
+    if (!silent) showToast("Failed to refresh watchlist");
   } finally {
     if (!silent) setRefreshing(false);
   }
 };
+
 
 
   useFocusEffect(
@@ -497,17 +494,29 @@ const displayList = [
   if (item.__type === "divider") {
     return <View style={styles.sectionDivider} />;
   }
-    const session = getMarketSession(item.quote_updated_at);
-    const isMarketClosed = session !== "LIVE";
+  // session comes from service (LIVE | LAST)
+const session = item.session;
 
-    const signal = item.hybridSignal || "HOLD";
+// flattened quote fields
+const price = item.price;
+const change = item.change;
+const changePct = item.changePct;
+
+const isLive = session === "LIVE";
+
+    // 🔧 normalize bullbrain fields (watchlist-safe)
+    const signal = item.bullbrain?.signal || "HOLD";
+    const confidence =
+      typeof item.bullbrain?.confidence === "number"
+        ? item.bullbrain.confidence
+        : null;
+
+    const confidenceBadge = item.bullbrain?.confidenceBadge || null;
+    const isMarketClosed = session !== "LIVE";
     const score = item.hybridScore || 0;
     const color = signalColor(signal);
-
-    const up = typeof item.changePct === "number" ? item.changePct >= 0 : null;
-      if (!priceFlash[item.symbol]) {
-      priceFlash[item.symbol] = new Animated.Value(0);
-    }
+    const patternName = item.pattern?.name;
+    const patternWinRate = item.pattern?.winRate;
 
     return (
       <Swipeable
@@ -532,88 +541,127 @@ const displayList = [
                 </Text>
               </View>
 
-              {/* CENTER — Sparkline */}
-              <View style={styles.sparklineCenter}>
-                <MiniSparkline
-                  data={item.sparkline}
-                  color={signalColor(item.hybridSignal)}
-                />
-              </View>
-
-              {/* RIGHT — Price + Change */}
-              <View style={styles.priceBlock}>
-                <Animated.Text
-                  style={[
-                    styles.price,
-                    {
-                      backgroundColor: priceFlash[item.symbol]?.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [
-                          "transparent",
-                          item.changePct >= 0
-                            ? "rgba(0,227,150,0.18)"
-                            : "rgba(255,69,96,0.18)",
-                        ],
-                      }),
-                      paddingHorizontal: 4,
-                      borderRadius: 6,
-                    },
-                  ]}
-                >
-                  ${fmt(item.price)}
-                </Animated.Text>
-
-                {typeof item.changePct === "number" && (
-                  <Text
+              {/* {/* RIGHT — Price + Change */}
+                <View style={styles.priceBlock}>
+                 <Animated.Text
                     style={[
-                      styles.changePct,
-                      getSessionTextStyle(
-                        getMarketSession(item.quote_updated_at),
-                        item.changePct >= 0
-                      ),
+                      styles.price,
+                      {
+                        color:
+                          session === "LIVE"
+                            ? changePct >= 0
+                              ? BRAND.accent
+                              : BRAND.red
+                            : BRAND.sub,
+
+                        backgroundColor: priceFlash[item.symbol]?.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [
+                            "transparent",
+                            changePct >= 0
+                              ? "rgba(0,227,150,0.30)"
+                              : "rgba(255,69,96,0.30)",
+                          ],
+                        }),
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 8,
+
+                      },
                     ]}
                   >
-                    {fmtPct(item.changePct)}{" "}
-                    {getMarketSession(item.quote_updated_at) === "LIVE"
-                      ? "Live"
-                      : getMarketSession(item.quote_updated_at)}
-                  </Text>
-                )}
-              </View>
+                    ${fmt(price)}
+                  </Animated.Text>
+
+{(() => {
+  const isLive = item.session === "LIVE";
+
+const change =
+  typeof item.change === "number" ? item.change : null;
+const pct =
+  typeof item.changePct === "number" ? item.changePct : null;
+
+
+  if (change == null || pct == null) {
+    return (
+      <Text style={[styles.changePct, { color: BRAND.sub }]}>
+        -- {session || ""}
+      </Text>
+    );
+  }
+
+  const isUp = pct >= 0;
+
+  return (
+    <Text
+      style={[
+        styles.changePct,
+        {
+          color: isLive
+            ? isUp
+              ? BRAND.accent
+              : BRAND.red
+            : BRAND.sub,
+          opacity: isLive ? 1 : 0.75,
+        },
+      ]}
+    >
+      {isUp ? "▲" : "▼"} ${Math.abs(change).toFixed(2)} (
+      {isUp ? "+" : "-"}
+      {Math.abs(pct).toFixed(2)}%) {session}
+    </Text>
+  );
+})()}
+
+              
+                </View>
+
             </View>
 
 
 
   {/* SIGNAL ROW */}
-  <View style={styles.signalRow}>
-    <View
-      style={[
-        styles.signalBadge,
-        { backgroundColor: signalColor(item.hybridSignal) },
-      ]}
-    >
-      <Text style={styles.signalText}>
-        {item.hybridSignal || "HOLD"}
-      </Text>
-    </View>
-
-    <Text style={styles.confLabel}>Confidence</Text>
-    <Text
-      style={[
-        styles.confValue,
-        { color: signalColor(item.hybridSignal) },
-      ]}
-    >
-      {Math.round(item.hybridScore || 0)}%
+<View style={styles.signalRow}>
+  <View
+    style={[
+      styles.signalBadge,
+      { backgroundColor: signalColor(item.hybridSignal) },
+    ]}
+  >
+    <Text style={styles.signalText}>
+      {item.hybridSignal || "HOLD"}
     </Text>
   </View>
 
+  <Text style={styles.confLabel}>Confidence</Text>
+  <Text
+    style={[
+      styles.confValue,
+      { color: signalColor(item.hybridSignal) },
+    ]}
+  >
+    {Math.round(item.bullbrain?.confidence ?? 0)}%
+  </Text>
+</View>
+
+
   {/* SUMMARY */}
-  {!!item.grokSummary && (
-    <Text style={styles.summary} numberOfLines={2}>
-      {item.grokSummary}
+  {!!item.watchlistSummary && (
+    <Text style={styles.summary} numberOfLines={3}>
+      {item.watchlistSummary}
     </Text>
   )}
+{/* SMART PATTERN */}
+<View
+  style={[
+    styles.patternBadge,
+    { backgroundColor: getPatternColor(patternWinRate) },
+  ]}
+>
+  <Text style={styles.patternText}>
+    {formatPatternLabel(patternName, patternWinRate)}
+  </Text>
+</View>
 
   {/* UPDATED */}
   <Text style={styles.lastUpdated}>
@@ -1118,15 +1166,24 @@ lastUpdated: {
   fontStyle: "italic",
   opacity: 0.7,
 },
-sparklineCenter: {
-  flex: 1,
-  alignItems: "center",
-  justifyContent: "center",
-},
 
 priceBlock: {
   alignItems: "flex-end",
   minWidth: 90, // keeps price aligned nicely
+},
+patternBadge: {
+  alignSelf: "flex-start",
+  marginTop: 6,
+  paddingVertical: 4,
+  paddingHorizontal: 10,
+  borderRadius: 999,
+},
+
+patternText: {
+  color: "#000",
+  fontSize: 11,
+  fontWeight: "700",
+  letterSpacing: 0.3,
 },
 
 });

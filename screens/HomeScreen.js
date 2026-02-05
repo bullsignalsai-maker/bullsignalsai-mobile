@@ -1,5 +1,7 @@
 // screens/HomeScreen.js
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+
 import {
   View,
   Text,
@@ -14,10 +16,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Alert } from "react-native";
-import { AppState } from "react-native";
-import Svg, { Polyline } from "react-native-svg";
-
 import { getHomeScreen } from "../services/HomeService";
 
 const LOGO = require("../assets/logo.png");
@@ -39,17 +37,6 @@ const fmtPct = (v) =>
     ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
     : "--";
 
-// Session label from timestamp (same logic as Watchlist)
-function getMarketSession(ts) {
-  if (!ts) return null;
-  const d = new Date(ts);
-  const h = d.getHours();
-
-  if (h < 9 || (h === 9 && d.getMinutes() < 30)) return "PRE";
-  if (h >= 16) return "AH";
-  return "LIVE";
-}
-
 
 // --- Helper: human-readable timestamps
 function timeAgo(isoString) {
@@ -65,88 +52,139 @@ function timeAgo(isoString) {
 }
 
 
-function MiniSparkline({ data = [], width = 64, height = 20, color }) {
-  if (!Array.isArray(data) || data.length < 6) return null;
+function formatPattern(pattern, winRate) {
+  if (!pattern) return null;
+  if (typeof winRate === "number") {
+    return `${pattern} · ${(winRate * 100).toFixed(0)}% win rate`;
+  }
+  return pattern;
+}
 
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
 
-  const stepX = width / (data.length - 1);
-  const points = data
-    .map((v, i) => {
-      const x = i * stepX;
-      const y = height - ((v - min) / range) * height;
-      return `${x},${y}`;
-    })
-    .join(" ");
+function getPatternColor(winRate) {
+  if (typeof winRate !== "number") return "#374151"; // neutral gray
+  if (winRate >= 0.7) return "#16A34A"; // strong green
+  if (winRate >= 0.6) return "#22C55E"; // green
+  if (winRate >= 0.5) return "#FACC15"; // yellow
+  return "#EF4444"; // red
+}
+
+function formatPatternLabel(pattern, winRate) {
+  if (!pattern) return null;
+
+  if (typeof winRate === "number") {
+    return `${pattern} · ${Math.round(winRate * 100)}%`;
+  }
+
+  return pattern;
+}
+
+function renderColoredSegments(value, styles, BRAND) {
+  if (!value) return null;
+
+  const segments = value.split(" · ");
 
   return (
-    <Svg width={width} height={height}>
-      <Polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-      />
-    </Svg>
+    <View style={styles.segmentWrap}>
+      {segments.map((seg, idx) => {
+        const isUp = seg.includes("▲") || seg.includes("+");
+        const isDown = seg.includes("▼") || seg.includes("-");
+
+        return (
+          <Text
+            key={idx}
+            style={[
+              styles.segmentText,
+              isUp && { color: BRAND.accent },
+              isDown && { color: BRAND.red },
+            ]}
+          >
+            {seg}
+            {idx < segments.length - 1 ? " · " : ""}
+          </Text>
+        );
+      })}
+    </View>
   );
 }
+
+
+// Session label from timestamp (RESTORE — DO NOT CHANGE)
+function getMarketSession(ts) {
+  if (!ts) return null;
+  const d = new Date(ts);
+  const h = d.getHours();
+
+  if (h < 9 || (h === 9 && d.getMinutes() < 30)) return "PRE";
+  if (h >= 16) return "AH";
+  return "LIVE";
+}
+
 
 export default function HomeScreen({ navigation }) {
   const [home, setHome] = useState(null);
   // 🔥 price flash animation per symbol
 const priceFlash = useRef({}).current;
+const REFRESH_INTERVAL_MS = 15000; // ✅ matches quotes ttl (30s)
 
-  const [refreshing, setRefreshing] = useState(false);
 
-  const dockTranslate = useRef(new Animated.Value(0)).current;
-  const lastY = useRef(0);
-
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newTicker, setNewTicker] = useState("");
-
+const [refreshing, setRefreshing] = useState(false);
   /* ---------------------------------------------------------
      Load + Auto Refresh (5s)
   --------------------------------------------------------- */
-  useEffect(() => {
-    let mounted = true;
+  useFocusEffect(
+  React.useCallback(() => {
+    let active = true;
 
     const load = async () => {
+      if (!active) return;
+
       const data = await getHomeScreen();
-      if (!mounted || !data) return;
+      if (!data) return;
 
       setHome(data);
 
       // 🔥 trigger price flash
-      (data.signals || []).forEach((it) => {
-        const anim = priceFlash[it.symbol];
-        if (!anim) return;
+   
+        (data.signals || []).forEach((it) => {
+          // ✅ ensure animation exists
+          if (!priceFlash[it.symbol]) {
+            priceFlash[it.symbol] = new Animated.Value(0);
+          }
 
-        anim.setValue(1);
-        Animated.timing(anim, {
-          toValue: 0,
-          duration: 900,
-          useNativeDriver: false, // backgroundColor animation
-        }).start();
-      });
+          // ✅ don't skip — price updates should flash even if needsRefresh flips
+          priceFlash[it.symbol].setValue(1);
+          Animated.timing(priceFlash[it.symbol], {
+            toValue: 0,
+            duration: 900,
+            useNativeDriver: false,
+          }).start();
+        });
+
+
     };
 
-
+    // initial load
     load();
-    const interval = setInterval(load, 5000);
 
+    // auto refresh
+    const interval = setInterval(load, REFRESH_INTERVAL_MS);
+
+    // cleanup when screen loses focus
     return () => {
-      mounted = false;
+      active = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [])
+);
+
 
   /* ---------------------------------------------------------
      Pull To Refresh
   --------------------------------------------------------- */
   const onRefresh = async () => {
+  if (refreshing) return;
+
   setRefreshing(true);
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -154,50 +192,25 @@ const priceFlash = useRef({}).current;
   if (data) {
     setHome(data);
 
-    // 🔥 trigger price flash
     (data.signals || []).forEach((it) => {
-      const anim = priceFlash[it.symbol];
-      if (!anim) return;
+      if (!priceFlash[it.symbol]) {
+        priceFlash[it.symbol] = new Animated.Value(0);
+      }
 
-      anim.setValue(1);
-      Animated.timing(anim, {
+      priceFlash[it.symbol].setValue(1);
+      Animated.timing(priceFlash[it.symbol], {
         toValue: 0,
         duration: 900,
         useNativeDriver: false,
       }).start();
     });
+
   }
 
   setRefreshing(false);
 };
 
 
-  /* ---------------------------------------------------------
-     Scroll animation (unchanged)
-  --------------------------------------------------------- */
-  const handleScroll = (e) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const goingDown = y > lastY.current + 6;
-    const goingUp = y < lastY.current - 6;
-
-    Animated.timing(dockTranslate, {
-      toValue: goingDown ? 1 : 0,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
-
-    lastY.current = y;
-  };
-
-  const dockY = dockTranslate.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 60],
-  });
-
-  const dockOpacity = dockTranslate.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
 
   if (!home) {
     return (
@@ -252,16 +265,38 @@ const priceFlash = useRef({}).current;
                 {c.title}
               </Text>
             </View>
-            <Text style={styles.featureValue} numberOfLines={3}>
-              {c.value}
-            </Text>
+
+            {c.id === "sectors" ? (
+              <View style={styles.sectorWrap}>
+                {c.value.split(" · ").map((seg, idx) => {
+                  const isUp = seg.includes("▲");
+                  const isDown = seg.includes("▼");
+
+                  return (
+                    <Text
+                      key={idx}
+                      style={[
+                        styles.sectorText,
+                        isUp && { color: BRAND.accent },
+                        isDown && { color: BRAND.red },
+                      ]}
+                    >
+                      {seg}
+                      {idx < c.value.split(" · ").length - 1 ? " · " : ""}
+                    </Text>
+                  );
+                })}
+              </View>
+            ) : (
+              renderColoredSegments(c.value, styles, BRAND)
+            )}
           </View>
         ))}
       </ScrollView>
 
+
       {/* MAIN LIST */}
       <ScrollView
-        onScroll={handleScroll}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"   // ✅ REQUIRED
         refreshControl={
@@ -275,12 +310,22 @@ const priceFlash = useRef({}).current;
         contentContainerStyle={{ paddingBottom: 50 }}
       >
         {signals.map((item, idx) => {
+      const session = getMarketSession(item.lastUpdated);
+      const isLive = session === "LIVE";
+
+      const isUp =
+        typeof item.changePct === "number"
+          ? item.changePct >= 0
+          : true;
+
           const signalColor =
             item.signal === "BUY"
               ? BRAND.accent
               : item.signal === "SELL"
               ? BRAND.red
               : BRAND.amber;
+            const hasLivePrice = typeof item.price === "number";
+  
 
           const changeColor =
             item.changePct >= 0 ? BRAND.accent : BRAND.red;
@@ -298,7 +343,6 @@ const priceFlash = useRef({}).current;
               onPress={() => {
                 console.log("Tapped:", item.symbol); // debug
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
                 navigation.navigate("StockDetailScreen", {
                   symbol: item.symbol,
                   name: item.name || item.symbol,
@@ -306,37 +350,35 @@ const priceFlash = useRef({}).current;
                 });
               }}
             >
-
-
               <View style={styles.cardHeader}>
 
                 {/* LEFT */}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.symbol}>{item.symbol}</Text>
-                  <Text style={styles.name}>{item.name}</Text>
-                </View>
+                  <Text style={styles.name}>{item.companyName}</Text>
 
-                {/* CENTER — Sparkline */}
-                <View style={styles.sparklineCenter}>
-                  <MiniSparkline
-                    data={item.sparkline}
-                    color={signalColor}
-                  />
                 </View>
 
                 {/* RIGHT */}
-                <View style={{ alignItems: "flex-end" }}>
+              <View style={{ alignItems: "flex-end" }}>
+                {/* PRICE */}
                 <Animated.Text
                   style={[
                     styles.price,
                     {
+                      color: isLive
+                        ? isUp
+                          ? BRAND.accent
+                          : BRAND.red
+                        : BRAND.sub,
+
                       backgroundColor: priceFlash[item.symbol]?.interpolate({
                         inputRange: [0, 1],
                         outputRange: [
                           "transparent",
-                          item.changePct >= 0
-                            ? "rgba(0,227,150,0.18)"   // green flash
-                            : "rgba(255,69,96,0.18)", // red flash
+                          isUp
+                            ? "rgba(0,227,150,0.30)"
+                            : "rgba(255,69,96,0.30)",
                         ],
                       }),
                       paddingHorizontal: 6,
@@ -344,35 +386,53 @@ const priceFlash = useRef({}).current;
                     },
                   ]}
                 >
-                  ${Number(item.price || 0).toFixed(2)}
+                  {item.price != null ? `$${item.price.toFixed(2)}` : "--"}
                 </Animated.Text>
 
-
+                {/* CHANGE + % */}
                 {(() => {
-                  const session = getMarketSession(item.lastUpdated);
-                  const isLive = session === "LIVE";
-                  const isUp = typeof item.changePct === "number" ? item.changePct >= 0 : true;
+                const session = getMarketSession(item.lastUpdated);
+                const isLive = session === "LIVE";
 
+                const change =
+                  typeof item.change === "number" ? item.change : null;
+                const pct =
+                  typeof item.changePct === "number" ? item.changePct : null;
+
+                if (change == null || pct == null) {
                   return (
-                    <Text
-                      style={[
-                        styles.changePct,
-                        {
-                          // LIVE = green/red, AH/PRE = muted
-                          color: isLive ? (isUp ? BRAND.accent : BRAND.red) : BRAND.sub,
-                          opacity: isLive ? 1 : 0.75,
-                        },
-                      ]}
-                    >
-                      {fmtPct(item.changePct)} {session || ""}
+                    <Text style={[styles.changePct, { color: BRAND.sub }]}>
+                      -- {session || ""}
                     </Text>
                   );
-                })()}
-              </View>
+                }
+
+                const isUp = pct >= 0;
+
+                return (
+                  <Text
+                    style={[
+                      styles.changePct,
+                      {
+                        color: isLive
+                          ? isUp
+                            ? BRAND.accent
+                            : BRAND.red
+                          : BRAND.sub,
+                        opacity: isLive ? 1 : 0.75,
+                      },
+                    ]}
+                  >
+                    {isUp ? "▲" : "▼"} ${Math.abs(change).toFixed(2)} (
+                    {isUp ? "+" : "-"}
+                    {Math.abs(pct).toFixed(2)}%) {session}
+                  </Text>
+                );
+              })()}
 
 
               </View>
-
+              </View>
 
               <View style={styles.signalRow}>
                 <View
@@ -391,9 +451,27 @@ const priceFlash = useRef({}).current;
                 </Text>
               </View>
 
-              <Text style={styles.summary} numberOfLines={2}>
-                {item.grokSummary || item.summary}
-              </Text>
+              <Text style={styles.summary} numberOfLines={4}>
+              {item.grokSummary ||
+                (typeof item.summary === "string"
+                  ? item.summary
+                  : item.summary?.primary)}
+            </Text>
+
+              {item.pattern && (
+                <View
+                  style={[
+                    styles.patternBadge,
+                    { backgroundColor: getPatternColor(item.patternWinRate) },
+                  ]}
+                >
+                  <Text style={styles.patternText}>
+                    {formatPatternLabel(item.pattern, item.patternWinRate)}
+                  </Text>
+                </View>
+              )}
+
+
               <Text style={styles.lastUpdated}>
                 {timeAgo(item.lastUpdated)}
               </Text>
@@ -401,57 +479,6 @@ const priceFlash = useRef({}).current;
           );
         })}
       </ScrollView>
-
-      {/* FLOATING DOCK */}
-      <Animated.View
-        style={[
-          styles.quickDock,
-          { transform: [{ translateY: dockY }], opacity: dockOpacity },
-        ]}
-      >
-        <TouchableOpacity onPress={() => setShowAddModal(true)}>
-          <Ionicons name="add-circle-outline" size={28} color={BRAND.text} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate("AlertScreen")}>
-          <Ionicons
-            name="notifications-outline"
-            size={26}
-            color={BRAND.text}
-          />
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* ADD TICKER MODAL (UI ONLY – backend will handle later) */}
-      <Modal transparent visible={showAddModal} animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Add a Ticker</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter symbol (e.g., TSLA)"
-              placeholderTextColor="#666"
-              value={newTicker}
-              onChangeText={setNewTicker}
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  Alert.alert(
-                    "Info",
-                    "Ticker add handled server-side in next phase."
-                  );
-                  setShowAddModal(false);
-                }}
-              >
-                <Text style={styles.addText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -467,8 +494,8 @@ const styles = StyleSheet.create({
   syncRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   moodText: { color: BRAND.sub, fontSize: 12, marginLeft: 2 },
 
-  carousel: { marginTop: 5 },
-  carouselContent: { paddingHorizontal: 20, paddingBottom: 16 },
+   carousel: { marginTop: 5, marginBottom: 8 },
+  carouselContent: { paddingHorizontal: 12, paddingBottom: 16 },
   featureCard: {
     backgroundColor: BRAND.card,
     borderRadius: 14,
@@ -486,14 +513,15 @@ const styles = StyleSheet.create({
   featureValue: { color: BRAND.sub, fontSize: 12 },
 
   card: {
-    backgroundColor: BRAND.card,
-    borderRadius: 16,
-    padding: 12,
-    marginHorizontal: 20,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-  },
+  backgroundColor: BRAND.card,
+  borderRadius: 16,
+  padding: 14,           // slightly more inner space
+  marginHorizontal: 10,  // ✅ wider cards
+  marginBottom: 10,
+  borderWidth: 1,
+  borderColor: BRAND.border,
+},
+
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -522,21 +550,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontStyle: "italic",
     opacity: 0.7,
-  },
-
-  quickDock: {
-    position: "absolute",
-    bottom: 24,
-    alignSelf: "center",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: 150,
-    backgroundColor: "rgba(17,24,39,0.88)",
-    borderRadius: 28,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderWidth: 1,
-    borderColor: BRAND.border,
   },
 
   modalOverlay: {
@@ -578,15 +591,54 @@ const styles = StyleSheet.create({
   fontSize: 12,
   fontWeight: "600",
 },
-sparklineCenter: {
-  flex: 1,
-  alignItems: "center",
-  justifyContent: "center",
-},
-
 priceBlock: {
   alignItems: "flex-end",
   minWidth: 90,
+},
+patternText: {
+  color: BRAND.sub,
+  fontSize: 12,
+  marginTop: 2,
+  opacity: 0.85,
+},
+patternBadge: {
+  alignSelf: "flex-start",
+  marginTop: 6,
+  paddingVertical: 4,
+  paddingHorizontal: 10,
+  borderRadius: 999,
+},
+
+patternText: {
+  color: "#000",
+  fontSize: 11,
+  fontWeight: "700",
+  letterSpacing: 0.3,
+},
+sectorWrap: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+},
+
+sectorText: {
+  fontSize: 12,
+  color: BRAND.sub,
+  fontWeight: "600",
+},
+segmentWrap: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+},
+
+segmentText: {
+  fontSize: 12,
+  color: BRAND.sub,
+  fontWeight: "600",
+},
+changeLine: {
+  fontSize: 12,
+  fontWeight: "700",
+  marginTop: 2,
 },
 
 });

@@ -485,11 +485,11 @@ async function fetchGrokAnalysis(symbol, force = false) {
 }
 
 function smoothPath(path) {
-  if (!path || typeof path !== "string") return path;
+  if (!path || typeof path !== "string") return null;
 
-  // Extract all x,y pairs like "12.3,45.6"
+  // Extract x,y pairs
   const matches = path.match(/(\d+(\.\d+)?),(\d+(\.\d+)?)/g);
-  if (!matches || matches.length < 3) return path;
+  if (!matches || matches.length < 3) return null;
 
   const points = matches.map(pair => {
     const [x, y] = pair.split(",").map(Number);
@@ -499,7 +499,6 @@ function smoothPath(path) {
   let d = `M ${points[0].x},${points[0].y}`;
 
   for (let i = 1; i < points.length - 1; i++) {
-    const p0 = points[i - 1];
     const p1 = points[i];
     const p2 = points[i + 1];
 
@@ -515,8 +514,6 @@ function smoothPath(path) {
   return d;
 }
 
-
-
 function PriceSparkline({ sparkline }) {
   if (!sparkline?.path) {
     return (
@@ -527,15 +524,15 @@ function PriceSparkline({ sparkline }) {
   }
 
   const isUp = sparkline.direction === "up";
-
   const stroke = isUp ? BRAND.accent : BRAND.red;
   const gradientId = isUp ? "gradUp" : "gradDown";
+
+  // ✅ FIX: compute BEFORE JSX
+  const smoothD = smoothPath(sparkline.path);
 
   return (
     <View style={styles.sparklineWrap}>
       <Svg viewBox="0 0 100 30" width="100%" height={60}>
-
-
         <Defs>
           <SvgLinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor={stroke} stopOpacity="0.25" />
@@ -544,13 +541,15 @@ function PriceSparkline({ sparkline }) {
           </SvgLinearGradient>
         </Defs>
 
-        {/* Area fill (very soft) */}
-        <Path
-          d={`${smoothPath(sparkline.path)} L 100,30 L 0,30 Z`}
-          fill={`url(#${gradientId})`}
-        />
+        {/* Area fill */}
+        {smoothD && (
+          <Path
+            d={`${smoothD} L 100,30 L 0,30 Z`}
+            fill={`url(#${gradientId})`}
+          />
+        )}
 
-        {/* Main line (thin & clean) */}
+        {/* Line */}
         <Path
           d={sparkline.path}
           fill="none"
@@ -559,7 +558,6 @@ function PriceSparkline({ sparkline }) {
           strokeLinecap="round"
           strokeLinejoin="bevel"
         />
-
       </Svg>
 
       <View style={styles.sparklineMeta}>
@@ -573,7 +571,6 @@ function PriceSparkline({ sparkline }) {
     </View>
   );
 }
-
 
 // =======================
 //   COMPONENT
@@ -771,14 +768,7 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
                   {quote?.open != null ? `$${quote.open.toFixed(2)}` : "—"}
                 </Text>
               </View>
-              <View style={styles.metaCol}>
-                <Text style={styles.headerMeta}>Volume</Text>
-                <Text style={styles.headerMetaValue}>
-                  {quote?.volume != null
-                    ? formatNumberShort(quote.volume)
-                    : "N/A"}
-                </Text>
-              </View>
+              
             </View>
 
             {detail?.asOf && (
@@ -836,7 +826,7 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionAccent} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.sectionTitle}>AI Hybrid Signal</Text>
+            <Text style={styles.sectionTitle}>AI Signal</Text>
             <Text style={styles.cardSubText}>
               Powered by BullsignalsAI •{" "}
               {hybridUpdatedTs
@@ -877,6 +867,38 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
               </Text>
             </View>
           </View>
+          {detail?.ui?.decision?.bias && (
+          <View
+            style={{
+              marginLeft: 6,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 999,
+              backgroundColor:
+                detail.ui.decision.bias.label === "Bullish"
+                  ? "rgba(0,227,150,0.18)"
+                  : detail.ui.decision.bias.label === "Bearish"
+                  ? "rgba(239,68,68,0.18)"
+                  : "rgba(250,204,21,0.18)",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "800",
+                color:
+                  detail.ui.decision.bias.label === "Bullish"
+                    ? BRAND.accent
+                    : detail.ui.decision.bias.label === "Bearish"
+                    ? BRAND.red
+                    : BRAND.amber,
+              }}
+            >
+              {detail.ui.decision.bias.label}
+            </Text>
+          </View>
+        )}
+
 
           {/* Numbers row */}
           <View style={styles.hybridNumbersRow}>
@@ -907,6 +929,22 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
               </Text>
             </View>
           </View>
+          <View style={{ marginTop: 8 }}>
+          <View style={{ height: 6, backgroundColor: "#1f2937", borderRadius: 4 }}>
+            <View
+              style={{
+                width: `${hybridProbUp * 100}%`,
+                height: 6,
+                borderRadius: 4,
+                backgroundColor: BRAND.accent,
+              }}
+            />
+          </View>
+          <Text style={{ color: BRAND.sub, fontSize: 11, marginTop: 4 }}>
+            Upside {Math.round(hybridProbUp * 100)}% • Downside {Math.round((1 - hybridProbUp) * 100)}%
+          </Text>
+        </View>
+
 
           {/* Narrative */}
         
@@ -920,6 +958,16 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
               })}
             </Text>
           </View>
+          {detail?.ui?.decision?.reasons?.length > 0 && (
+            <View style={styles.whyBlock}>
+              <Text style={styles.whyLabel}>Why this signal?</Text>
+              {detail.ui.decision.reasons.map((reason, idx) => (
+                <Text key={`reason-${idx}`} style={styles.whyText}>
+                  • {reason.replace(/([A-Z])/g, " $1").trim()}
+                </Text>
+              ))}
+            </View>
+          )}
 
         </View>
       </View>
@@ -1135,15 +1183,18 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
       )}
 
       {/* EXEC SUMMARY */}
-      {grokSections.execSummary && (
+      {detail?.ui?.executiveSummaryShort && (
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionAccent} />
             <Text style={styles.sectionTitle}>Executive Summary</Text>
           </View>
-          <Text style={styles.sectionBody}>{grokSections.execSummary}</Text>
+          <Text style={styles.sectionBody}>
+            {detail.ui.executiveSummaryShort}
+          </Text>
         </View>
       )}
+
 
       {/* KEY STATS (ticker-specific from Grok essay) */}
       {grokSections.keyStats &&
@@ -1325,10 +1376,26 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
 
                   {/* Note / disclaimer */}
                   {tradeIdea.note && (
-                    <Text style={styles.tradeDisclaimer}>
-                      {tradeIdea.note}
+                  <View
+                    style={{
+                      marginTop: 8,
+                      paddingTop: 6,
+                      borderTopWidth: 1,
+                      borderTopColor: BRAND.border,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: BRAND.sub,
+                        fontSize: 11.5,
+                        lineHeight: 16,
+                      }}
+                    >
+                      📊 {tradeIdea.note}
                     </Text>
-                  )}
+                  </View>
+                )}
+
                 </View>
               )}
 

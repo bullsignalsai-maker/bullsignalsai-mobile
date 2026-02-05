@@ -14,6 +14,8 @@ import gdown
 import re
 import math
 from symbols_clean import REAL_TICKERS
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 app = FastAPI()
 
@@ -1955,172 +1957,78 @@ def get_technical(symbol: str):
     except Exception as e:
         print("get_technical error:", e)
         return {"symbol": symbol, "error": str(e)}
+# --------------------------------------------------------------------
+# STOCKDETAIL — FIRESTORE-FIRST (OPTIMIZED)
+# --------------------------------------------------------------------
+import time
+import datetime
+from fastapi import HTTPException
+
+from backend.firestore_paths import stockdetail_doc_ref
+from backend.schema_versions import STOCKDETAIL_SCHEMA_VERSION
+
+# Reuse the SAME builder used by cron
+from backend.stockdetail_cron import build_stockdetail_payload
+
 
 # --------------------------------------------------------------------
-# STOCKDETAIL SUPER ENDPOINT
+# STOCKDETAIL ENDPOINT
 # --------------------------------------------------------------------
 @app.get("/stockdetail/{symbol}")
-def stockdetail(symbol: str, limit_candles: int = 120, forceGrok: bool = False):
+def stockdetail(symbol: str, force: bool = False):
+    """
+    Firestore-first Stock Detail endpoint.
+
+    - Reads precomputed payload from Firestore
+    - Falls back to compute ONLY if expired or forced
+    - UI should never call with force=true
+    """
     symbol = symbol.upper()
+    now_ts = int(time.time())
+
     try:
-        quote = backend_fetch_quote(symbol)
-        candles = fetch_daily_candles(symbol)
+        # ------------------------------------------------------------
+        # 1️⃣ FAST PATH — Firestore
+        # ------------------------------------------------------------
+        doc_ref = stockdetail_doc_ref(symbol)
+        snap = doc_ref.get()
 
-        feature_dict = None
-        last_close = None
-        bullbrain_block = None
-        bull_prob_up = None
+        if snap.exists and not force:
+            cached = snap.to_dict()
 
-        # BULLBRAIN
-        if candles and bullbrain_model is not None:
-            features_vec, feature_dict, last_close = compute_bullbrain_features(candles)
-            inference = bullbrain_infer(features_vec)
-            prob_up = float(
-                inference.get("probability_up") or inference.get("raw_output") or 0.5
-            )
-            bull_prob_up = prob_up
-            class_probs = _class_probs_from_prob_up(prob_up)
-            bullbrain_block = {
-                "version": BULLBRAIN_VERSION,
-                "signal": inference.get("signal"),
-                "confidence": inference.get("confidence"),
-                "probabilities": class_probs,
-                "raw": {"prob_up": prob_up, "prob_down": 1.0 - prob_up},
-            }
+            # TTL check (epoch seconds)
+            expires_at = cached.get("expiresAt")
+            if expires_at and expires_at > now_ts:
+                return cached
 
-        if last_close is None and quote:
-            last_close = float(quote.get("current") or 0.0)
-
-        # TECHNICAL SNAPSHOT
-        technical = None
-        if feature_dict is not None and last_close is not None:
-            technical = build_technical_snapshot(symbol, feature_dict, last_close)
-
-        # CANDLES PAYLOAD
-        candles_payload = None
-        if candles:
-            closes = candles["close"]
-            highs = candles["high"]
-            lows = candles["low"]
-            opens = candles["open"]
-            vols = candles["volume"]
-            ts_list = candles.get("timestamp") or []
-            n = len(closes)
-            if n > 0:
-                use_n = min(limit_candles, n)
-                start_idx = n - use_n
-                chart_items = []
-                for i in range(start_idx, n):
-                    t_raw = ts_list[i] if i < len(ts_list) else None
-                    if t_raw:
-                        dt = datetime.datetime.utcfromtimestamp(t_raw / 1000.0).replace(microsecond=0)
-                        t_iso = dt.isoformat() + "Z"
-                    else:
-                        dt = datetime.datetime.utcnow() - datetime.timedelta(days=(n - 1 - i))
-                        t_iso = dt.replace(microsecond=0).isoformat() + "Z"
-
-                    chart_items.append(
-                        {
-                            "t": t_iso,
-                            "open": float(opens[i]),
-                            "high": float(highs[i]),
-                            "low": float(lows[i]),
-                            "close": float(closes[i]),
-                            "volume": float(vols[i]),
-                        }
-                    )
-                candles_payload = {
-                    "symbol": symbol,
-                    "source": candles.get("source", "polygon"),
-                    "candles": chart_items,
-                }
-
-        # NEWS + GROK
-        news = get_symbol_news(symbol, limit=8)
-        grok_pack = get_stockdetail_grok(symbol, quote, technical, force=forceGrok)
-        grok_prob_up = grok_pack.get("prob_up")
-
-        # HYBRID
-        hybrid_p, hybrid_signal, hybrid_conf = _hybrid_from_probs(
-            bull_prob_up, grok_prob_up
+        # ------------------------------------------------------------
+        # 2️⃣ SLOW PATH — Recompute (rare)
+        # ------------------------------------------------------------
+        # NOTE:
+        # This uses the SAME function as cron
+        # No logic duplication allowed here
+        payload = build_stockdetail_payload(
+            symbol=symbol,
+            force_grok=force,  # only true for admin/debug
         )
 
-        # -----------------------------------------------------------
-        # SMART PATTERN + HISTORY (SAFE WRAPPER)
-        # -----------------------------------------------------------
-        raw_ph = scan_smart_pattern_history(symbol, candles)
+        # Safety: enforce schema + timestamps
+        payload["schemaVersion"] = STOCKDETAIL_SCHEMA_VERSION
+        payload["asOf"] = datetime.datetime.utcnow().replace(
+            microsecond=0
+        ).isoformat() + "Z"
 
-        safe_smart_pattern = None
-        safe_pattern_dates = []
-        safe_pattern_stats = raw_ph  # return full stats for debugging/UI
+        # ------------------------------------------------------------
+        # 3️⃣ Write-through cache
+        # ------------------------------------------------------------
+        doc_ref.set(payload, merge=True)
 
-        if raw_ph:
-            cp = raw_ph.get("currentPattern")
-            hist = raw_ph.get("historyForCurrent")
-
-            # If we have a valid pattern for today
-            if cp and cp.get("pattern"):
-                safe_smart_pattern = {
-                    "pattern": cp.get("pattern"),
-                    "headline": cp.get("headline"),
-                    "winRate": cp.get("winRate"),
-                    "occurrences": hist.get("occurrences") if hist else 0,
-                    "samples": hist.get("samples") if hist else [],
-                    "forwardReturns": hist.get("forwardReturns") if hist else {},
-                }
-
-                if hist and hist.get("samples"):
-                    safe_pattern_dates = hist["samples"][:5]
-
-            else:
-                # No pattern today — return clean structure (prevents frontend crash)
-                safe_smart_pattern = {
-                    "pattern": None,
-                    "headline": None,
-                    "winRate": None,
-                    "occurrences": 0,
-                    "samples": [],
-                    "forwardReturns": {},
-                }
-                safe_pattern_dates = []
-
-        else:
-            # No history at all
-            safe_smart_pattern = {
-                "pattern": None,
-                "headline": None,
-                "winRate": None,
-                "occurrences": 0,
-                "samples": [],
-                "forwardReturns": {},
-            }
-            safe_pattern_dates = []
-
-        # FINAL RESPONSE
-        return {
-            "symbol": symbol,
-            "asOf": datetime.datetime.utcnow().isoformat(),
-            "quote": quote,
-            "price": last_close,
-            "bullbrain": bullbrain_block,
-            "features": feature_dict,
-            "technical": technical,
-            "candles": candles_payload,
-            "news": news,
-            "grok": grok_pack,
-            "hybridProbUp": hybrid_p,
-            "hybridSignal": hybrid_signal,
-            "hybridScore": hybrid_conf,
-
-            # NEW — Smart pattern data for UI
-            "smartPattern": safe_smart_pattern,
-            "patternDates": safe_pattern_dates,
-            "patternStats": safe_pattern_stats,
-        }
+        return payload
 
     except Exception as e:
         print("stockdetail error:", e)
-        return {"symbol": symbol, "error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # --------------------------------------------------------------------
 # SMART PATTERN HISTORY ENDPOINT
@@ -3837,164 +3745,67 @@ def _get_market_overview_quick():
 
 @app.get("/market-pulse")
 def market_pulse():
-    import pytz
-    eastern = pytz.timezone("America/New_York")
-    utc = pytz.utc
-
+    """
+    Firestore read-only endpoint.
+    Cron job is the single writer.
+    """
     try:
-        # ----------------------------------------------------
-        # 1) ALWAYS FETCH FRESH NEWS
-        # ----------------------------------------------------
-        news_resp = market_news()
-        raw_news = news_resp.get("data", []) if isinstance(news_resp, dict) else []
+        db = firestore.client()
+        doc = db.collection("bullsignals_ai").document("market_pulse").get()
 
-        if not isinstance(raw_news, list):
-            raw_news = []
+        if not doc.exists:
+            return {
+                "highlights_grouped": {
+                    "bullish": [],
+                    "neutral": [],
+                    "bearish": [],
+                },
+                "news_grouped": {
+                    "today": [],
+                    "yesterday": [],
+                    "week": [],
+                    "older": [],
+                },
+                "updated_at": None,
+            }
 
-        cleaned = []
-
-        # ----------------------------------------------------
-        # 2) Convert UTC → Eastern time
-        # ----------------------------------------------------
-        for n in raw_news:
-            try:
-                # Parse published date (UTC ISO)
-                dt_utc = datetime.datetime.fromisoformat(
-                    n["pubDate"].replace("Z", "")
-                ).replace(tzinfo=utc)
-
-                # Convert → Eastern
-                dt_et = dt_utc.astimezone(eastern)
-
-                n["pubDateET"] = dt_et.isoformat()
-                n["pubDateObj"] = dt_et
-
-                cleaned.append(n)
-
-            except:
-                continue
-
-        # ----------------------------------------------------
-        # 3) SORT LATEST → FIRST using ET
-        # ----------------------------------------------------
-        cleaned.sort(key=lambda x: x["pubDateObj"], reverse=True)
-
-        # ----------------------------------------------------
-        # 4) SENTIMENT — from latest 80 items
-        # ----------------------------------------------------
-        titles = [n.get("title", "") for n in cleaned[:80] if n.get("title")]
-
-        analyzed = _analyze_headline_sentiment_py(titles)
-
-        bullish_raw = [a["title"] for a in analyzed if a["tag"] == "📈"]
-        bearish_raw = [a["title"] for a in analyzed if a["tag"] == "📉"]
-        neutral_raw = [a["title"] for a in analyzed if a["tag"] == "⚖️"]
-
-        # Fallback keyword method (adds variation)
-        for n in cleaned[:80]:
-            t = n.get("title", "").lower()
-            if not t:
-                continue
-
-            if any(w in t for w in ["rises", "beats", "up", "strong", "record"]):
-                bullish_raw.append(n["title"])
-            elif any(w in t for w in ["falls", "drops", "down", "weak", "cuts"]):
-                bearish_raw.append(n["title"])
-            else:
-                neutral_raw.append(n["title"])
-
-        # Unique
-        bullish_raw = list(set(bullish_raw))
-        bearish_raw = list(set(bearish_raw))
-        neutral_raw = list(set(neutral_raw))
-
-        # Top 5 each
-        bullish = bullish_raw[:5]
-        neutral = neutral_raw[:5]
-        bearish = bearish_raw[:5]
-
-        # Numeric summary
-        highlights_numeric = {
-            "bull": len(bullish_raw),
-            "bear": len(bearish_raw),
-            "neutral": len(neutral_raw),
-        }
-
-        # ----------------------------------------------------
-        # 5) MARKET OVERVIEW
-        # ----------------------------------------------------
-        overview = _get_market_overview_quick()
-
-        # ----------------------------------------------------
-        # 6) GROUP NEWS BY DATE (ET)
-        # ----------------------------------------------------
-        grouped = {"today": [], "yesterday": [], "week": [], "older": []}
-
-        now_et = datetime.datetime.now(eastern)
-        today_et = now_et.date()
-        yesterday_et = today_et - datetime.timedelta(days=1)
-        week_ago_et = today_et - datetime.timedelta(days=7)
-
-        for n in cleaned:
-            d = n["pubDateObj"].date()
-
-            if d == today_et:
-                grouped["today"].append(n)
-            elif d == yesterday_et:
-                grouped["yesterday"].append(n)
-            elif d >= week_ago_et:
-                grouped["week"].append(n)
-            else:
-                grouped["older"].append(n)
-
-        # ----------------------------------------------------
-        # 7) Sort grouped lists by ET timestamp
-        # ----------------------------------------------------
-        for key in grouped:
-            grouped[key].sort(key=lambda x: x["pubDateObj"], reverse=True)
-
-        # ----------------------------------------------------
-        # FINAL RESPONSE
-        # ----------------------------------------------------
-        return {
-            "market_overview": overview,
-            "highlights_numeric": highlights_numeric,
-            "highlights_grouped": {
-                "bullish": bullish,
-                "neutral": neutral,
-                "bearish": bearish,
-            },
-            "news_grouped": grouped,
-            "updated_at": datetime.datetime.utcnow().isoformat() + "Z",
-        }
+        return doc.to_dict()
 
     except Exception as e:
-        print("market_pulse error:", e)
-        fb = _get_market_overview_quick()
+        backend.log(f"[market-pulse] Firestore read error: {e}")
         return {
-            "market_overview": fb,
-            "highlights_numeric": {"bull": 0, "bear": 0, "neutral": 0},
             "highlights_grouped": {
                 "bullish": [],
                 "neutral": [],
                 "bearish": [],
             },
-            "news_grouped": {"today": [], "yesterday": [], "week": [], "older": []},
-            "updated_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "news_grouped": {
+                "today": [],
+                "yesterday": [],
+                "week": [],
+                "older": [],
+            },
+            "updated_at": None,
         }
 
-def bullbrain_infer_single(symbol: str):
-    try:
-        candles = fetch_daily_candles(symbol)
-        if not candles:
-            return None
 
-        features_vec, feature_dict, last_close = compute_bullbrain_features(candles)
-        return bullbrain_infer(features_vec)
+@app.get("/market-overview")
+def market_overview():
+    try:
+        db = firestore.client()
+        doc = db.collection("bullsignals_ai").document("market_overview_live").get()
+
+        if not doc.exists:
+            return {}
+
+        return doc.to_dict()
 
     except Exception as e:
-        print("bullbrain_infer_single error:", symbol, e)
-        return None
+        backend.log(f"[market-overview] Firestore read error: {e}")
+        return {}
+
+
+
 
 
 
@@ -4015,160 +3826,165 @@ def debug_bullbrain(symbol: str):
 
     except Exception as e:
         return {"error": str(e)}
-        
+
+
+
 # ---------------------------------------------------------
-# Read market AI cache (global Firestore)
+# Firebase Admin init (shared by API + Cron)
 # ---------------------------------------------------------
-def read_market_cache(doc_id):
+def init_firebase_admin():
+    """
+    Initialize Firebase Admin exactly once using FIREBASE_ADMIN_JSON.
+    This is safe to call from both main API and cron scripts.
+    """
+    if firebase_admin._apps:
+        # Already initialized
+        return firebase_admin._apps[0]
+
+    firebase_json = os.getenv("FIREBASE_ADMIN_JSON")
+    if not firebase_json:
+        print("❌ FIREBASE_ADMIN_JSON is missing!")
+        return None
+
     try:
-        import firebase_admin
-        from firebase_admin import credentials, firestore
+        cred_dict = json.loads(firebase_json)
+        cred = credentials.Certificate(cred_dict)
+        app = firebase_admin.initialize_app(cred)
+        print("🔥 Firebase Admin initialized")
+        return app
+    except Exception as e:
+        print("❌ Firebase Admin init failed:", e)
+        return None
 
-        # safe init
+
+# Initialize immediately for API process
+init_firebase_admin()
+db = firestore.client()
+
+
+# ---------------------------------------------------------
+# Generic helpers: save/read market AI cache (Firestore)
+# ---------------------------------------------------------
+def save_to_firestore_market_cache(doc_id: str, data: dict):
+    """
+    Save a document into bullsignals_ai/<doc_id>.
+    Used by cron script OR any backend batch job.
+    """
+    try:
         if not firebase_admin._apps:
-            cred = credentials.ApplicationDefault()
-            firebase_admin.initialize_app(cred)
+            init_firebase_admin()
 
-        db = firestore.client()
+        doc_ref = db.collection("bullsignals_ai").document(doc_id)
+        doc_ref.set(data, merge=True)
+
+        print(f"🔥 Saved AI Market Cache: {doc_id}")
+    except Exception as e:
+        print("save_to_firestore_market_cache error:", e)
+
+
+def read_market_cache(doc_id: str):
+    """
+    Read a document from bullsignals_ai/<doc_id>.
+    API endpoints use this to return cached Hotlist/BearWatch.
+    No recompute, no TTL logic here — cron keeps it fresh.
+    """
+    try:
+        if not firebase_admin._apps:
+            init_firebase_admin()
+
         doc_ref = db.collection("bullsignals_ai").document(doc_id)
         snap = doc_ref.get()
 
         if not snap.exists:
+            print(f"⚠️ No Firestore cache for {doc_id}")
             return None
 
         data = snap.to_dict()
-        updated = data.get("updated_at")
-        if not updated:
-            return None
-
-        # Check cache age
-        age_minutes = (datetime.datetime.utcnow() -
-                       datetime.datetime.fromisoformat(updated.replace("Z",""))
-                       ).total_seconds() / 60
-
-        if age_minutes <= 5:
-            print(f"💾 Using cached {doc_id} ({age_minutes:.1f} min old)")
-            return data
-
-        print(f"⏳ Cache expired ({age_minutes:.1f} min). Will recompute.")
-        return None
-
+        return data
     except Exception as e:
         print("read_market_cache error:", e)
         return None
 
 
-
 # ---------------------------------------------------------
-# /market-hotlist — Top 15 strongest bullish tickers
+# /market-hotlist — READ-ONLY view of Firestore cache
 # ---------------------------------------------------------
 @app.get("/market-hotlist")
 def market_hotlist():
-    from symbols_clean import REAL_TICKERS
-    import datetime
+    """
+    Returns the last precomputed Hotlist from Firestore.
 
-    # 1) Try returning cached first
+    Document shape (in bullsignals_ai/market_hotlist):
+    {
+        "count": 5,
+        "hotlist": [
+            {
+                "symbol": "KO",
+                "prob_up": 0.6123,
+                "prob_down": 0.3877,
+                "signal": "BUY",
+                "kind": "STRONG_BUY" | "BUY" | "WATCHLIST_BUY",
+                "confidence": 61.23,
+                "explanation_short": "...",
+                "explanation_risk": "..."
+            },
+            ...
+        ],
+        "updated_at": "2025-12-10T03:15:00Z"
+    }
+    """
     cache = read_market_cache("market_hotlist")
-    if cache:
+    if not cache:
         return {
-            "count": cache.get("count", 0),
-            "hotlist": cache.get("hotlist", [])
+            "count": 0,
+            "hotlist": [],
+            "updated_at": None,
         }
 
-    results = []
-
-    # 2) Full scan (ALL SP500 tickers)
-    for sym in REAL_TICKERS:
-        try:
-            infer = bullbrain_infer_single(sym)
-            if not infer:
-                continue
-
-            prob_up = float(infer.get("probability_up", 0))
-            prob_down = float(infer.get("probability_down", 0))
-
-            results.append({
-                "symbol": sym,
-                "prob_up": round(prob_up, 4),
-                "prob_down": round(prob_down, 4),
-                "signal": infer.get("signal"),
-                "confidence": infer.get("confidence"),
-            })
-
-        except Exception as e:
-            print(f"hotlist error {sym}:", e)
-
-    # 3) Sort strongest bullish
-    results.sort(key=lambda x: x["prob_up"], reverse=True)
-    top15 = results[:15]
-
-    # 4) Save to Firestore
-    try:
-        cache_data = {
-            "count": len(top15),
-            "hotlist": top15,
-            "updated_at": datetime.datetime.utcnow().isoformat() + "Z",
-        }
-        save_to_firestore_market_cache("market_hotlist", cache_data)
-    except Exception as e:
-        print("🔥 Cache save failed (hotlist):", e)
-
-    return {"count": len(top15), "hotlist": top15}
-
+    return {
+        "count": cache.get("count", len(cache.get("hotlist", []))),
+        "hotlist": cache.get("hotlist", []),
+        "updated_at": cache.get("updated_at"),
+    }
 
 
 # ---------------------------------------------------------
-# /market-bearwatch — Top 15 strongest bearish tickers
+# /market-bearwatch — READ-ONLY view of Firestore cache
 # ---------------------------------------------------------
 @app.get("/market-bearwatch")
 def market_bearwatch():
-    from symbols_clean import REAL_TICKERS
-    import datetime
+    """
+    Returns the last precomputed BearWatch from Firestore.
 
-    # 1) Use cached version if available
+    Document shape (in bullsignals_ai/market_bearwatch):
+    {
+        "count": 5,
+        "bearwatch": [
+            {
+                "symbol": "VZ",
+                "prob_up": 0.287,
+                "prob_down": 0.713,
+                "signal": "SELL" | "HOLD",
+                "kind": "STRONG_SELL" | "SELL" | "HOLD",
+                "confidence": 71.3,
+                "explanation_short": "...",
+                "explanation_risk": "..."
+            },
+            ...
+        ],
+        "updated_at": "2025-12-10T03:15:00Z"
+    }
+    """
     cache = read_market_cache("market_bearwatch")
-    if cache:
+    if not cache:
         return {
-            "count": cache.get("count", 0),
-            "bearwatch": cache.get("bearwatch", [])
+            "count": 0,
+            "bearwatch": [],
+            "updated_at": None,
         }
 
-    results = []
-
-    # 2) FULL SCAN of SP500
-    for sym in REAL_TICKERS:
-        try:
-            infer = bullbrain_infer_single(sym)
-            if not infer:
-                continue
-
-            prob_up = float(infer.get("probability_up", 0))
-            prob_down = float(infer.get("probability_down", 0))
-
-            results.append({
-                "symbol": sym,
-                "prob_up": round(prob_up, 4),
-                "prob_down": round(prob_down, 4),
-                "signal": infer.get("signal"),
-                "confidence": infer.get("confidence"),
-            })
-
-        except Exception as e:
-            print(f"bearwatch error {sym}:", e)
-
-    # 3) Sort strongest bearish
-    results.sort(key=lambda x: x["prob_down"], reverse=True)
-    top15 = results[:15]
-
-    # 4) Save to Firestore
-    try:
-        cache_data = {
-            "count": len(top15),
-            "bearwatch": top15,
-            "updated_at": datetime.datetime.utcnow().isoformat() + "Z",
-        }
-        save_to_firestore_market_cache("market_bearwatch", cache_data)
-    except Exception as e:
-        print("🔥 Cache save failed (bearwatch):", e)
-
-    return {"count": len(top15), "bearwatch": top15}
+    return {
+        "count": cache.get("count", len(cache.get("bearwatch", []))),
+        "bearwatch": cache.get("bearwatch", []),
+        "updated_at": cache.get("updated_at"),
+    }

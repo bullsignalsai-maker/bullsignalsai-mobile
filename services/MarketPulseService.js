@@ -2,148 +2,189 @@
 import { API_BASE_URL } from "../config/apiKeys";
 
 /* ---------------------------------------------------------
-   1) Fetch Market Pulse (Highlights + News)
-   🔥 Firestore-backed, fast
+   INTERNAL HELPERS
 --------------------------------------------------------- */
-export async function getMarketPulse() {
-  try {
-    const url = `${API_BASE_URL}/market-pulse`;
-    console.log("📡 Fetching Market Pulse:", url);
 
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.warn("❌ Market Pulse fetch failed:", res.status);
-      return null;
-    }
+/**
+ * Extract ticker symbol from labels like:
+ *  - "S&P 500 (SPY)" → SPY
+ *  - "Gold (GLD)" → GLD
+ *  - "BTC" → BTC
+ */
+function extractSymbol(label = "") {
+  const m = String(label).match(/\(([^)]+)\)/);
+  return (m?.[1] || label).trim().toUpperCase();
+}
 
-    const json = await res.json();
-
-    // Safety defaults
-    const highlights = json.highlights_grouped || {
-      bullish: [],
-      neutral: [],
-      bearish: [],
-    };
-
-    const grouped = json.news_grouped || {
-      today: [],
-      yesterday: [],
-      week: [],
-      older: [],
-    };
-
-    // Normalize timestamps for UI
-    const normalizeGroup = (arr) =>
-      arr.map((n) => {
-        const clean = { ...n };
-        try {
-          const iso = n.pubDateET || n.pubDate;
-          const d = new Date(iso);
-
-          clean.timeFormatted = d.toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-
-          clean.dateFormatted = d.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          });
-        } catch (e) {
-          clean.timeFormatted = "";
-          clean.dateFormatted = "";
-        }
-        return clean;
-      });
-
-    return {
-      highlights_grouped: highlights,
-      highlights_numeric: json.highlights_numeric || {
-        bull: 0,
-        neutral: 0,
-        bear: 0,
-      },
-      news_grouped: {
-        today: normalizeGroup(grouped.today),
-        yesterday: normalizeGroup(grouped.yesterday),
-        week: normalizeGroup(grouped.week),
-        older: normalizeGroup(grouped.older),
-      },
-      updated_at: json.updated_at,
-    };
-  } catch (err) {
-    console.warn("❌ MarketPulseService error:", err.message);
-    return null;
-  }
+/**
+ * Normalize quote fields safely
+ */
+function normalizeQuote(q = {}) {
+  return {
+    price: typeof q.price === "number" ? q.price : null,
+    change: typeof q.change === "number" ? q.change : null,
+    changePct: typeof q.changePct === "number" ? q.changePct : null,
+    updated_at: q.updated_at || null,
+    needs_refresh: q.needs_refresh === true,
+    source: q.source || null,
+  };
 }
 
 /* ---------------------------------------------------------
-   2) Fetch Market Overview (Live snapshot)
-   🔥 Firestore-backed, very fast
+   1) MARKET OVERVIEW + LIVE QUOTES (CORE)
 --------------------------------------------------------- */
 export async function getMarketOverview() {
   try {
-    const url = `${API_BASE_URL}/market-overview`;
-    console.log("📡 Fetching Market Overview:", url);
+    // 1️⃣ Fetch snapshot (cron-backed, cheap)
+    const snapRes = await fetch(`${API_BASE_URL}/homescreen-context`);
+    if (!snapRes.ok) return null;
 
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.warn("❌ Market Overview fetch failed:", res.status);
-      return null;
+    const snapJson = await snapRes.json();
+    const carousel = Array.isArray(snapJson.carousel)
+      ? snapJson.carousel
+      : [];
+
+    // 2️⃣ Collect unique symbols from carousel
+    const symbolsSet = new Set();
+
+    carousel.forEach((card) => {
+      card?.items?.forEach((it) => {
+        const sym = extractSymbol(it.label);
+        if (sym) symbolsSet.add(sym);
+      });
+    });
+
+    const symbols = Array.from(symbolsSet);
+    let liveQuotes = {};
+
+    // 3️⃣ Fetch LIVE quotes in bulk (TTL + needs_refresh aware)
+    if (symbols.length) {
+      const qRes = await fetch(
+        `${API_BASE_URL}/quotes-bulk?scope=market&symbols=${symbols.join(",")}`
+      );
+
+      if (qRes.ok) {
+        const qJson = await qRes.json();
+        liveQuotes = qJson?.quotes || {};
+      }
     }
 
-    return await res.json();
-  } catch (err) {
-    console.warn("❌ getMarketOverview error:", err.message);
+    // 4️⃣ Merge live quotes into carousel items
+    const mergedCarousel = carousel.map((card) => ({
+      ...card,
+      items: (card.items || []).map((it) => {
+        const sym = extractSymbol(it.label);
+        const live = liveQuotes[sym];
+
+        return {
+          ...it,
+          symbol: sym,
+          quote: live
+            ? normalizeQuote(live)
+            : normalizeQuote(it.quote),
+        };
+      }),
+    }));
+
+    return {
+      market: snapJson.market || {
+        marketStatus: "Unknown",
+        marketMood: "Unknown",
+        risk_level: "Unknown",
+        fearGreed: null,
+      },
+      carousel: mergedCarousel,
+      updated_at: snapJson.updated_at || null,
+      version: snapJson.version || "v1",
+      meta: {
+        symbols_count: symbols.length,
+        quotes_source: "quotes_collection",
+      },
+    };
+  } catch (e) {
+    console.warn("❌ getMarketOverview error:", e.message);
     return null;
   }
 }
 
 /* ---------------------------------------------------------
-   3) Fetch Hotlist (Fast — Firestore)
+   2) MARKET MOVERS (LIVE-QUOTE SAFE)
 --------------------------------------------------------- */
-export async function getHotlist() {
+export async function getMarketMovers() {
   try {
-    const url = `${API_BASE_URL}/market-hotlist`;
-    console.log("📡 Fetching Hotlist:", url);
-
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.warn("❌ Hotlist fetch failed:", res.status);
-      return null;
-    }
+    const res = await fetch(`${API_BASE_URL}/market-movers`);
+    if (!res.ok) return null;
 
     const json = await res.json();
-    console.log(`🔥 Hotlist received (${json.count} items)`);
 
-    return json;
-  } catch (err) {
-    console.warn("❌ getHotlist error:", err.message);
+    const movers = (json.movers || []).map((m) => {
+      const q = normalizeQuote(m.quote || {});
+
+      return {
+        symbol: m.symbol,
+        company: m.company || m.symbol,
+
+        // live-safe quote
+        price: q.price,
+        change: q.change,
+        changePct: q.changePct,
+        needs_refresh: q.needs_refresh,
+
+        direction: m.direction,
+        trendLabel: m.trend?.label || null,
+        pattern:
+          m.pattern?.name &&
+          m.pattern.name !== "NO CLEAR PATTERN"
+            ? m.pattern.name
+            : null,
+        oneLiner: m.oneLiner || null,
+      };
+    });
+
+    return {
+      gainers: movers.filter((m) => m.direction === "up"),
+      losers: movers.filter((m) => m.direction === "down"),
+      updated_at: json.updated_at || null,
+      as_of: json.as_of || null,
+    };
+  } catch (e) {
+    console.warn("❌ getMarketMovers error:", e.message);
     return null;
   }
 }
 
 /* ---------------------------------------------------------
-   4) Fetch BearWatch (Fast — Firestore)
+   3) MARKET NEWS
 --------------------------------------------------------- */
-export async function getBearwatch() {
+export async function getMarketNews() {
   try {
-    const url = `${API_BASE_URL}/market-bearwatch`;
-    console.log("📡 Fetching BearWatch:", url);
-
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.warn("❌ BearWatch fetch failed:", res.status);
-      return null;
-    }
+    const res = await fetch(`${API_BASE_URL}/market-news`);
+    if (!res.ok) return null;
 
     const json = await res.json();
-    console.log(`🔥 BearWatch received (${json.count} items)`);
+    const items = Array.isArray(json.data) ? json.data : [];
 
-    return json;
-  } catch (err) {
-    console.warn("❌ getBearwatch error:", err.message);
+    const news = items.map((n) => {
+      const d = new Date(n.pubDate);
+      return {
+        ...n,
+        timeFormatted: isNaN(d)
+          ? ""
+          : d.toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+      };
+    });
+
+    return {
+      news,
+      highlights: [], // future-proof
+      updated_at: json.updated_at || null,
+      source: "market-news",
+    };
+  } catch (e) {
+    console.warn("❌ getMarketNews error:", e.message);
     return null;
   }
 }

@@ -28,7 +28,7 @@ import PortfolioScreen from "./screens/PortfolioScreen"; // ✅ new
 import AddPositionScreen from "./screens/AddPositionScreen"; // ✅ new
 import FullPatternDetailScreen from "./screens/FullPatternDetailScreen"; // ✅ new
 import FullTechnicalDetailScreen from "./screens/FullTechnicalDetailScreen"; // ✅ new
-
+import MarketMoversScreen from "./screens/MarketMoversScreen"; // ✅ new
 // Services
 import { registerPushToken } from "./services/notifications"; // ✅ new import
 import FullChartScreen from "./screens/FullChartScreen";
@@ -239,6 +239,26 @@ export default function App() {
           }}
         />
 
+<Stack.Screen
+          name="MarketMoversScreen"
+          component={MarketMoversScreen}
+          options={{
+            headerShown: true,
+            title: "Market Movers",
+            headerStyle: { backgroundColor: "#000" },
+            headerTintColor: "#00E396",
+            headerBackTitleVisible: false,
+            headerBackTitle: false,
+            headerBackImage: () => (
+              <Ionicons
+                name="chevron-back-outline"
+                size={24}
+                color="#00E396"
+                style={{ marginLeft: 10 }}
+              />
+            ),
+          }}
+        />
         {/* ALERT SCREEN */}
         <Stack.Screen
           name="AlertScreen"
