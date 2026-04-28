@@ -18,7 +18,7 @@ import { API_BASE_URL } from "../config/apiKeys"; // ✅ backend base URL
 import SmartPatternCard from "../components/SmartPatternCard";
 import { getStockDetail } from "../services/stockDetailService";
 import { SafeAreaView } from "react-native";
-
+import AstraChat from "../components/AstraChat";
 
 // === Brand palette ===
 const BRAND = {
@@ -592,7 +592,7 @@ export default function StockDetailScreen({ route, navigation }) {
   const [loadingGrok, setLoadingGrok] = useState(true);
 
   const [refreshing, setRefreshing] = useState(false);
- 
+ const [astraVisible, setAstraVisible] = useState(false);
 
   const loadAll = useCallback(
     async (forceGrok = false) => {
@@ -657,6 +657,17 @@ const patternStats = detail?.patternStats;
     ? new Date(structuredGrok.updatedAt).getTime()
     : null;
 
+    const astraStockContext = detail
+  ? {
+      contextType: "stock_detail",
+      symbol: detail.symbol,
+      companyName: detail.companyName,
+      total_value: 0,
+      total_gain: 0,
+      today_gain: 0,
+      positions: [],
+    }
+  : null;
   // ---- Derived sections from Grok essay ----
   const grokSections = useMemo(
     () => parseStructuredSections(rawGrokText),
@@ -685,6 +696,7 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
 
 
   return (
+     <View style={{ flex: 1, backgroundColor: BRAND.bg }}>
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
@@ -834,6 +846,7 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
                 : "Analyzing..."}
             </Text>
           </View>
+
           <TouchableOpacity
             onPress={() => loadAll(true)}
             disabled={loadingDetail || loadingGrok}
@@ -860,6 +873,7 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
                 {(hybridSignal || "NEUTRAL").toUpperCase()}
               </Text>
             </View>
+
             <View style={{ flex: 1 }}>
               <Text style={styles.signalTagline} numberOfLines={2}>
                 {structuredGrok.ai_signal ||
@@ -867,38 +881,39 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
               </Text>
             </View>
           </View>
+
+          {/* Bias badge */}
           {detail?.ui?.decision?.bias && (
-          <View
-            style={{
-              marginLeft: 6,
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 999,
-              backgroundColor:
-                detail.ui.decision.bias.label === "Bullish"
-                  ? "rgba(0,227,150,0.18)"
-                  : detail.ui.decision.bias.label === "Bearish"
-                  ? "rgba(239,68,68,0.18)"
-                  : "rgba(250,204,21,0.18)",
-            }}
-          >
-            <Text
+            <View
               style={{
-                fontSize: 11,
-                fontWeight: "800",
-                color:
+                marginLeft: 6,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 999,
+                backgroundColor:
                   detail.ui.decision.bias.label === "Bullish"
-                    ? BRAND.accent
+                    ? "rgba(0,227,150,0.18)"
                     : detail.ui.decision.bias.label === "Bearish"
-                    ? BRAND.red
-                    : BRAND.amber,
+                    ? "rgba(239,68,68,0.18)"
+                    : "rgba(250,204,21,0.18)",
               }}
             >
-              {detail.ui.decision.bias.label}
-            </Text>
-          </View>
-        )}
-
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: "800",
+                  color:
+                    detail.ui.decision.bias.label === "Bullish"
+                      ? BRAND.accent
+                      : detail.ui.decision.bias.label === "Bearish"
+                      ? BRAND.red
+                      : BRAND.amber,
+                }}
+              >
+                {detail.ui.decision.bias.label}
+              </Text>
+            </View>
+          )}
 
           {/* Numbers row */}
           <View style={styles.hybridNumbersRow}>
@@ -908,6 +923,7 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
                 {hybridScore != null ? formatPercent(hybridScore, 1) : "N/A"}
               </Text>
             </View>
+
             <View style={styles.hybridNumCol}>
               <Text style={styles.hybridLabel}>Chances of upside</Text>
               <Text style={styles.hybridValue}>
@@ -916,6 +932,7 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
                   : "N/A"}
               </Text>
             </View>
+
             <View style={styles.hybridNumCol}>
               <Text style={styles.hybridLabel}>Model blend</Text>
               <Text style={styles.hybridValue} numberOfLines={2}>
@@ -929,25 +946,39 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
               </Text>
             </View>
           </View>
+
+          {/* Progress bar */}
           <View style={{ marginTop: 8 }}>
-          <View style={{ height: 6, backgroundColor: "#1f2937", borderRadius: 4 }}>
             <View
               style={{
-                width: `${hybridProbUp * 100}%`,
                 height: 6,
+                backgroundColor: "#1f2937",
                 borderRadius: 4,
-                backgroundColor: BRAND.accent,
               }}
-            />
-          </View>
-          <Text style={{ color: BRAND.sub, fontSize: 11, marginTop: 4 }}>
-            Upside {Math.round(hybridProbUp * 100)}% • Downside {Math.round((1 - hybridProbUp) * 100)}%
-          </Text>
-        </View>
+            >
+              <View
+                style={{
+                  width: `${hybridProbUp ? hybridProbUp * 100 : 0}%`,
+                  height: 6,
+                  borderRadius: 4,
+                  backgroundColor: BRAND.accent,
+                }}
+              />
+            </View>
 
+            <Text
+              style={{
+                color: BRAND.sub,
+                fontSize: 11,
+                marginTop: 4,
+              }}
+            >
+              Upside {hybridProbUp ? Math.round(hybridProbUp * 100) : 0}% •
+              Downside {hybridProbUp ? Math.round((1 - hybridProbUp) * 100) : 0}%
+            </Text>
+          </View>
 
           {/* Narrative */}
-        
           <View style={styles.hybridNarrativeBox}>
             <Text style={styles.hybridNarrativeText}>
               {buildHybridSignalSummary({
@@ -958,9 +989,12 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
               })}
             </Text>
           </View>
+
+          {/* Why this signal */}
           {detail?.ui?.decision?.reasons?.length > 0 && (
             <View style={styles.whyBlock}>
               <Text style={styles.whyLabel}>Why this signal?</Text>
+
               {detail.ui.decision.reasons.map((reason, idx) => (
                 <Text key={`reason-${idx}`} style={styles.whyText}>
                   • {reason.replace(/([A-Z])/g, " $1").trim()}
@@ -969,9 +1003,29 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
             </View>
           )}
 
+          {/* CTA — Full Signal Details */}
+          <TouchableOpacity
+            style={styles.techButton}
+            onPress={() =>
+              navigation.navigate("FullDecisionDetailScreen", {
+                symbol: detail.symbol,
+                companyName: detail.companyName,
+                quote: detail.quote,
+                hybridSignal: detail.hybridSignal,
+                hybridScore: detail.hybridScore,
+                bullbrain: detail.bullbrain,
+                technical: detail.technical,
+                pattern: detail.pattern,
+                isPremium: true,
+              })
+            }
+          >
+            <Text style={styles.techButtonText}>
+              Why This Signal?
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
-
                     {/* SMART PATTERN (SUMMARY ONLY) */}
         {patternInsight && (
           <View style={styles.card}>
@@ -1038,9 +1092,9 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
             <Text style={styles.sectionTitle}>Outlook</Text>
           </View>
           <View style={{ marginTop: 4 }}>
-  <Text style={styles.sectionBody}>
-    Near- and long-term expectations based on fundamentals, technicals, and macro assumptions.
-  </Text>
+        <Text style={styles.sectionBody}>
+          Near- and long-term expectations based on fundamentals, technicals, and macro assumptions.
+        </Text>
 
       <View style={{ marginTop: 6 }}>
         <GreenBullets items={outlookBullets} />
@@ -1452,16 +1506,28 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
             )}
 
 
-      {/* RISK NOTE / FOOTER */}
-      {structuredGrok.risk_note && (
-        <View style={styles.card}>
-          <Text style={styles.riskNoteText}>{structuredGrok.risk_note}</Text>
+      {/* EDUCATIONAL NOTE / RISK FOOTER */}
+        <View style={styles.riskFooterCard}>
+          <View style={styles.riskFooterHeader}>
+            <Ionicons name="shield-checkmark-outline" size={16} color={BRAND.amber} />
+            <Text style={styles.riskFooterTitle}>Educational Note</Text>
+          </View>
+
+          {structuredGrok.risk_note ? (
+            <Text style={styles.riskNoteText}>{structuredGrok.risk_note}</Text>
+          ) : null}
+
           <Text style={styles.riskNoteText}>
-            This app is for educational purposes only and does not provide
-            financial advice.
+            BullSignalsAI insights are generated using historical price data,
+            technical indicators, probability models, pattern analysis, and market
+            behavior. These signals do not guarantee future performance.
+          </Text>
+
+          <Text style={styles.riskNoteText}>
+            This information is provided for educational and research purposes only and
+            should not be treated as financial or investment advice.
           </Text>
         </View>
-      )}
 
       {/* Footer credit */}
       <View style={{ marginTop: 18, alignItems: "center", marginBottom: 30 }}>
@@ -1473,7 +1539,27 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
         </Text>
       </View>
     </ScrollView>
-  );
+    
+    {detail && (
+      <TouchableOpacity
+        style={styles.astraFab}
+        activeOpacity={0.85}
+        onPress={() => setAstraVisible(true)}
+      >
+        <Ionicons name="aperture" size={35} color={BRAND.accent} />
+      </TouchableOpacity>
+    )}
+
+    {astraStockContext && (
+      <AstraChat
+        visible={astraVisible}
+        onClose={() => setAstraVisible(false)}
+        portfolioData={astraStockContext}
+      />
+    )}
+  </View>
+);
+  
 }
 
 // =======================
@@ -1990,6 +2076,42 @@ sparklineMetaText: {
   fontSize: 11,
   opacity: 0.85,
 },
+riskFooterCard: {
+  backgroundColor: "#020617",
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: BRAND.border,
+  paddingHorizontal: 12,
+  paddingVertical: 12,
+  marginTop: 12,
+  marginBottom: 8,
+},
 
+riskFooterHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  marginBottom: 6,
+},
 
+riskFooterTitle: {
+  color: BRAND.amber,
+  fontSize: 14,
+  fontWeight: "800",
+  marginLeft: 8,
+},
+astraFab: {
+  position: "absolute",
+  left: 20,
+  bottom: 32,
+  width: 46,
+  height: 46,
+  borderRadius: 23,
+  backgroundColor: "#020617",
+  borderWidth: 1.5,
+  borderColor: BRAND.border,
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 999,
+  elevation: 10,
+},
 });

@@ -268,7 +268,7 @@ const [refreshing, setRefreshing] = useState(false);
 
             {c.id === "sectors" ? (
               <View style={styles.sectorWrap}>
-                {c.value.split(" · ").map((seg, idx) => {
+                {c.value.split(/\s*·\s*|\n/).filter(Boolean).map((seg, idx) => {
                   const isUp = seg.includes("▲");
                   const isDown = seg.includes("▼");
 
@@ -282,7 +282,7 @@ const [refreshing, setRefreshing] = useState(false);
                       ]}
                     >
                       {seg}
-                      {idx < c.value.split(" · ").length - 1 ? " · " : ""}
+                      {idx < c.value.split(/\s*·\s*|\n/).filter(Boolean).length - 1 ? " · " : ""}
                     </Text>
                   );
                 })}

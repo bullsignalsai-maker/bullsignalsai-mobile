@@ -14,14 +14,14 @@ import {
   Keyboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { API_BASE_URL } from "../config/apiKeys";
+import { askAstra as askAstraService } from "../services/astraService";
 
 export default function AstraChat({ visible, onClose, portfolioData }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [askedIds, setAskedIds] = useState([]); // which predefined questions already used
-
+  const [suggestedFollowups, setSuggestedFollowups] = useState([]);
   const scrollRef = useRef(null);
 
   
@@ -29,6 +29,19 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
 // DYNAMIC QUESTION BUILDER (based on portfolio size)
 // -----------------------------------------------------
 const buildAllChips = () => {
+  const isStockDetailMode = portfolioData?.contextType === "stock_detail";
+  const stockSymbol = portfolioData?.symbol || "this stock";
+
+  if (isStockDetailMode) {
+    return [
+      { id: "stock_explain", label: `Explain ${stockSymbol}` },
+      { id: "decision_explain", label: `Why is ${stockSymbol} rated this way?` },
+      { id: "pattern_explain", label: `Explain ${stockSymbol} pattern` },
+      { id: "technical_explain", label: `Explain ${stockSymbol} technicals` },
+      { id: "risk_explain", label: `What is the biggest risk?` },
+    ];
+  }
+
   const p = portfolioData?.positions || [];
   const count = p.length;
 
@@ -90,7 +103,8 @@ const starterIds = new Set(starterChips.map((c) => c.id));
       scrollRef.current?.scrollToEnd({ animated: true });
     }, 30);
   };
-
+const makeId = (suffix) =>
+  `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${suffix}`;
   // Reset Astra every time it is opened
   useEffect(() => {
     if (visible) {
@@ -99,25 +113,31 @@ const starterIds = new Set(starterChips.map((c) => c.id));
           id: "welcome",
           from: "astra",
           text:
-            "Meet Astra — your AI co-pilot that monitors your holdings and explains what matters in clear, simple language. Select a quick question below or ask anything.",
+  portfolioData?.contextType === "stock_detail"
+    ? `Ask Astra anything about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, risks, or what could change.`
+    : "Meet Astra — your AI co-pilot that monitors your holdings and explains what matters in clear, simple language. Select a quick question below or ask anything.",
         },
       ]);
       setInput("");
       setAskedIds([]);
+      setSuggestedFollowups([]);
     }
   }, [visible]);
 
   // Core ask logic → calls /astra-chat
   const askAstra = async ({ question_id = null, question_text = null }) => {
+    const isStockDetailMode = portfolioData?.contextType === "stock_detail";
+
     if (
-      !portfolioData ||
-      !portfolioData.positions ||
-      portfolioData.positions.length === 0
+      !isStockDetailMode &&
+      (!portfolioData ||
+        !portfolioData.positions ||
+        portfolioData.positions.length === 0)
     ) {
       setMessages((prev) => [
         ...prev,
         {
-          id: Date.now() + "_err",
+          id: makeId("err"),
           from: "astra",
           text:
             "Add at least one stock to your portfolio so I can analyze performance, risk, and trends.",
@@ -139,7 +159,7 @@ const starterIds = new Set(starterChips.map((c) => c.id));
     }
 
     const userMsg = {
-      id: Date.now() + "_user",
+      id: makeId("user"),
       from: "user",
       text: label,
     };
@@ -148,48 +168,57 @@ const starterIds = new Set(starterChips.map((c) => c.id));
     setMessages((prev) => [
       ...prev,
       userMsg,
-      { id: "typing", from: "typing", text: "" },
+      { id: makeId("typing"), from: "typing", text: "" },
     ]);
     setInput("");
     scrollToEnd();
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/astra-chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...portfolioData,
-          question_id,
-          question: question_text,
-        }),
-      });
+  const chatHistory = messages
+    .filter((m) => m.from === "user" || m.from === "astra")
+    .slice(-6)
+    .map((m) => ({
+      role: m.from === "user" ? "user" : "assistant",
+      text: m.text,
+    }));
 
-      const json = await res.json();
-      const answer =
-        json?.answer ||
-        json?.message ||
-        "I processed your question and generated an update.";
+  const result = await askAstraService({
+    ...portfolioData,
+    question_id,
+    question: question_text || label,
+    chat_history: chatHistory,
+  });
 
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== "typing"),
-        { id: Date.now() + "_astra", from: "astra", text: answer },
-      ]);
-      scrollToEnd();
-    } catch (err) {
-      console.log("AstraChat error:", err);
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== "typing"),
-        {
-          id: Date.now() + "_err2",
-          from: "astra",
-          text: "I couldn't reach the server right now. Try again shortly.",
-        },
-      ]);
-      scrollToEnd();
-    } finally {
-      setLoading(false);
-    }
+  setMessages((prev) => [
+  ...prev.filter((m) => m.from !== "typing"),
+    {
+    id: makeId("astra"),
+    from: "astra",
+    text: result.answer,
+    cards: result.cards || [],
+  },
+]);
+
+setSuggestedFollowups(result.suggestedFollowups || []);
+
+scrollToEnd();
+} catch (err) {
+  console.log("AstraChat error:", err);
+
+  setMessages((prev) => [
+    ...prev.filter((m) => m.from !== "typing"),
+    {
+      id: makeId("err"),
+      from: "astra",
+      text: "I couldn't reach Astra right now. Please try again shortly.",
+    },
+  ]);
+
+  scrollToEnd();
+} finally {
+  setLoading(false);
+}
   };
 
   const sendCustom = () => {
@@ -251,8 +280,22 @@ const starterIds = new Set(starterChips.map((c) => c.id));
                     </View>
                   ) : (
                     <View key={m.id} style={styles.botBubble}>
-                      <Text style={styles.botText}>{m.text}</Text>
-                    </View>
+                    <Text style={styles.botText}>{m.text}</Text>
+
+                    {Array.isArray(m.cards) && m.cards.length > 0 && (
+                      <View style={styles.answerCardsWrap}>
+                        {m.cards.map((card, idx) => (
+                          <View key={`${m.id}-card-${idx}`} style={styles.answerCard}>
+                            <Text style={styles.answerCardTitle}>{card.title}</Text>
+                            <Text style={styles.answerCardValue}>{card.value}</Text>
+                            {!!card.subtitle && (
+                              <Text style={styles.answerCardSubtitle}>{card.subtitle}</Text>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
                   )
                 )}
 
@@ -287,7 +330,7 @@ const starterIds = new Set(starterChips.map((c) => c.id));
             </View>
 
             {/* More insights after first question */}
-            {hasAsked && moreChips.length > 0 && (
+            {hasAsked && suggestedFollowups.length === 0 && moreChips.length > 0 && (
               <>
                 <Text style={styles.promptHeader}>More insights</Text>
                 <View style={styles.chipColumn}>
@@ -314,8 +357,37 @@ const starterIds = new Set(starterChips.map((c) => c.id));
                 </View>
               </>
             )}
+            {suggestedFollowups.length > 0 && (
+              <>
+                <Text style={styles.promptHeader}>Suggested follow-ups</Text>
 
+                <View style={styles.chipColumn}>
+                  {suggestedFollowups.slice(0, 2).map((q, idx) => (
+                    <Pressable
+                      key={`followup-${idx}-${q}`}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        pressed && { opacity: 0.8 },
+                      ]}
+                      onPress={() => askAstra({ question_text: q })}
+                    >
+                      <Ionicons
+                        name="chatbubble-ellipses-outline"
+                        size={14}
+                        color="#00E396"
+                        style={{ marginRight: 6 }}
+                      />
+
+                      <Text style={styles.chipText}>{q}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
             {/* Input */}
+            <Text style={styles.disclaimerText}>
+              Astra provides educational AI insights only, not personal financial advice.
+            </Text>
             <View style={styles.inputRow}>
               <TextInput
                 style={styles.input}
@@ -359,9 +431,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#1F2937",
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 10,
     paddingBottom: 12,
-    height: "88%",
+    height: "92%",
   },
 
   headerRow: {
@@ -521,4 +593,46 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  disclaimerText: {
+  color: "#6B7280",
+  fontSize: 10.5,
+  lineHeight: 14,
+  textAlign: "center",
+  marginBottom: 4,
+},
+answerCardsWrap: {
+  marginTop: 8,
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8,
+},
+
+answerCard: {
+  width: "48%",
+  backgroundColor: "#020617",
+  borderWidth: 1,
+  borderColor: "#1F2937",
+  borderRadius: 12,
+  paddingHorizontal: 9,
+  paddingVertical: 8,
+},
+
+answerCardTitle: {
+  color: "#9CA3AF",
+  fontSize: 10.5,
+  marginBottom: 3,
+},
+
+answerCardValue: {
+  color: "#00E396",
+  fontSize: 13,
+  fontWeight: "800",
+},
+
+answerCardSubtitle: {
+  color: "#E5E7EB",
+  fontSize: 10.5,
+  lineHeight: 14,
+  marginTop: 3,
+},
 });

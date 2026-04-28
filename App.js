@@ -29,6 +29,7 @@ import AddPositionScreen from "./screens/AddPositionScreen"; // ✅ new
 import FullPatternDetailScreen from "./screens/FullPatternDetailScreen"; // ✅ new
 import FullTechnicalDetailScreen from "./screens/FullTechnicalDetailScreen"; // ✅ new
 import MarketMoversScreen from "./screens/MarketMoversScreen"; // ✅ new
+import SignalDetailScreen from "./screens/SignalDetailScreen"; // ✅ new
 // Services
 import { registerPushToken } from "./services/notifications"; // ✅ new import
 import FullChartScreen from "./screens/FullChartScreen";
@@ -203,6 +204,26 @@ export default function App() {
           options={{
             headerShown: true,
             title: "Technical Details",
+            headerStyle: { backgroundColor: "#000" },
+            headerTintColor: "#00E396",
+            headerBackTitleVisible: false,
+            headerBackTitle: false,
+            headerBackImage: () => (
+              <Ionicons
+                name="chevron-back-outline"
+                size={24}
+                color="#00E396"
+                style={{ marginLeft: 10 }}
+              />
+            ),
+          }}
+        />
+        <Stack.Screen
+          name="FullDecisionDetailScreen"
+          component={SignalDetailScreen}
+          options={{
+            headerShown: true,
+            title: "Signal Details",
             headerStyle: { backgroundColor: "#000" },
             headerTintColor: "#00E396",
             headerBackTitleVisible: false,

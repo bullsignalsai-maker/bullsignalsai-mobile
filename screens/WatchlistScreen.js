@@ -646,11 +646,12 @@ const pct =
 
 
   {/* SUMMARY */}
-  {!!item.watchlistSummary && (
-    <Text style={styles.summary} numberOfLines={3}>
-      {item.watchlistSummary}
-    </Text>
-  )}
+
+{!!item.watchlistSummary && (
+  <Text style={styles.summary}>
+    {item.watchlistSummary}
+  </Text>
+)}
 {/* SMART PATTERN */}
 <View
   style={[
@@ -878,22 +879,15 @@ const styles = StyleSheet.create({
   },
   trackedText: { color: BRAND.sub, fontSize: 10, marginLeft: 4 },
 
-  card: {
-    backgroundColor: BRAND.card,
-    borderRadius: 14,
-    marginHorizontal: 18,
-    marginBottom: 8,
-    padding: 8, 
-    borderWidth: 1,
-    borderColor: BRAND.border,
-  },
+
+
   cardHead: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
 
-  symbol: { fontSize: 14, fontWeight: "800", color: "#E5E7EB" },
+ 
   company: { marginTop: 1, fontSize: 12, color: BRAND.sub },
 
   badge: {
@@ -1048,9 +1042,6 @@ rowTop: {
   alignItems: "center",
 },
 
-priceBlock: {
-  alignItems: "flex-end",
-},
 
 liveDotRow: {
   flexDirection: "row",
@@ -1072,12 +1063,6 @@ liveText: {
   fontWeight: "700",
 },
 
-signalRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  marginTop: 4,
-},
-
 confText: {
   marginLeft: 8,
   fontSize: 12,
@@ -1087,13 +1072,12 @@ confText: {
 card: {
   backgroundColor: BRAND.card,
   borderRadius: 16,
-  padding: 12,            // 👈 smaller than Home (14 → 12)
-  marginHorizontal: 18,
+  padding: 12,
+  marginHorizontal: 10,
   marginBottom: 8,
   borderWidth: 1,
   borderColor: BRAND.border,
 },
-
 cardHeader: {
   flexDirection: "row",
   justifyContent: "space-between",
@@ -1155,10 +1139,10 @@ confValue: {
 
 summary: {
   color: BRAND.sub,
-  fontSize: 13,
-  marginTop: 6,
+  fontSize: 12.5,
+  lineHeight: 18,
+  marginTop: 7,
 },
-
 lastUpdated: {
   color: BRAND.sub,
   fontSize: 11,
