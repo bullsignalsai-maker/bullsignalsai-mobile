@@ -19,7 +19,8 @@ import {
 } from "../services/MarketPulseService";
 import { Linking } from "react-native";
 import * as Haptics from "expo-haptics";
-
+import { Ionicons } from "@expo/vector-icons";
+import AstraChat from "../components/AstraChat";
 /* ---------------------------------------------------------
    Utils
 --------------------------------------------------------- */
@@ -129,7 +130,7 @@ export default function MarketScreen({ navigation }) {
   const [highlights, setHighlights] = useState([]);
   const priceCacheRef = useRef({});
   const prevPriceCacheRef = useRef({});
-
+  const [astraVisible, setAstraVisible] = useState(false);
 
       const loadData = useCallback(async (silent = false) => {
       try {
@@ -206,7 +207,13 @@ export default function MarketScreen({ navigation }) {
     );
   }
   const groupedNews = groupNewsByDate(news);
-
+  const astraMarketContext = {
+    contextType: "market",
+    total_value: 0,
+    total_gain: 0,
+    today_gain: 0,
+    positions: [],
+  };
   return (
     <View style={styles.wrapper}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
@@ -566,6 +573,19 @@ export default function MarketScreen({ navigation }) {
           </View>
 
       </ScrollView>
+      <TouchableOpacity
+        style={styles.astraFab}
+        activeOpacity={0.85}
+        onPress={() => setAstraVisible(true)}
+      >
+        <Ionicons name="aperture" size={34} color="#00E396" />
+      </TouchableOpacity>
+
+      <AstraChat
+        visible={astraVisible}
+        onClose={() => setAstraVisible(false)}
+        portfolioData={astraMarketContext}
+      />
     </View>
   );
 }
@@ -1011,5 +1031,19 @@ sectionSubtle: {
   fontSize: 12,
   fontWeight: "600",
 },
-
+astraFab: {
+  position: "absolute",
+  left: 18,
+  bottom: 28,
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  backgroundColor: "#020617",
+  borderWidth: 1,
+  borderColor: "#1F2937",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 999,
+  elevation: 10,
+},
 });

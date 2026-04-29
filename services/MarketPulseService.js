@@ -162,7 +162,7 @@ export async function getMarketNews() {
     if (!res.ok) return null;
 
     const json = await res.json();
-    const items = Array.isArray(json.data) ? json.data : [];
+    const items = Array.isArray(json.news) ? json.news : [];
 
     const news = items.map((n) => {
       const d = new Date(n.pubDate);

@@ -103,7 +103,7 @@ export default function SignupScreen({ navigation }) {
           />
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>
-            Join BullSignalsAI and stay ahead with AI-powered market insights.
+            Join AlphaWise and stay ahead with AI-powered market insights.
           </Text>
         </View>
 

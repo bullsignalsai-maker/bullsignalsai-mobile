@@ -840,7 +840,7 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
           <View style={{ flex: 1 }}>
             <Text style={styles.sectionTitle}>AI Signal</Text>
             <Text style={styles.cardSubText}>
-              Powered by BullsignalsAI •{" "}
+              Powered by AlphaWise •{" "}
               {hybridUpdatedTs
                 ? `Updated ${timeAgo(hybridUpdatedTs)}`
                 : "Analyzing..."}
@@ -1518,7 +1518,7 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
           ) : null}
 
           <Text style={styles.riskNoteText}>
-            BullSignalsAI insights are generated using historical price data,
+            AlphaWise insights are generated using historical price data,
             technical indicators, probability models, pattern analysis, and market
             behavior. These signals do not guarantee future performance.
           </Text>
@@ -1534,7 +1534,7 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
         <Text style={{ color: BRAND.sub, fontSize: 12 }}>
           Powered by{" "}
           <Text style={{ color: BRAND.accent, fontWeight: "600" }}>
-            BullSignalsAI
+            AlphaWise
           </Text>
         </Text>
       </View>

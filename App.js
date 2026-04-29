@@ -125,7 +125,7 @@ export default function App() {
       >
         <ActivityIndicator size="large" color="#00E396" />
         <Text style={{ color: "#A3A3A3", marginTop: 12, fontSize: 14 }}>
-          Initializing BullSignalsAI...
+          Initializing AlphaWise...
         </Text>
       </View>
     );
@@ -350,7 +350,7 @@ export default function App() {
               headerShown: true,
               title:
                 screen === "About"
-                  ? "About BullSignalsAI"
+                  ? "About AlphaWise"
                   : screen === "PrivacyPolicy"
                   ? "Privacy Policy"
                   : "Terms of Use",

@@ -10,7 +10,7 @@ export default function PrivacyPolicyScreen() {
       <Text style={styles.updated}>Last Updated: January 2025</Text>
 
       <Text style={styles.text}>
-        This Privacy Policy describes how BullSignalsAI (“we,” “our,” or “us”)
+        This Privacy Policy describes how AlphaWise (“we,” “our,” or “us”)
         collects, uses, and protects information when you use our mobile
         application. By using the app, you agree to the terms of this Privacy
         Policy.
@@ -58,7 +58,7 @@ export default function PrivacyPolicyScreen() {
 
       <Text style={styles.subTitle}>6. Children’s Privacy</Text>
       <Text style={styles.text}>
-        BullSignalsAI is not intended for individuals under 18 years of age. We
+        AlphaWise is not intended for individuals under 18 years of age. We
         do not knowingly collect personal data from children.
       </Text>
 
@@ -79,7 +79,7 @@ export default function PrivacyPolicyScreen() {
       </Text>
 
       <Text style={styles.footer}>
-        © 2025 BullSignalsAI • Informational use only • No legal advice intended.
+        © 2025 AlphaWise • Informational use only • No legal advice intended.
       </Text>
     </ScrollView>
   );

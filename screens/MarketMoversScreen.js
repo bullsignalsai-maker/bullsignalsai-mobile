@@ -12,15 +12,31 @@ import {
   RefreshControl,
 } from "react-native";
 
-import { getMarketMovers } from "../services/MarketPulseService";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { getMarketMovers } from "../services/MarketPulseService";
+
+const BRAND = {
+  bg: "#000000",
+  card: "#0B1220",
+  card2: "#020617",
+  border: "#1F2937",
+  softBorder: "#111827",
+  text: "#FFFFFF",
+  sub: "#9CA3AF",
+  muted: "#6B7280",
+  green: "#00E396",
+  red: "#EF4444",
+  amber: "#FACC15",
+  blue: "#60A5FA",
+};
 
 /* ---------------------------------------------------------
    Utils
 --------------------------------------------------------- */
 function arrowForChange(pct) {
-  if (pct >= 0) return { arrow: "▲", color: "#00E396" };
-  return { arrow: "▼", color: "#EF4444" };
+  if (Number(pct) >= 0) return { arrow: "▲", color: BRAND.green };
+  return { arrow: "▼", color: BRAND.red };
 }
 
 function formatPct(v) {
@@ -31,67 +47,89 @@ function formatPct(v) {
 function formatPrice(v) {
   if (v == null || Number.isNaN(Number(v))) return "—";
   const n = Number(v);
-  // keep compact for huge prices
   if (n >= 1000) return `$${n.toFixed(0)}`;
-  if (n >= 100) return `$${n.toFixed(2)}`;
   if (n >= 1) return `$${n.toFixed(2)}`;
   return `$${n.toFixed(4)}`;
+}
+
+function formatChange(v) {
+  if (v == null || Number.isNaN(Number(v))) return "—";
+  return Math.abs(Number(v)).toFixed(2);
 }
 
 function isMeaningfulPattern(name) {
   if (!name) return false;
   const up = String(name).trim().toUpperCase();
-  if (!up) return false;
-  if (up === "NO CLEAR PATTERN") return false;
-  return true;
+  return up && up !== "NO CLEAR PATTERN";
 }
 
+function timeAgoFromUtc(iso) {
+  if (!iso) return "Just now";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Just now";
+
+  const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diff < 60) return "Just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
+  return `${Math.floor(diff / 86400)} day ago`;
+}
 
 /* ---------------------------------------------------------
    Screen
 --------------------------------------------------------- */
 export default function MarketMoversScreen({ navigation }) {
-  const [raw, setRaw] = useState({ gainers: [], losers: [], as_of: null, updated_at: null });
+  const [raw, setRaw] = useState({
+    gainers: [],
+    losers: [],
+    as_of: null,
+    updated_at: null,
+  });
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [sortBy, setSortBy] = useState("change"); 
-    // "change" | "price" | "confidence"
 
-  // subtle refresh pulse
+  const [tab, setTab] = useState("all"); // all | gainers | losers
+  const [sortBy, setSortBy] = useState("move"); // move | price | symbol
+
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  const loadMovers = useCallback(async (silent = false) => {
-    try {
-      if (!silent) setLoading(true);
-      const data = await getMarketMovers();
-      if (!data) return;
+  const loadMovers = useCallback(
+    async (silent = false) => {
+      try {
+        if (!silent) setLoading(true);
 
-      setRaw({
-        gainers: data.gainers || [],
-        losers: data.losers || [],
-        as_of: data.as_of || null,
-        updated_at: data.updated_at || null,
-      });
+        const data = await getMarketMovers();
+        if (!data) return;
 
-      Animated.sequence([
-        Animated.timing(fadeAnim, {
-          toValue: 0.6,
-          duration: 120,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } catch (e) {
-      console.warn("MarketMoversScreen error:", e.message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [fadeAnim]);
+        setRaw({
+          gainers: data.gainers || [],
+          losers: data.losers || [],
+          as_of: data.as_of || null,
+          updated_at: data.updated_at || null,
+        });
+
+        Animated.sequence([
+          Animated.timing(fadeAnim, {
+            toValue: 0.65,
+            duration: 120,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 180,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      } catch (e) {
+        console.warn("MarketMoversScreen error:", e.message);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [fadeAnim]
+  );
 
   useEffect(() => {
     loadMovers(false);
@@ -103,63 +141,58 @@ export default function MarketMoversScreen({ navigation }) {
   };
 
   const data = useMemo(() => {
-  const combined = [...(raw.gainers || []), ...(raw.losers || [])];
+    let combined = [];
 
-  const cleaned = combined
-    .map((m) => ({
-      ...m,
-      changePct: Number(m.changePct),
-      price: m.price == null ? null : Number(m.price),
-      confidence: m.confidence == null ? null : Number(m.confidence),
-    }))
-    .filter((m) => m.symbol);
+    if (tab === "gainers") combined = raw.gainers || [];
+    else if (tab === "losers") combined = raw.losers || [];
+    else combined = [...(raw.gainers || []), ...(raw.losers || [])];
 
-  cleaned.sort((a, b) => {
-    if (sortBy === "price") {
-      return (b.price || 0) - (a.price || 0);
-    }
-    if (sortBy === "confidence") {
-      return (b.confidence || 0) - (a.confidence || 0);
-    }
-    // default: % change
-    return Math.abs(b.changePct || 0) - Math.abs(a.changePct || 0);
-  });
+    const cleaned = combined
+      .map((m) => ({
+        ...m,
+        changePct: m.changePct == null ? null : Number(m.changePct),
+        change: m.change == null ? null : Number(m.change),
+        price: m.price == null ? null : Number(m.price),
+      }))
+      .filter((m) => !!m.symbol);
 
-  return cleaned;
-}, [raw.gainers, raw.losers, sortBy]);
+    cleaned.sort((a, b) => {
+      if (sortBy === "price") return (b.price || 0) - (a.price || 0);
+      if (sortBy === "symbol") return String(a.symbol).localeCompare(String(b.symbol));
+      return Math.abs(b.changePct || 0) - Math.abs(a.changePct || 0);
+    });
 
+    return cleaned;
+  }, [raw.gainers, raw.losers, tab, sortBy]);
 
-  const headerMeta = useMemo(() => {
-    const total = data.length;
-    const g = raw.gainers?.length || 0;
-    const l = raw.losers?.length || 0;
-    const asOf = raw.as_of ? String(raw.as_of) : "";
-    return { total, g, l, asOf };
-  }, [data.length, raw.as_of, raw.gainers, raw.losers]);
+  const stats = useMemo(() => {
+    const gainers = raw.gainers?.length || 0;
+    const losers = raw.losers?.length || 0;
+    return {
+      gainers,
+      losers,
+      total: gainers + losers,
+      updated: timeAgoFromUtc(raw.updated_at || raw.as_of),
+    };
+  }, [raw]);
 
-  /* ---------------------------------------------------------
-     Row Renderer
-  --------------------------------------------------------- */
   const renderRow = ({ item }) => {
     const pct = Number(item.changePct);
     const isUp = !Number.isNaN(pct) && pct >= 0;
     const { arrow, color } = arrowForChange(pct || 0);
 
-    const trendLabel =
-      item.trendLabel ||
-      item.trend?.label ||
-      null;
+    const trendLabel = item.trendLabel || item.trend?.label || null;
 
     const patternName =
-      item.pattern ||
-      item.pattern?.name ||
-      null;
+      typeof item.pattern === "string"
+        ? item.pattern
+        : item.pattern?.name || null;
 
     const showPattern = isMeaningfulPattern(patternName);
 
     return (
       <TouchableOpacity
-        activeOpacity={0.85}
+        activeOpacity={0.86}
         style={styles.rowTouch}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -171,45 +204,64 @@ export default function MarketMoversScreen({ navigation }) {
         }}
       >
         <View style={styles.row}>
-          {/* Subtle left accent */}
           <View style={[styles.accentBar, isUp ? styles.accentUp : styles.accentDown]} />
 
-          {/* Main content */}
           <View style={styles.rowContent}>
             <View style={styles.topLine}>
               <View style={styles.leftBlock}>
-                <Text style={styles.symbol}>{item.symbol}</Text>
-                {item.company ? (
+                <View style={styles.symbolRow}>
+                  <Text style={styles.symbol}>{item.symbol}</Text>
+
+                  <View
+                    style={[
+                      styles.directionPill,
+                      isUp ? styles.directionPillUp : styles.directionPillDown,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.directionText,
+                        { color: isUp ? BRAND.green : BRAND.red },
+                      ]}
+                    >
+                      {isUp ? "Gainer" : "Loser"}
+                    </Text>
+                  </View>
+                </View>
+
+                {!!item.company && (
                   <Text style={styles.company} numberOfLines={1}>
                     {item.company}
                   </Text>
-                ) : null}
+                )}
               </View>
 
               <View style={styles.rightBlock}>
-                {/* PRICE */}
-                <Text style={styles.price}>
-                  {formatPrice(item.price)}
-                </Text>
-
-                {/* CHANGE + % */}
+                <Text style={styles.price}>{formatPrice(item.price)}</Text>
                 <Text style={[styles.change, { color }]}>
-                  {arrow}{" "}
-                  {Math.abs(item.change ?? 0).toFixed(2)} (
-                  {formatPct(pct)})
+                  {arrow} {formatChange(item.change)} ({formatPct(pct)})
                 </Text>
               </View>
-
             </View>
 
+            {!!item.oneLiner && (
+              <Text style={styles.oneLiner} numberOfLines={2}>
+                {item.oneLiner}
+              </Text>
+            )}
+
             <View style={styles.bottomLine}>
-              {trendLabel ? (
+              <View style={styles.metaLeft}>
+                <Ionicons
+                  name="analytics-outline"
+                  size={13}
+                  color={BRAND.muted}
+                  style={{ marginRight: 5 }}
+                />
                 <Text style={styles.trendText}>
-                  {trendLabel}
+                  {trendLabel || "Trend unavailable"}
                 </Text>
-              ) : (
-                <Text style={styles.trendTextMuted}>—</Text>
-              )}
+              </View>
 
               {showPattern ? (
                 <View style={styles.badge}>
@@ -218,8 +270,8 @@ export default function MarketMoversScreen({ navigation }) {
                   </Text>
                 </View>
               ) : (
-                <View style={styles.badgeGhost}>
-                  <Text style={styles.badgeGhostText}> </Text>
+                <View style={styles.badgeMuted}>
+                  <Text style={styles.badgeMutedText}>No clear pattern</Text>
                 </View>
               )}
             </View>
@@ -231,43 +283,82 @@ export default function MarketMoversScreen({ navigation }) {
 
   const ListHeader = () => (
     <View style={styles.headerWrap}>
+      <View style={styles.subHeaderOnly}>
+        <Text style={styles.headerSub}>
+          Internal tracked universe · Updated {stats.updated}
+        </Text>
+      </View>
 
-      <View style={styles.subHeader}>
-            <Text style={styles.subHeaderText}>
-            Sorted by % change · {headerMeta.g} gainers · {headerMeta.l} losers
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryValue}>{stats.total}</Text>
+          <Text style={styles.summaryLabel}>Total</Text>
+        </View>
+
+        <View style={styles.summaryDivider} />
+
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryValue, { color: BRAND.green }]}>
+            {stats.gainers}
+          </Text>
+          <Text style={styles.summaryLabel}>Gainers</Text>
+        </View>
+
+        <View style={styles.summaryDivider} />
+
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryValue, { color: BRAND.red }]}>
+            {stats.losers}
+          </Text>
+          <Text style={styles.summaryLabel}>Losers</Text>
+        </View>
+      </View>
+
+      <View style={styles.tabRow}>
+        {[
+          { key: "all", label: "All" },
+          { key: "gainers", label: "Gainers" },
+          { key: "losers", label: "Losers" },
+        ].map((opt) => (
+          <TouchableOpacity
+            key={opt.key}
+            onPress={() => setTab(opt.key)}
+            style={[styles.tabPill, tab === opt.key && styles.tabPillActive]}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.tabText, tab === opt.key && styles.tabTextActive]}>
+              {opt.label}
             </Text>
-     </View>
-     <View style={styles.sortRow}>
-  {[
-    { key: "change", label: "% Change" },
-    { key: "price", label: "Price" },
-    { key: "confidence", label: "Confidence" },
-  ].map((opt) => (
-    <TouchableOpacity
-      key={opt.key}
-      onPress={() => setSortBy(opt.key)}
-      style={[
-        styles.sortPill,
-        sortBy === opt.key && styles.sortPillActive,
-      ]}
-    >
-      <Text
-        style={[
-          styles.sortText,
-          sortBy === opt.key && styles.sortTextActive,
-        ]}
-      >
-        {opt.label}
-      </Text>
-    </TouchableOpacity>
-  ))}
-</View>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-      
-      {/* Sticky-ish mini note row (visual polish) */}
-      <View style={styles.miniNoteRow}>
-        <Text style={styles.miniNoteLeft}>Symbol / Price</Text>
-        <Text style={styles.miniNoteRight}>Move</Text>
+      <View style={styles.sortRow}>
+        <Text style={styles.sortLabel}>Sort by</Text>
+
+        {[
+          { key: "move", label: "% Move" },
+          { key: "price", label: "Price" },
+          { key: "symbol", label: "Symbol" },
+        ].map((opt) => (
+          <TouchableOpacity
+            key={opt.key}
+            onPress={() => setSortBy(opt.key)}
+            style={[styles.sortPill, sortBy === opt.key && styles.sortPillActive]}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[styles.sortText, sortBy === opt.key && styles.sortTextActive]}
+            >
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.columnHint}>
+        <Text style={styles.columnHintText}>Symbol / Signal context</Text>
+        <Text style={styles.columnHintText}>Move</Text>
       </View>
     </View>
   );
@@ -276,7 +367,7 @@ export default function MarketMoversScreen({ navigation }) {
     return (
       <View style={styles.loading}>
         <StatusBar barStyle="light-content" backgroundColor="#000" />
-        <ActivityIndicator size="large" color="#00E396" />
+        <ActivityIndicator size="large" color={BRAND.green} />
         <Text style={styles.loadingText}>Loading market movers…</Text>
       </View>
     );
@@ -292,27 +383,33 @@ export default function MarketMoversScreen({ navigation }) {
           keyExtractor={(item) => item.symbol}
           renderItem={renderRow}
           ListHeaderComponent={ListHeader}
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Ionicons name="pulse-outline" size={28} color={BRAND.muted} />
+              <Text style={styles.emptyTitle}>No movers available</Text>
+              <Text style={styles.emptySub}>
+                Pull to refresh or check again after the next market update.
+              </Text>
+            </View>
+          }
           ListFooterComponent={
-                <View style={styles.footerWrap}>
-                    <Text style={styles.poweredBy}>
-                    Powered by BullSignals
-                    </Text>
+            <View style={styles.footerWrap}>
+              <Text style={styles.poweredBy}>Powered by AlphaWise</Text>
 
-                    <Text style={styles.disclaimer}>
-                    Disclaimer: Market Movers are based on percentage price movement and internal analytics.
-                    This content is for informational purposes only and is not financial advice.
-                    Always do your own research before making investment decisions.
-                    </Text>
-                </View>
-                }
-
-          contentContainerStyle={{ paddingBottom: 40 }}
+              <Text style={styles.disclaimer}>
+                Market Movers are based on AlphaWise’s internal tracked universe,
+                percentage price movement, trend context, and pattern analytics.
+                This is educational information only and not financial advice.
+              </Text>
+            </View>
+          }
+          contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#00E396"
+              tintColor={BRAND.green}
             />
           }
         />
@@ -327,60 +424,160 @@ export default function MarketMoversScreen({ navigation }) {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: BRAND.bg,
   },
 
-  /* HEADER */
-headerWrap: {
-  paddingTop: 6,          // 👈 KEY FIX
-  paddingBottom: 8,
-  paddingHorizontal: 14,
+  listContent: {
+    paddingBottom: 42,
+  },
+
+  loading: {
+    flex: 1,
+    backgroundColor: BRAND.bg,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  loadingText: {
+    color: BRAND.sub,
+    marginTop: 10,
+  },
+
+  headerWrap: {
+    paddingTop: 5,
+    paddingBottom: 15,
+    paddingHorizontal: 14,
+    backgroundColor: BRAND.bg,
+  },
+  headerSub: {
+  color: BRAND.sub,
+  fontSize: 12,
+  marginTop: 1,
+  textAlign: "center",
 },
 
-  headerTitle: {
-    color: "#00E396",
-    fontSize: 22,
+  summaryCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: BRAND.card,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    borderRadius: 18,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+
+  summaryItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  summaryValue: {
+    color: BRAND.text,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+
+  summaryLabel: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 3,
     fontWeight: "700",
   },
 
-  headerSub: {
-    color: "#9CA3AF",
+  summaryDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: BRAND.border,
+  },
+
+  tabRow: {
+    flexDirection: "row",
+    backgroundColor: BRAND.card2,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    padding: 4,
+    marginBottom: 10,
+  },
+
+  tabPill: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 999,
+    alignItems: "center",
+  },
+
+  tabPillActive: {
+    backgroundColor: "rgba(0,227,150,0.14)",
+  },
+
+  tabText: {
+    color: BRAND.sub,
     fontSize: 12,
-    marginTop: 3,
+    fontWeight: "800",
   },
 
-  headerMeta: {
-    color: "#6B7280",
+  tabTextActive: {
+    color: BRAND.green,
+  },
+
+  sortRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+    columnGap: 8,
+  },
+
+  sortLabel: {
+    color: BRAND.muted,
     fontSize: 11,
-    marginTop: 4,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    marginRight: 2,
   },
 
-  miniNoteRow: {
-    marginTop: 10,
+  sortPill: {
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    backgroundColor: BRAND.card2,
+  },
+
+  sortPillActive: {
+    borderColor: BRAND.green,
+    backgroundColor: "rgba(0,227,150,0.10)",
+  },
+
+  sortText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  sortTextActive: {
+    color: BRAND.green,
+  },
+
+  columnHint: {
+    marginTop: 12,
     paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: BRAND.softBorder,
     flexDirection: "row",
     justifyContent: "space-between",
-    borderTopWidth: 1,
-    borderTopColor: "#111827",
   },
 
-  miniNoteLeft: {
-    color: "#6B7280",
+  columnHintText: {
+    color: BRAND.muted,
     fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 0.4,
+    fontWeight: "900",
     textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
 
-  miniNoteRight: {
-    color: "#6B7280",
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
-
-  /* ROWS */
   rowTouch: {
     paddingHorizontal: 10,
   },
@@ -388,40 +585,81 @@ headerWrap: {
   row: {
     flexDirection: "row",
     alignItems: "stretch",
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#0B1220",
+    backgroundColor: BRAND.card,
     borderWidth: 1,
-    borderColor: "#111827",
+    borderColor: BRAND.softBorder,
   },
 
   accentBar: {
-    width: 3,
+    width: 4,
   },
 
   accentUp: {
-    backgroundColor: "#00E396",
+    backgroundColor: BRAND.green,
   },
 
   accentDown: {
-    backgroundColor: "#EF4444",
+    backgroundColor: BRAND.red,
   },
 
   rowContent: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 11,
     paddingHorizontal: 12,
   },
 
   topLine: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
   },
 
   leftBlock: {
-    flex: 1.35,
+    flex: 1.3,
     paddingRight: 10,
+  },
+
+  symbolRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  symbol: {
+    color: BRAND.text,
+    fontWeight: "900",
+    fontSize: 16,
+    letterSpacing: 0.2,
+    marginRight: 8,
+  },
+
+  directionPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+
+  directionPillUp: {
+    backgroundColor: "rgba(0,227,150,0.08)",
+    borderColor: "rgba(0,227,150,0.45)",
+  },
+
+  directionPillDown: {
+    backgroundColor: "rgba(239,68,68,0.08)",
+    borderColor: "rgba(239,68,68,0.45)",
+  },
+
+  directionText: {
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
+
+  company: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 3,
   },
 
   rightBlock: {
@@ -429,79 +667,72 @@ headerWrap: {
     alignItems: "flex-end",
   },
 
-  symbol: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-    fontSize: 15,
-    letterSpacing: 0.2,
-  },
-
-  company: {
-    color: "#6B7280",
-    fontSize: 11,
-    marginTop: 2,
-  },
-
   price: {
-    color: "#E5E7EB",
+    color: BRAND.text,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 
   change: {
-    marginTop: 2,
+    marginTop: 3,
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "900",
+  },
+
+  oneLiner: {
+    color: BRAND.sub,
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: 8,
   },
 
   bottomLine: {
-    marginTop: 8,
+    marginTop: 9,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
 
-  trendText: {
-    color: "#9CA3AF",
-    fontSize: 11,
-    fontWeight: "700",
+  metaLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    paddingRight: 8,
   },
 
-  trendTextMuted: {
-    color: "#6B7280",
+  trendText: {
+    color: BRAND.sub,
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 
   badge: {
-    maxWidth: "62%",
-    paddingHorizontal: 10,
+    maxWidth: "58%",
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: "rgba(250,204,21,0.10)",
     borderWidth: 1,
-    borderColor: "#FACC15",
+    borderColor: "rgba(250,204,21,0.65)",
   },
 
   badgeText: {
-    color: "#FACC15",
+    color: BRAND.amber,
     fontSize: 10,
-    fontWeight: "800",
+    fontWeight: "900",
   },
 
-  // Keeps row heights consistent when pattern is missing
-  badgeGhost: {
-    maxWidth: "62%",
-    paddingHorizontal: 10,
+  badgeMuted: {
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(107,114,128,0.08)",
     borderWidth: 1,
-    borderColor: "transparent",
+    borderColor: "rgba(107,114,128,0.18)",
   },
 
-  badgeGhostText: {
-    color: "transparent",
+  badgeMutedText: {
+    color: BRAND.muted,
     fontSize: 10,
     fontWeight: "800",
   },
@@ -510,87 +741,58 @@ headerWrap: {
     height: 10,
   },
 
-  /* LOADING */
-  loading: {
-    flex: 1,
-    backgroundColor: "#000",
-    justifyContent: "center",
+  emptyBox: {
+    marginHorizontal: 16,
+    marginTop: 28,
+    padding: 24,
+    borderRadius: 18,
+    backgroundColor: BRAND.card,
+    borderWidth: 1,
+    borderColor: BRAND.border,
     alignItems: "center",
   },
 
-  loadingText: {
-    color: "#9CA3AF",
+  emptyTitle: {
+    color: BRAND.text,
+    fontSize: 15,
+    fontWeight: "800",
     marginTop: 10,
   },
-  subHeader: {
-  paddingTop: 2,
-  paddingBottom: 6,
+
+  emptySub: {
+    color: BRAND.sub,
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 6,
+    lineHeight: 17,
+  },
+
+  footerWrap: {
+    marginTop: 28,
+    paddingTop: 18,
+    paddingBottom: 30,
+    paddingHorizontal: 18,
+    borderTopWidth: 1,
+    borderTopColor: BRAND.softBorder,
+    alignItems: "center",
+  },
+
+  poweredBy: {
+    color: BRAND.green,
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+
+  disclaimer: {
+    color: BRAND.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+  },
+  subHeaderOnly: {
+  paddingBottom: 5,
   alignItems: "center",
-  backgroundColor: "#000",
+  paddingTop: 5,
 },
-
-subHeaderText: {
-  color: "#9CA3AF",
-  fontSize: 13,
-  fontWeight: "600",
-},
-sortRow: {
-  flexDirection: "row",
-  justifyContent: "center",
-  marginTop: 4,
-  gap: 8,
-},
-
-sortPill: {
-  paddingHorizontal: 12,
-  paddingVertical: 5,
-  borderRadius: 999,
-  borderWidth: 1,
-  borderColor: "#1F2937",
-  backgroundColor: "#020617",
-},
-
-sortPillActive: {
-  backgroundColor: "rgba(0,227,150,0.12)",
-  borderColor: "#00E396",
-},
-
-sortText: {
-  color: "#9CA3AF",
-  fontSize: 11,
-  fontWeight: "700",
-},
-
-sortTextActive: {
-  color: "#00E396",
-},
-footerWrap: {
-  marginTop: 28,
-  paddingTop: 18,
-  paddingBottom: 30,
-  paddingHorizontal: 18,
-  borderTopWidth: 1,
-  borderTopColor: "#111827",
-  alignItems: "center",
-},
-
-poweredBy: {
-  color: "#00E396",
-  fontSize: 12,
-  fontWeight: "700",
-  marginBottom: 8,
-},
-
-disclaimer: {
-  color: "#6B7280",
-  fontSize: 11,
-  lineHeight: 16,
-  textAlign: "center",
-},
-change: {
-  marginTop: 2,
-  fontSize: 13,
-  fontWeight: "800",
-},
-
 });

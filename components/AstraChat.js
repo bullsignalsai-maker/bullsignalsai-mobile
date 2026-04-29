@@ -29,9 +29,23 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
 // DYNAMIC QUESTION BUILDER (based on portfolio size)
 // -----------------------------------------------------
 const buildAllChips = () => {
-  const isStockDetailMode = portfolioData?.contextType === "stock_detail";
-  const stockSymbol = portfolioData?.symbol || "this stock";
+  const isMarketMode = portfolioData?.contextType === "market";
 
+    if (isMarketMode) {
+      return [
+        { id: "market_pulse", label: "Explain today’s market pulse" },
+        { id: "market_risk", label: "What is market risk now?" },
+        { id: "spy_qqq", label: "What are SPY and QQQ showing?" },
+        {
+          id: "crypto_commodities",
+          label: "Are crypto and commodities confirming risk?",
+        },
+        { id: "market_news", label: "Summarize market news" },
+        { id: "market_movers", label: "Explain top gainers and losers" },
+      ];
+    }
+  const isStockDetailMode = portfolioData?.contextType === "stock_detail";
+  const stockSymbol = portfolioData?.symbol || "this stock";  
   if (isStockDetailMode) {
     return [
       { id: "stock_explain", label: `Explain ${stockSymbol}` },
@@ -113,10 +127,11 @@ const makeId = (suffix) =>
           id: "welcome",
           from: "astra",
           text:
-  portfolioData?.contextType === "stock_detail"
-    ? `Ask Astra anything about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, risks, or what could change.`
-    : "Meet Astra — your AI co-pilot that monitors your holdings and explains what matters in clear, simple language. Select a quick question below or ask anything.",
-        },
+          portfolioData?.contextType === "market"
+            ? "Ask Astra about today’s Market Pulse — SPY, QQQ, crypto, commodities, risk sentiment, movers, and market news."
+            : portfolioData?.contextType === "stock_detail"
+            ? `Ask Astra anything about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, risks, or what could change.`
+            : "Meet Astra — your AI co-pilot that monitors your holdings and explains what matters in clear, simple language. Select a quick question below or ask anything.",},
       ]);
       setInput("");
       setAskedIds([]);
@@ -127,13 +142,15 @@ const makeId = (suffix) =>
   // Core ask logic → calls /astra-chat
   const askAstra = async ({ question_id = null, question_text = null }) => {
     const isStockDetailMode = portfolioData?.contextType === "stock_detail";
+      const isMarketMode = portfolioData?.contextType === "market";
 
-    if (
-      !isStockDetailMode &&
-      (!portfolioData ||
-        !portfolioData.positions ||
-        portfolioData.positions.length === 0)
-    ) {
+      if (
+        !isStockDetailMode &&
+        !isMarketMode &&
+        (!portfolioData ||
+          !portfolioData.positions ||
+          portfolioData.positions.length === 0)
+      ) {
       setMessages((prev) => [
         ...prev,
         {
