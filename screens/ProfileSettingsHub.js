@@ -46,10 +46,11 @@ export default function ProfileSettingsHub({ navigation }) {
   const [editable, setEditable] = useState(false);
   
   const [notifPrefs, setNotifPrefs] = useState({
+  enabled: true,
   watchlist: true,
   portfolio: true,
   crypto: true,
-});
+  });
 
   const toastAnim = useState(new Animated.Value(0))[0];
   const [toastMessage, setToastMessage] = useState("");
@@ -84,17 +85,20 @@ if (userId) {
     const data = prefSnap.data() || {};
 
     setNotifPrefs({
-      watchlist: data.watchlist ?? true,
-      portfolio: data.portfolio ?? true,
-      crypto: data.crypto ?? true,
+  enabled: data.enabled ?? true,
+  watchlist: data.watchlist ?? true,
+  portfolio: data.portfolio ?? true,
+  crypto: data.crypto ?? true,
     });
   } else {
     await setDoc(
       prefRef,
       {
+        enabled: true,
         watchlist: true,
         portfolio: true,
         crypto: true,
+        updatedAt: new Date().toISOString(),
       },
       { merge: true }
     );
@@ -447,11 +451,25 @@ const updateNotifPref = async (key, value) => {
 
       <View style={styles.card}>
         <SettingsRow
+          icon="notifications-outline"
+          label="Push Notifications"
+          right={
+            <Switch
+              value={notifPrefs.enabled}
+              onValueChange={(v) => updateNotifPref("enabled", v)}
+              trackColor={{ false: "#444", true: BRAND.accent }}
+              thumbColor="#FFF"
+            />
+          }
+        />
+
+        <SettingsRow
           icon="star-outline"
           label="Watchlist Alerts"
           right={
             <Switch
               value={notifPrefs.watchlist}
+              disabled={!notifPrefs.enabled}
               onValueChange={(v) => updateNotifPref("watchlist", v)}
               trackColor={{ false: "#444", true: BRAND.accent }}
               thumbColor="#FFF"
@@ -465,6 +483,7 @@ const updateNotifPref = async (key, value) => {
           right={
             <Switch
               value={notifPrefs.portfolio}
+              disabled={!notifPrefs.enabled}
               onValueChange={(v) => updateNotifPref("portfolio", v)}
               trackColor={{ false: "#444", true: BRAND.accent }}
               thumbColor="#FFF"
@@ -478,6 +497,7 @@ const updateNotifPref = async (key, value) => {
           right={
             <Switch
               value={notifPrefs.crypto}
+              disabled={!notifPrefs.enabled}
               onValueChange={(v) => updateNotifPref("crypto", v)}
               trackColor={{ false: "#444", true: BRAND.accent }}
               thumbColor="#FFF"
@@ -485,7 +505,7 @@ const updateNotifPref = async (key, value) => {
           }
         />
       </View>
-
+      
       {/* INFORMATION */}
       <Text style={styles.groupTitle}>Information</Text>
 
