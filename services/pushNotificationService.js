@@ -15,6 +15,11 @@ Notifications.setNotificationHandler({
 
 export async function registerForPushNotifications(userId) {
   try {
+    if (!userId) {
+      console.warn("Push registration skipped: missing userId");
+      return null;
+    }
+
     if (!Device.isDevice) {
       console.warn("Push notifications require a physical device.");
       return null;
@@ -58,13 +63,12 @@ export async function registerForPushNotifications(userId) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        user_id: userId || "default_user",
+        user_id: userId,
         token: expoPushToken,
         platform: Platform.OS,
       }),
     });
 
-   
     return expoPushToken;
   } catch (e) {
     console.warn("Push registration error:", e.message);
