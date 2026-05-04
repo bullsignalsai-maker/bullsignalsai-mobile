@@ -18,8 +18,6 @@ import OnboardingScreen from "./screens/OnboardingScreen";
 import LoginScreen from "./screens/LoginScreen";
 import SignupScreen from "./screens/SignupScreen";
 import TermsOfUseScreen from "./screens/TermsOfUseScreen";
-import NewsScreen from "./screens/NewsScreen";
-import NewsDetailScreen from "./screens/NewsDetailScreen";
 import MarketScreen from "./screens/MarketScreen";
 import AlertScreen from "./screens/AlertScreen";
 import NotificationsScreen from "./screens/NotificationsScreen"; // ✅ new
@@ -322,26 +320,7 @@ const isNavigationReady = useRef(false);
           }}
         />
 
-        <Stack.Screen
-          name="NewsDetailScreen"
-          component={NewsDetailScreen}
-          options={{
-            headerShown: true,
-            title: "Article Details",
-            headerStyle: { backgroundColor: "#000" },
-            headerTintColor: "#00E396",
-            headerBackTitleVisible: false,
-            headerBackTitle: false,
-            headerBackImage: () => (
-              <Ionicons
-                name="chevron-back-outline"
-                size={24}
-                color="#00E396"
-                style={{ marginLeft: 10 }}
-              />
-            ),
-          }}
-        />
+
 
       <Stack.Screen
           name="MarketMoversScreen"
