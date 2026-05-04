@@ -221,7 +221,7 @@ setSuggestedFollowups(result.suggestedFollowups || []);
 
 scrollToEnd();
 } catch (err) {
-  console.log("AstraChat error:", err);
+  console.warn("AstraChat error:", err);
 
   setMessages((prev) => [
     ...prev.filter((m) => m.from !== "typing"),

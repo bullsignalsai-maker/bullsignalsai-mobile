@@ -103,6 +103,6 @@ export async function fetchMarketNews() {
 
   // --- Ensure at least 20 items ---
   const finalNews = deduped.slice(0, 25);
-  console.log(`📰 Loaded ${finalNews.length} U.S. market-moving headlines`);
+
   return finalNews;
 }

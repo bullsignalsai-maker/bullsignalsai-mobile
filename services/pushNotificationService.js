@@ -16,7 +16,7 @@ Notifications.setNotificationHandler({
 export async function registerForPushNotifications(userId) {
   try {
     if (!Device.isDevice) {
-      console.log("Push notifications require a physical device.");
+      console.warn("Push notifications require a physical device.");
       return null;
     }
 
@@ -31,7 +31,7 @@ export async function registerForPushNotifications(userId) {
     }
 
     if (finalStatus !== "granted") {
-      console.log("Push permission not granted.");
+      console.warn("Push permission not granted.");
       return null;
     }
 
@@ -64,7 +64,7 @@ export async function registerForPushNotifications(userId) {
       }),
     });
 
-    console.log("✅ Expo push token registered");
+   
     return expoPushToken;
   } catch (e) {
     console.warn("Push registration error:", e.message);

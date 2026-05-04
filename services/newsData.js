@@ -5,10 +5,10 @@ import { API_BASE_URL } from "../config/apiKeys";
 // Fetch Market News — backend only, clean + simple
 // ===========================================================
 export async function getMarketNews(force = false) {
-  console.log(force ? "🔄 Force-refreshing market news..." : "📡 Loading market news…");
+ 
 
   const endpoint = `${API_BASE_URL}/market-news`;
-  console.log("🔍 Fetching:", endpoint);
+
 
   try {
     const res = await fetch(endpoint, { method: "GET" });

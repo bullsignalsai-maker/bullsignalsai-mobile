@@ -78,7 +78,7 @@ export default function PortfolioScreen({ navigation }) {
             return copy;
           });
 
-          console.log("🗑️ Deleted position:", symbol);
+    
         },
       },
     ]);
@@ -100,7 +100,7 @@ export default function PortfolioScreen({ navigation }) {
         lastName: profile.lastName || "",
       });
 
-      console.log("👤 Loaded profile for portfolio:", profile);
+     
     } catch (err) {
       console.warn("Profile load error:", err);
     }
