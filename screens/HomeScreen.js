@@ -341,7 +341,7 @@ const [refreshing, setRefreshing] = useState(false);
               delayPressIn={0}
               style={styles.card}
               onPress={() => {
-                console.log("Tapped:", item.symbol); // debug
+               
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 navigation.navigate("StockDetailScreen", {
                   symbol: item.symbol,

@@ -15,8 +15,13 @@ Notifications.setNotificationHandler({
 
 export async function registerForPushNotifications(userId) {
   try {
+    if (!userId) {
+      console.warn("Push registration skipped: missing userId");
+      return null;
+    }
+
     if (!Device.isDevice) {
-      console.log("Push notifications require a physical device.");
+      console.warn("Push notifications require a physical device.");
       return null;
     }
 
@@ -31,7 +36,7 @@ export async function registerForPushNotifications(userId) {
     }
 
     if (finalStatus !== "granted") {
-      console.log("Push permission not granted.");
+      console.warn("Push permission not granted.");
       return null;
     }
 
@@ -58,13 +63,12 @@ export async function registerForPushNotifications(userId) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        user_id: userId || "default_user",
+        user_id: userId,
         token: expoPushToken,
         platform: Platform.OS,
       }),
     });
 
-    console.log("✅ Expo push token registered:", expoPushToken);
     return expoPushToken;
   } catch (e) {
     console.warn("Push registration error:", e.message);

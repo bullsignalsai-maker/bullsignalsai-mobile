@@ -452,7 +452,6 @@ async function fetchGrokAnalysis(symbol, force = false) {
   if (!force) {
     const cached = await loadCachedGrok(symbol);
     if (cached) {
-      console.log(`💾 Using cached Grok analysis for ${symbol}`);
       return cached;
     }
   }
@@ -477,7 +476,7 @@ async function fetchGrokAnalysis(symbol, force = false) {
     // 2️⃣ Hard fallback to last good local cache
     const cached = await loadCachedGrok(symbol);
     if (cached) {
-      console.log(`♻️ Falling back to cached Grok essay for ${symbol}`);
+      
       return cached;
     }
     return { text: "⚠️ Failed to fetch AI analysis.", updatedAt: null };

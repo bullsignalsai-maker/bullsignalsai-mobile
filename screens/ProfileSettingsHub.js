@@ -75,7 +75,7 @@ export default function ProfileSettingsHub({ navigation }) {
           avatar: saved.avatar || null,
         });
        
-        console.log("🔔 Loading notification prefs for userId:", userId);
+    
 
 if (userId) {
   const prefRef = doc(db, "users", userId, "preferences", "notifications");
@@ -188,12 +188,6 @@ const updateNotifPref = async (key, value) => {
   try {
     const userId = auth.currentUser?.uid;
 
-    console.log("🔔 Notification pref update:", {
-      key,
-      value,
-      userId,
-      currentUser: auth.currentUser,
-    });
 
     if (!userId) {
       showToast("Please login again");
@@ -218,7 +212,7 @@ const updateNotifPref = async (key, value) => {
       { merge: true }
     );
 
-    console.log("✅ Saved notification prefs to Firestore:", updated);
+   
 
     showToast("Notification preference updated");
   } catch (e) {

@@ -49,71 +49,7 @@ export async function saveCachedSummary(symbol, summary) {
   }
 }
 
-// === GLOBAL NEWS FEED ===
-export async function getGlobalNewsFeed() {
-  try {
-    const snaps = await getDocs(collection(db, "news_feed"));
-    return snaps.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-  } catch (err) {
-    console.warn("getGlobalNewsFeed error:", err);
-    return [];
-  }
-}
 
-export async function saveToGlobalFeed(newsItem) {
-  try {
-    const hash = simpleHash(newsItem.headline + newsItem.link);
-    const ref = doc(db, "news_feed", hash);
-    await setDoc(ref, { ...newsItem, savedAt: new Date().toISOString() }, { merge: true });
-    console.log("Saved to global feed:", hash);
-  } catch (err) {
-    console.warn("saveToGlobalFeed error:", err);
-  }
-}
-
-// === NEW: AI Analysis Cache for NewsDetailScreen ===
-export async function getCachedNewsAnalysis(headline) {
-  try {
-    const user = auth.currentUser;
-    if (!user) return null;
-    const hash = simpleHash(headline);
-    const ref = doc(db, "users", user.uid, "news_ai", hash);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      const data = snap.data();
-      const age = (Date.now() - new Date(data.updatedAt).getTime()) / (1000 * 60 * 60);
-      if (age < 24) return data.analysis;
-      await ref.delete(); // Expire old
-    }
-    return null;
-  } catch (err) {
-    console.warn("getCachedNewsAnalysis error:", err);
-    return null;
-  }
-}
-
-export async function saveCachedNewsAnalysis(headline, analysis) {
-  try {
-    const user = auth.currentUser;
-    if (!user) return;
-    const hash = simpleHash(headline);
-    const ref = doc(db, "users", user.uid, "news_ai", hash);
-    await setDoc(ref, { analysis, updatedAt: new Date().toISOString() }, { merge: true });
-  } catch (err) {
-    console.warn("saveCachedNewsAnalysis error:", err);
-  }
-}
-
-// === Hash Helper (used by news feed & AI cache) ===
-function simpleHash(str) {
-  let hash = 0;
-  str = str || "";
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(36).slice(0, 10);
-}
 // -------------------------------------------------------------
 // PORTFOLIO CRUD (Firestore) — Lot-Based, FIFO
 // -------------------------------------------------------------
