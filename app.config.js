@@ -3,10 +3,10 @@ import "dotenv/config";
 
 export default {
   expo: {
-    name: "BullSignalsAI",
+    name: "Alphaclara",
     slug: "bullsignalsai",
     owner: "bullsignalsai",
-    scheme: "bullsignalsai",
+    scheme: "alphaclara",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -20,7 +20,7 @@ export default {
 
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.anonymous.BullSignalsAI",
+      bundleIdentifier: "ai.alphaclara.app",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
       },
@@ -32,7 +32,7 @@ export default {
         backgroundColor: "#ffffff",
       },
       edgeToEdgeEnabled: true,
-      package: "com.anonymous.BullSignalsAI",
+      package: "ai.alphaclara.app",           
     },
 
     web: {
@@ -45,12 +45,10 @@ export default {
       "expo-notifications",
     ],
 
-    // ✅ ADD THIS BLOCK
     updates: {
       url: "https://u.expo.dev/2bfff8b1-676c-461b-a991-ed884e800110",
     },
 
-    // ✅ ADD THIS BLOCK
     runtimeVersion: {
       policy: "appVersion",
     },
