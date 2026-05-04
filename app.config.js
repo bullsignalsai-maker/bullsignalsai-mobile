@@ -23,6 +23,7 @@ export default {
       bundleIdentifier: "ai.alphaclara.app",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        NSPhotoLibraryUsageDescription: "Allow access to your photos to upload profile picture.",
       },
     },
 
