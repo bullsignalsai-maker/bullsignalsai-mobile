@@ -107,7 +107,7 @@ export default function SettingsScreen({ navigation }) {
           onPress={() => navigation.navigate("About")}
         >
           <Ionicons name="information-circle-outline" size={18} color="#00E396" />
-          <Text style={styles.linkText}>About AlphaWise</Text>
+          <Text style={styles.linkText}>About Alphaclara</Text>
           <Ionicons
             name="chevron-forward-outline"
             size={18}

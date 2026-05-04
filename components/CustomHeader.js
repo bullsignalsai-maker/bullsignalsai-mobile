@@ -18,7 +18,7 @@ export default function CustomHeader({ title }) {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.appName}>BullSignalsAI</Text>
+        <Text style={styles.appName}>Alphaclara</Text>
       </View>
 
       <Text style={styles.pageTitle}>{title}</Text>

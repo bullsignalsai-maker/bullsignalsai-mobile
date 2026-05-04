@@ -230,7 +230,7 @@ const [refreshing, setRefreshing] = useState(false);
       <View style={styles.header}>
         <View style={styles.headerBrandRow}>
           <Image source={LOGO} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.title}>AlphaWise</Text>
+          <Text style={styles.title}>Alphaclara</Text>
         </View>
         <Text style={styles.subtitle}>AI-Powered Market Intelligence</Text>
          <View style={styles.syncRow}>

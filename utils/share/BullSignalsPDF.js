@@ -9,7 +9,7 @@ import { decode } from "base-64";
 const atob = (str) => decode(str);
 
 export async function shareBullSignalsPDF({
-  title = "BullSignalsAI",
+  title = "Alphaclara",
   subtitle = "AI-Driven Market Intelligence",
   sections = [],
   filename = "bullsignals-analysis.pdf",
@@ -150,7 +150,7 @@ export async function shareBullSignalsPDF({
   });
 
   page.drawText(
-    "Educational purposes only. Not investment advice. Markets involve risk.\n© BullSignalsAI",
+    "Educational purposes only. Not investment advice. Markets involve risk.\n© Alphaclara",
     {
       x: 50,
       y: 48,
@@ -171,6 +171,6 @@ export async function shareBullSignalsPDF({
 
   await Sharing.shareAsync(uri, {
     mimeType: "application/pdf",
-    dialogTitle: "Share BullSignalsAI Analysis",
+    dialogTitle: "Share Alphaclara Analysis",
   });
 }

@@ -19,7 +19,7 @@ export default function TermsOfUseScreen({ navigation }) {
   const handleDecline = () => {
     Alert.alert(
       "Notice",
-      "You must accept the terms to continue using AlphaWise."
+      "You must accept the terms to continue using Alphaclara."
     );
     navigation.goBack();
   };
@@ -29,15 +29,15 @@ export default function TermsOfUseScreen({ navigation }) {
       <View style={styles.body}>
         <Text style={styles.intro}>
           These Terms of Use ("Terms") govern your access to and use of the
-          AlphaWise mobile application ("App"), owned and operated for
+          Alphaclara mobile application ("App"), owned and operated for
           informational and educational purposes only.
         </Text>
 
         <Text style={styles.text}>
-          By using AlphaWise, you acknowledge that it does not provide
+          By using Alphaclara, you acknowledge that it does not provide
           financial, investment, or legal advice. The App provides AI-driven
           signals and sentiment summaries for informational purposes only.
-          Trading and investing involve risk, and AlphaWise is not liable
+          Trading and investing involve risk, and Alphaclara is not liable
           for any losses resulting from user decisions.
         </Text>
 
@@ -54,7 +54,7 @@ export default function TermsOfUseScreen({ navigation }) {
         </Text>
 
         <Text style={styles.text}>
-          AlphaWise uses anonymized analytics and may integrate with APIs
+          Alphaclara uses anonymized analytics and may integrate with APIs
           from trusted partners (e.g., X, Finnhub, Grok AI) to retrieve market
           data. No personal financial information is collected or stored.
         </Text>
@@ -80,7 +80,7 @@ export default function TermsOfUseScreen({ navigation }) {
         </Text>
 
         <Text style={styles.footer}>
-          © 2025 AlphaWise. All rights reserved.{"\n"}
+          © 2025 Alphaclara. All rights reserved.{"\n"}
           This app is for informational use only and does not provide legal,
           financial, or investment advice.
         </Text>

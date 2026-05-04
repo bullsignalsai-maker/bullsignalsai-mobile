@@ -11,11 +11,11 @@ export default function AboutScreen() {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.title}>About AlphaWise</Text>
+        <Text style={styles.title}>About Alphaclara</Text>
       </View>
 
       <Text style={styles.text}>
-        AlphaWise is an AI-powered market-insight application designed to
+        Alphaclara is an AI-powered market-insight application designed to
         help users monitor stocks, analyze sentiment, and stay informed about
         market trends in real time. The app aggregates data from multiple
         public and trusted financial sources, social sentiment signals, and
@@ -40,7 +40,7 @@ export default function AboutScreen() {
 
       <Text style={styles.subTitle}>Disclaimer</Text>
       <Text style={styles.text}>
-        AlphaWise does not provide financial, investment, or trading
+        Alphaclara does not provide financial, investment, or trading
         advice. All information displayed is generated using algorithmic
         analysis and is intended for educational and informational purposes
         only. You should always conduct your own research or consult a licensed
@@ -48,7 +48,7 @@ export default function AboutScreen() {
       </Text>
 
       <Text style={styles.footer}>
-        © 2025 AlphaWise. All rights reserved.
+        © 2025 Alphaclara. All rights reserved.
       </Text>
     </ScrollView>
   );

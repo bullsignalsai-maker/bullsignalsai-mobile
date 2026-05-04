@@ -394,10 +394,10 @@ export default function MarketMoversScreen({ navigation }) {
           }
           ListFooterComponent={
             <View style={styles.footerWrap}>
-              <Text style={styles.poweredBy}>Powered by AlphaWise</Text>
+              <Text style={styles.poweredBy}>Powered by Alphaclara</Text>
 
               <Text style={styles.disclaimer}>
-                Market Movers are based on AlphaWise’s internal tracked universe,
+                Market Movers are based on Alphaclara’s internal tracked universe,
                 percentage price movement, trend context, and pattern analytics.
                 This is educational information only and not financial advice.
               </Text>

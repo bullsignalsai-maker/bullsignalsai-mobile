@@ -12,7 +12,7 @@ export async function shareBullSignalsText({
   body,
 }) {
   const message = `
-BullSignalsAI
+Alphaclara
 AI-Powered Market Intelligence
 
 ${title}
@@ -23,7 +23,7 @@ ${BULLSIGNALS_DISCLAIMER}
 `;
 
   await Share.share({
-    title: "BullSignalsAI Analysis",
+    title: "Alphaclara Analysis",
     message,
   });
 }
@@ -56,7 +56,7 @@ export async function shareBullSignalsPDF({
       color: bullGreen,
     });
 
-    page.drawText("BullSignalsAI", {
+    page.drawText("Alphaclara", {
       x: 40,
       y: height - 50,
       size: 26,
@@ -155,7 +155,7 @@ export async function shareBullSignalsPDF({
 
     await Sharing.shareAsync(uri, {
       mimeType: "application/pdf",
-      dialogTitle: "Share BullSignalsAI Analysis",
+      dialogTitle: "Share Alphaclara Analysis",
     });
   } catch (e) {
     console.warn("PDF failed, fallback to text:", e.message);

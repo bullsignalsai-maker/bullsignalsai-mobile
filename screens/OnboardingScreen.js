@@ -29,7 +29,7 @@ const slides = [
   {
     key: "3",
     title: "Stay Ahead of Every Move",
-    text: "Build your watchlist, receive alerts, and act with confidence — powered by AlphaWise.",
+    text: "Build your watchlist, receive alerts, and act with confidence — powered by Alphaclara.",
     image: require("../assets/onboard3.png"),
   },
 ];
@@ -54,7 +54,7 @@ export default function OnboardingScreen() {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.appName}>AlphaWise</Text>
+        <Text style={styles.appName}>Alphaclara</Text>
       </View>
 
       <Image source={item.image} style={styles.image} resizeMode="contain" />

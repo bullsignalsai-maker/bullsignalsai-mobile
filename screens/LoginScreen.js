@@ -107,7 +107,7 @@ export default function LoginScreen({ navigation }) {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.title}>AlphaWise</Text>
+        <Text style={styles.title}>Alphaclara</Text>
         <Text style={styles.subtitle}>Welcome Back</Text>
       </View>
 

@@ -340,7 +340,7 @@ const updateNotifPref = async (key, value) => {
           />
           <View style={{ flex: 1 }}>
             <Text style={styles.intelligenceTitle}>
-              AlphaWise Intelligence
+              Alphaclara Intelligence
             </Text>
             <Text style={styles.intelligenceSub}>
               AI-powered market insights and decision support
@@ -514,7 +514,7 @@ const updateNotifPref = async (key, value) => {
 
         <SettingsRow
           icon="information-circle-outline"
-          label="About AlphaWise"
+          label="About Alphaclara"
           onPress={() =>
             navigation.navigate("About")
           }
@@ -572,7 +572,7 @@ const updateNotifPref = async (key, value) => {
       </Animated.View>
 
       <View style={styles.versionWrap}>
-        <Text style={styles.versionText}>AlphaWise v1.0.0</Text>
+        <Text style={styles.versionText}>Alphaclara v1.0.0</Text>
         <Text style={styles.versionSubText}>AI-Powered Market Intelligence</Text>
       </View>
 

@@ -201,7 +201,7 @@ const isNavigationReady = useRef(false);
       >
         <ActivityIndicator size="large" color="#00E396" />
         <Text style={{ color: "#A3A3A3", marginTop: 12, fontSize: 14 }}>
-          Initializing AlphaWise...
+          Initializing Alphaclara...
         </Text>
       </View>
     );
@@ -412,7 +412,7 @@ const isNavigationReady = useRef(false);
               headerShown: true,
               title:
                 screen === "About"
-                  ? "About AlphaWise"
+                  ? "About Alphaclara"
                   : screen === "PrivacyPolicy"
                   ? "Privacy Policy"
                   : "Terms of Use",

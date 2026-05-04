@@ -318,7 +318,7 @@ const onShare = async () => {
     });
   } catch {
     Share.share({
-      title: "AlphaWise — Technical Snapshot",
+      title: "Alphaclara — Technical Snapshot",
       message: `${symbol}\nRSI: ${fmt.num(derived.rsi)}\nTrend: ${derived.trendLabel}\n\nEducational only.`,
     });
   }
