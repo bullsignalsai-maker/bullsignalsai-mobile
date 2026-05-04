@@ -1,12 +1,12 @@
 // App.js (with Push Notification Integration + Notifications Screen)
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { ActivityIndicator, View, Text } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-
+import * as Notifications from "expo-notifications";
 // Screens
 import HomeScreen from "./screens/HomeScreen";
 import StockDetailScreen from "./screens/StockDetailScreen";
@@ -31,7 +31,8 @@ import FullTechnicalDetailScreen from "./screens/FullTechnicalDetailScreen"; // 
 import MarketMoversScreen from "./screens/MarketMoversScreen"; // ✅ new
 import SignalDetailScreen from "./screens/SignalDetailScreen"; // ✅ new
 // Services
-import { registerPushToken } from "./services/notifications"; // ✅ new import
+import { registerForPushNotifications } from "./services/pushNotificationService";
+import { auth } from "./firebaseConfig";
 import FullChartScreen from "./screens/FullChartScreen";
 
 
@@ -88,7 +89,64 @@ function MainTabs() {
 // === ROOT STACK ===
 export default function App() {
   const [initialRoute, setInitialRoute] = useState(null);
+  const navigationRef = useRef(null);
+const isNavigationReady = useRef(false);
+  const handleNotificationNavigation = (response) => {
+  const data = response?.notification?.request?.content?.data || {};
 
+  const symbol = data?.symbol;
+  const type = data?.type;
+
+  // 1) Symbol alerts → Stock Detail
+  if (
+    symbol &&
+    (type === "watchlist_big_move" ||
+      type === "watchlist_signal_change" ||
+      type === "portfolio_position_big_move" ||
+      type === "portfolio_concentration_risk" ||
+      type === "portfolio_allocation_shift" ||
+      type === "portfolio_risk_loss_combo")
+  ) {
+    setTimeout(() => {
+      if (!isNavigationReady.current) return;
+
+      navigationRef.current?.navigate("StockDetailScreen", {
+        symbol,
+        name: symbol,
+        source: "push_notification",
+      });
+    }, 800);
+
+    return;
+  }
+
+  // 2) Portfolio alerts → Portfolio tab
+  if (
+    type === "portfolio_daily_performance" ||
+    type === "portfolio_ai_rebalance"
+  ) {
+    setTimeout(() => {
+      if (!isNavigationReady.current) return;
+
+      navigationRef.current?.navigate("Main", {
+        screen: "Portfolio",
+      });
+    }, 800);
+
+    return;
+  }
+
+  // 3) Crypto alerts → Market tab
+  if (type === "crypto_market_move") {
+    setTimeout(() => {
+      if (!isNavigationReady.current) return;
+
+      navigationRef.current?.navigate("Main", {
+        screen: "Market",
+      });
+    }, 800);
+  }
+};
   // === Check login/onboarding state ===
   useEffect(() => {
     const checkUserStatus = async () => {
@@ -106,12 +164,32 @@ export default function App() {
     checkUserStatus();
   }, []);
 
-  // === Register for push notifications once user reaches Main ===
   useEffect(() => {
-    if (initialRoute === "Main") {
-      registerPushToken(); // ask permission + save token in Firestore
+  if (initialRoute === "Main") {
+    const userId = auth.currentUser?.uid;
+
+    if (userId) {
+      registerForPushNotifications(userId);
     }
-  }, [initialRoute]);
+  }
+}, [initialRoute]);
+  useEffect(() => {
+  if (!initialRoute) return;
+
+  // Handles notification tap when app is already open/background
+  const sub = Notifications.addNotificationResponseReceivedListener(
+    handleNotificationNavigation
+  );
+
+  // Handles notification tap when app was fully closed
+  Notifications.getLastNotificationResponseAsync().then((response) => {
+    if (response) {
+      handleNotificationNavigation(response);
+    }
+  });
+
+  return () => sub.remove();
+}, [initialRoute]);
 
   if (!initialRoute) {
     return (
@@ -130,9 +208,14 @@ export default function App() {
       </View>
     );
   }
-
+  
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={() => {
+        isNavigationReady.current = true;
+      }}
+>
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{
@@ -260,7 +343,7 @@ export default function App() {
           }}
         />
 
-<Stack.Screen
+      <Stack.Screen
           name="MarketMoversScreen"
           component={MarketMoversScreen}
           options={{

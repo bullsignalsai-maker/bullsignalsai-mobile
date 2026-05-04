@@ -19,6 +19,8 @@ import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { registerForPushNotifications } from "../services/pushNotificationService";
+import { auth, db } from "../firebaseConfig";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 const BRAND = {
   bg: "#000000",
@@ -42,8 +44,12 @@ export default function ProfileSettingsHub({ navigation }) {
   });
 
   const [editable, setEditable] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-
+  
+  const [notifPrefs, setNotifPrefs] = useState({
+  watchlist: true,
+  portfolio: true,
+  crypto: true,
+});
 
   const toastAnim = useState(new Animated.Value(0))[0];
   const [toastMessage, setToastMessage] = useState("");
@@ -52,8 +58,10 @@ export default function ProfileSettingsHub({ navigation }) {
     useCallback(() => {
       (async () => {
         const email = (await AsyncStorage.getItem("userToken")) || "";
-        if (email) {
-          registerForPushNotifications(email);
+        const userId = auth.currentUser?.uid;
+
+        if (userId) {
+          registerForPushNotifications(userId);
         }
         const saved =
           JSON.parse(await AsyncStorage.getItem("profile_" + email)) || {};
@@ -65,10 +73,33 @@ export default function ProfileSettingsHub({ navigation }) {
           bio: saved.bio || "",
           avatar: saved.avatar || null,
         });
+       
+        console.log("🔔 Loading notification prefs for userId:", userId);
 
-        setNotificationsEnabled(
-          (await AsyncStorage.getItem("@notifications")) === "true"
-        );
+if (userId) {
+  const prefRef = doc(db, "users", userId, "preferences", "notifications");
+  const prefSnap = await getDoc(prefRef);
+
+  if (prefSnap.exists()) {
+    const data = prefSnap.data() || {};
+
+    setNotifPrefs({
+      watchlist: data.watchlist ?? true,
+      portfolio: data.portfolio ?? true,
+      crypto: data.crypto ?? true,
+    });
+  } else {
+    await setDoc(
+      prefRef,
+      {
+        watchlist: true,
+        portfolio: true,
+        crypto: true,
+      },
+      { merge: true }
+    );
+  }
+}
 
       })();
     }, [])
@@ -149,15 +180,48 @@ export default function ProfileSettingsHub({ navigation }) {
     }
   };
 
+const updateNotifPref = async (key, value) => {
+  try {
+    const userId = auth.currentUser?.uid;
 
-  const toggleNotifications = async () => {
-    const next = !notificationsEnabled;
-    setNotificationsEnabled(next);
-    await AsyncStorage.setItem(
-      "@notifications",
-      String(next)
+    console.log("🔔 Notification pref update:", {
+      key,
+      value,
+      userId,
+      currentUser: auth.currentUser,
+    });
+
+    if (!userId) {
+      showToast("Please login again");
+      return;
+    }
+
+    const updated = {
+      ...notifPrefs,
+      [key]: value,
+    };
+
+    setNotifPrefs(updated);
+
+    const prefRef = doc(db, "users", userId, "preferences", "notifications");
+
+    await setDoc(
+      prefRef,
+      {
+        ...updated,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
     );
-  };
+
+    console.log("✅ Saved notification prefs to Firestore:", updated);
+
+    showToast("Notification preference updated");
+  } catch (e) {
+    console.warn("❌ Notification pref save failed:", e.message || e);
+    showToast("Could not save notification preference");
+  }
+};
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem("userToken");
@@ -379,21 +443,43 @@ export default function ProfileSettingsHub({ navigation }) {
       )}
 
       {/* PREFERENCES */}
-      <Text style={styles.groupTitle}>Preferences</Text>
+      <Text style={styles.groupTitle}>Notification Settings</Text>
 
       <View style={styles.card}>
-
         <SettingsRow
-          icon="notifications-outline"
-          label="Push Notifications"
+          icon="star-outline"
+          label="Watchlist Alerts"
           right={
             <Switch
-              value={notificationsEnabled}
-              onValueChange={toggleNotifications}
-              trackColor={{
-                false: "#444",
-                true: BRAND.accent,
-              }}
+              value={notifPrefs.watchlist}
+              onValueChange={(v) => updateNotifPref("watchlist", v)}
+              trackColor={{ false: "#444", true: BRAND.accent }}
+              thumbColor="#FFF"
+            />
+          }
+        />
+
+        <SettingsRow
+          icon="wallet-outline"
+          label="Portfolio Alerts"
+          right={
+            <Switch
+              value={notifPrefs.portfolio}
+              onValueChange={(v) => updateNotifPref("portfolio", v)}
+              trackColor={{ false: "#444", true: BRAND.accent }}
+              thumbColor="#FFF"
+            />
+          }
+        />
+
+        <SettingsRow
+          icon="logo-bitcoin"
+          label="Crypto Alerts"
+          right={
+            <Switch
+              value={notifPrefs.crypto}
+              onValueChange={(v) => updateNotifPref("crypto", v)}
+              trackColor={{ false: "#444", true: BRAND.accent }}
               thumbColor="#FFF"
             />
           }
