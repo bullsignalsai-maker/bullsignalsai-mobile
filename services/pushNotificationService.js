@@ -64,7 +64,7 @@ export async function registerForPushNotifications(userId) {
       }),
     });
 
-    console.log("✅ Expo push token registered:", expoPushToken);
+    console.log("✅ Expo push token registered");
     return expoPushToken;
   } catch (e) {
     console.warn("Push registration error:", e.message);
