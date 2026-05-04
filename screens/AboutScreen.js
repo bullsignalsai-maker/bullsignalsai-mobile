@@ -7,7 +7,7 @@ export default function AboutScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Image
-          source={require("../assets/logo.png")}
+          source={require("../assets/icon.png")}
           style={styles.logo}
           resizeMode="contain"
         />

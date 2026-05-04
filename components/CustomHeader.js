@@ -14,7 +14,7 @@ export default function CustomHeader({ title }) {
 
       <View style={styles.centerContainer}>
         <Image
-          source={require("../assets/logo.png")}
+          source={require("../assets/icon.png")}
           style={styles.logo}
           resizeMode="contain"
         />

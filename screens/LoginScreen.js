@@ -103,7 +103,7 @@ export default function LoginScreen({ navigation }) {
       {/* === LOGO + APP NAME === */}
       <View style={styles.header}>
         <Image
-          source={require("../assets/logo.png")}
+          source={require("../assets/icon.png")}
           style={styles.logo}
           resizeMode="contain"
         />

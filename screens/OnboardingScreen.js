@@ -50,7 +50,7 @@ export default function OnboardingScreen() {
     <View style={styles.slide}>
       <View style={styles.header}>
         <Image
-          source={require("../assets/logo.png")}
+          source={require("../assets/icon.png")}
           style={styles.logo}
           resizeMode="contain"
         />
