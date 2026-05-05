@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { getHomeScreen } from "../services/HomeService";
 
-const LOGO = require("../assets/icon.png");
+const LOGO = require("../assets/alpha-transparent.png");
 
 const BRAND = {
   bg: "#000000",

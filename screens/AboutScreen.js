@@ -7,11 +7,11 @@ export default function AboutScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Image
-          source={require("../assets/icon.png")}
+          source={require("../assets/alpha-transparent.png")}
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.title}>About Alphaclara</Text>
+        <Text style={styles.title}>Alphaclara</Text>
       </View>
 
       <Text style={styles.text}>
