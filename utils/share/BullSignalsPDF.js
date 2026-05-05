@@ -69,7 +69,7 @@ export async function shareBullSignalsPDF({
   }
 
   // ================== LOGO ==================
-  const logoAsset = Asset.fromModule(require("../../assets/logo.png"));
+  const logoAsset = Asset.fromModule(require("../../assets/icon.png"));
   await logoAsset.downloadAsync();
   const logoBase64 = await FileSystem.readAsStringAsync(logoAsset.localUri, {
     encoding: "base64",
