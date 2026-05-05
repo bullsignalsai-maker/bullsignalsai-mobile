@@ -103,7 +103,7 @@ export default function LoginScreen({ navigation }) {
       {/* === LOGO + APP NAME === */}
       <View style={styles.header}>
         <Image
-          source={require("../assets/icon.png")}
+          source={require("../assets/alpha-transparent.png")}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -177,6 +177,7 @@ const styles = StyleSheet.create({
   logo: { width: 70, height: 70, marginBottom: 8 },
   title: { color: "#00E396", fontSize: 26, fontWeight: "800" },
   subtitle: { color: "#9CA3AF", fontSize: 18, marginTop: 6 },
+
   form: { marginTop: 20 },
   input: {
     backgroundColor: "#111",

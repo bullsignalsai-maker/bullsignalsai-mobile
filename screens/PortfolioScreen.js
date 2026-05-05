@@ -19,8 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Pressable } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { API_BASE_URL } from "../config/apiKeys";
-
-// ✅ Astra chatbot component (new)
+import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import AstraChat from "../components/AstraChat";
 
 export default function PortfolioScreen({ navigation }) {
@@ -694,7 +693,7 @@ export default function PortfolioScreen({ navigation }) {
         {portfolio.length > 0 && (
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
             <Pressable style={styles.astraFab} onPress={() => setAstraVisible(true)}>
-              <Ionicons name="aperture" size={40} color="#00E396" />
+              <AstraAnimatedIcon size={40} />
             </Pressable>
           </Animated.View>
         )}
@@ -1018,7 +1017,7 @@ const styles = StyleSheet.create({
   bottom: 32,
   width: 42,
   height: 42,
-  borderRadius: 29,
+  borderRadius: 20,
 },
   fab: {
   position: "absolute",

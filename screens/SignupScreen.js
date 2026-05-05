@@ -97,7 +97,7 @@ export default function SignupScreen({ navigation }) {
         {/* LOGO + TITLE */}
         <View style={styles.header}>
           <Image
-            source={require("../assets/icon.png")}
+            source={require("../assets/alpha-transparent.png")}
             style={styles.logo}
             resizeMode="contain"
           />

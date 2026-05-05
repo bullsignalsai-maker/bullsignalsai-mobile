@@ -21,6 +21,7 @@ import { Linking } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import AstraChat from "../components/AstraChat";
+import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 /* ---------------------------------------------------------
    Utils
 --------------------------------------------------------- */
@@ -578,7 +579,7 @@ export default function MarketScreen({ navigation }) {
         activeOpacity={0.85}
         onPress={() => setAstraVisible(true)}
       >
-        <Ionicons name="aperture" size={34} color="#00E396" />
+        <AstraAnimatedIcon size={40} />
       </TouchableOpacity>
 
       <AstraChat
@@ -1035,9 +1036,9 @@ astraFab: {
   position: "absolute",
   left: 18,
   bottom: 28,
-  width: 48,
-  height: 48,
-  borderRadius: 24,
+  width: 40,
+  height: 40,
+  borderRadius: 20,
   backgroundColor: "#020617",
   borderWidth: 1,
   borderColor: "#1F2937",

@@ -20,19 +20,18 @@ import SignupScreen from "./screens/SignupScreen";
 import TermsOfUseScreen from "./screens/TermsOfUseScreen";
 import MarketScreen from "./screens/MarketScreen";
 import AlertScreen from "./screens/AlertScreen";
-import NotificationsScreen from "./screens/NotificationsScreen"; // ✅ new
-import EditPositionScreen from "./screens/EditPositionScreen"; // ✅ new
-import PortfolioScreen from "./screens/PortfolioScreen"; // ✅ new
-import AddPositionScreen from "./screens/AddPositionScreen"; // ✅ new
-import FullPatternDetailScreen from "./screens/FullPatternDetailScreen"; // ✅ new
-import FullTechnicalDetailScreen from "./screens/FullTechnicalDetailScreen"; // ✅ new
-import MarketMoversScreen from "./screens/MarketMoversScreen"; // ✅ new
-import SignalDetailScreen from "./screens/SignalDetailScreen"; // ✅ new
-// Services
+import NotificationsScreen from "./screens/NotificationsScreen";
+import EditPositionScreen from "./screens/EditPositionScreen";
+import PortfolioScreen from "./screens/PortfolioScreen";
+import AddPositionScreen from "./screens/AddPositionScreen";
+import FullPatternDetailScreen from "./screens/FullPatternDetailScreen";
+import FullTechnicalDetailScreen from "./screens/FullTechnicalDetailScreen";
+import MarketMoversScreen from "./screens/MarketMoversScreen";
+import SignalDetailScreen from "./screens/SignalDetailScreen";
 import { registerForPushNotifications } from "./services/pushNotificationService";
 import { auth } from "./firebaseConfig";
 import FullChartScreen from "./screens/FullChartScreen";
-
+import AddAlertScreen from "./screens/AddAlertScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -103,7 +102,9 @@ const isNavigationReady = useRef(false);
       type === "portfolio_position_big_move" ||
       type === "portfolio_concentration_risk" ||
       type === "portfolio_allocation_shift" ||
-      type === "portfolio_risk_loss_combo")
+      type === "portfolio_risk_loss_combo" ||
+      type === "watchlist_price_alert"
+  )
   ) {
     setTimeout(() => {
       if (!isNavigationReady.current) return;
@@ -278,7 +279,26 @@ const isNavigationReady = useRef(false);
             ),
           }}
         />
-
+<Stack.Screen
+  name="AddAlertScreen"
+  component={AddAlertScreen}
+  options={{
+    headerShown: true,
+    title: "Add Alert",
+    headerStyle: { backgroundColor: "#000" },
+    headerTintColor: "#00E396",
+    headerBackTitleVisible: false,
+    headerBackTitle: false,
+    headerBackImage: () => (
+      <Ionicons
+        name="chevron-back-outline"
+        size={24}
+        color="#00E396"
+        style={{ marginLeft: 10 }}
+      />
+    ),
+  }}
+/>
                   <Stack.Screen
           name="FullTechnicalDetailScreen"
           component={FullTechnicalDetailScreen}

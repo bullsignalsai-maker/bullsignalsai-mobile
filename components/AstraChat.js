@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { askAstra as askAstraService } from "../services/astraService";
-
+import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 export default function AstraChat({ visible, onClose, portfolioData }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -257,23 +257,23 @@ scrollToEnd();
           <View style={styles.card}>
             {/* Header */}
             <View style={styles.headerRow}>
-              <View style={styles.headerLeft}>
-                <View style={styles.avatar}>
-                  <Ionicons name="aperture" size={35} color="#00E396" />
-                </View>
-
-                <View>
-                  <Text style={styles.astraTitle}>Astra</Text>
-                  <Text style={styles.astraTagline}>
-                    Artificial Stock Trading & Risk Analyst
-                  </Text>
-                </View>
+            <View style={styles.headerLeft}>
+              <View style={styles.avatar}>
+                <AstraAnimatedIcon size={40} />
               </View>
 
-              <Pressable onPress={onClose}>
-                <Ionicons name="close" size={22} color="#9CA3AF" />
-              </Pressable>
+              <View>
+                <Text style={styles.astraTitle}>Astra</Text>
+                <Text style={styles.astraTagline}>
+                  Artificial Stock Trading & Risk Analyst
+                </Text>
+              </View>
             </View>
+
+            <Pressable onPress={onClose}>
+              <Ionicons name="close" size={22} color="#9CA3AF" />
+            </Pressable>
+          </View>
 
             {/* Messages + starter chips */}
             <View style={styles.messagesBox}>
@@ -459,16 +459,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#0B1120",
-    borderWidth: 1.5,
-    borderColor: "#0B1120",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 227, 150, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(0, 227, 150, 0.25)",
+    marginRight: 12,
   },
 
   astraTitle: {

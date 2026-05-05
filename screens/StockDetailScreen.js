@@ -19,7 +19,7 @@ import SmartPatternCard from "../components/SmartPatternCard";
 import { getStockDetail } from "../services/stockDetailService";
 import { SafeAreaView } from "react-native";
 import AstraChat from "../components/AstraChat";
-
+import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 // === Brand palette ===
 const BRAND = {
   bg: "#000000",
@@ -1542,10 +1542,10 @@ const outlookBullets = detail?.insights?.combinedTechnicalSummary
     {detail && (
       <TouchableOpacity
         style={styles.astraFab}
-        activeOpacity={0.85}
+        activeOpacity={5}
         onPress={() => setAstraVisible(true)}
       >
-        <Ionicons name="aperture" size={35} color={BRAND.accent} />
+        <AstraAnimatedIcon size={50} color={BRAND.accent} />
       </TouchableOpacity>
     )}
 

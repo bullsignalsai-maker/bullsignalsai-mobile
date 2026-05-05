@@ -430,7 +430,7 @@ const displayList = [
 
     const actions = [
       pinnedNow ? "Unpin" : "Pin",
-      "Add Alert (coming soon)",
+      "Add Alert",
       "Notes",
       "Remove",
       "Cancel",
@@ -439,7 +439,9 @@ const displayList = [
     const handler = (idx) => {
       const choice = actions[idx];
       if (choice === "Pin" || choice === "Unpin") togglePin(sym);
-      else if (choice === "Add Alert (coming soon)") showToast("Alerts coming soon");
+      else if (choice === "Add Alert") {
+        navigation.navigate("AddAlertScreen", { symbol: sym });
+      }
       else if (choice === "Notes") openNotes(sym);
       else if (choice === "Remove") optimisticRemove(sym);
     };
