@@ -1,106 +1,173 @@
 import React from "react";
 import { View, Text, ScrollView, StyleSheet } from "react-native";
-import CustomHeader from "../components/CustomHeader";
+import { BRAND } from "../constants/theme";
 
 export default function PrivacyPolicyScreen() {
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Privacy Policy</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={styles.updated}>Last Updated: May 2026</Text>
 
-      <Text style={styles.updated}>Last Updated: January 2025</Text>
+      <View style={styles.card}>
+        <Text style={styles.text}>
+          Alphaclara (“we,” “our,” or “us”) respects your privacy and is
+          committed to protecting your information. This Privacy Policy explains
+          how we collect, use, and safeguard your data when you use our mobile
+          application.
+        </Text>
+      </View>
 
-      <Text style={styles.text}>
-        This Privacy Policy describes how Alphaclara (“we,” “our,” or “us”)
-        collects, uses, and protects information when you use our mobile
-        application. By using the app, you agree to the terms of this Privacy
-        Policy.
-      </Text>
+      <Section title="1. Information We Collect">
+        • Account Information – Email used for authentication (Firebase).{"\n"}•
+        App Data – Watchlist, portfolio, preferences, alerts.{"\n"}• Device &
+        Technical Data – Device info and crash logs.{"\n"}• Usage Data –
+        Anonymous usage insights.{"\n"}• Push Notification Token – For alerts
+        (if enabled).{"\n"}• No Sensitive Financial Data collected.
+      </Section>
 
-      <Text style={styles.subTitle}>1. Information We Collect</Text>
-      <Text style={styles.text}>
-        • Account Information – Email address and encrypted password stored
-        locally for login purposes.{"\n"}
-        • App Usage Data – Anonymous statistics about app interactions, such as
-        features used or pages visited.{"\n"}
-        • Device Information – Basic technical data (device ID, OS version,
-        crash logs) for performance improvements.{"\n"}
-        • No Financial Data – We never collect payment, bank, or trading account details.
-      </Text>
+      <Section title="2. How We Use Information">
+        • Provide core functionality (watchlists, alerts).{"\n"}• Deliver
+        AI-powered insights.{"\n"}• Send notifications (if enabled).{"\n"}•
+        Monitor performance and fix issues.{"\n"}• Alphaclara uses automated
+        analysis and AI models to generate market context, insights, alerts, and
+        summaries.
+      </Section>
 
-      <Text style={styles.subTitle}>2. How We Use Information</Text>
-      <Text style={styles.text}>
-        • To provide core app functions and personalized features.{"\n"}
-        • To improve AI signal accuracy and user experience.{"\n"}
-        • To send important alerts and market updates (if enabled).{"\n"}
-        • To analyze app performance and resolve issues.
-      </Text>
+      <Section title="3. Data Storage & Security">
+        Data is securely stored using trusted cloud infrastructure (Firebase /
+        Google Cloud). Industry-standard protections are used, but absolute
+        security cannot be guaranteed.
+      </Section>
 
-      <Text style={styles.subTitle}>3. Data Storage & Security</Text>
-      <Text style={styles.text}>
-        Your data is stored securely on your device and, where applicable, in
-        encrypted cloud storage. We implement industry-standard security measures to
-        prevent unauthorized access or disclosure.
-      </Text>
+      <Section title="4. Third-Party Services">
+        • Market data providers (Finnhub, Polygon, CoinGecko){"\n"}• Cloud
+        services (Firebase, hosting providers){"\n"}
+        These services process only necessary data. We do not sell or share your
+        personal data for advertising.
+      </Section>
 
-      <Text style={styles.subTitle}>4. Third-Party Services</Text>
-      <Text style={styles.text}>
-        The app may use third-party APIs (e.g., market data, sentiment feeds)
-        for analysis. We do not share your personal data with third parties for
-        marketing purposes.
-      </Text>
+      <Section title="5. Push Notifications">
+        Alphaclara may send alerts related to market activity and system
+        insights. You can control notifications in app settings.
+      </Section>
 
-      <Text style={styles.subTitle}>5. Your Choices</Text>
-      <Text style={styles.text}>
-        • You can toggle notifications and data sources in the Profile/Settings screen.{"\n"}
-        • You may delete stored data by clearing app storage or uninstalling the app.{"\n"}
-        • You may contact us for data-related requests at support@bullsignals.ai (placeholder).
-      </Text>
+      <Section title="6. Your Choices & Rights">
+        • Manage or disable notifications{"\n"}• Modify or delete your data
+        {"\n"}• Request account/data deletion via support{"\n"}• Stop using the
+        app at any time
+      </Section>
 
-      <Text style={styles.subTitle}>6. Children’s Privacy</Text>
-      <Text style={styles.text}>
-        Alphaclara is not intended for individuals under 18 years of age. We
-        do not knowingly collect personal data from children.
-      </Text>
+      <Section title="7. Data Retention">
+        Data is retained only as long as needed to provide services or meet
+        legal obligations.
+      </Section>
 
-      <Text style={styles.subTitle}>7. Disclaimer</Text>
-      <Text style={styles.text}>
-        We are not legal or financial advisors. All content is for informational and educational purposes only.
-      </Text>
+      <Section title="8. Children’s Privacy">
+        Alphaclara is not intended for individuals under 18.
+      </Section>
 
-      <Text style={styles.subTitle}>8. Changes to this Policy</Text>
-      <Text style={styles.text}>
-        We may update this Privacy Policy from time to time to reflect changes in
-        app features or legal requirements. Updates will be posted within the app.
-      </Text>
+      <Section title="9. Financial Disclaimer">
+        Alphaclara provides market insights, AI ratings, alerts, and summaries
+        for informational and educational purposes only. We do not provide
+        financial, investment, legal, or tax advice.
+      </Section>
 
-      <Text style={styles.subTitle}>9. Contact Us</Text>
-      <Text style={styles.text}>
-        For questions or concerns regarding this Privacy Policy, please contact us at support@bullsignals.ai
-      </Text>
+      <Section title="10. Changes to This Policy">
+        We may update this policy periodically. Updates will be reflected in the
+        app.
+      </Section>
 
-      <Text style={styles.footer}>
-        © 2025 Alphaclara • Informational use only • No legal advice intended.
-      </Text>
+      <Section title="11. Contact Us">support@alphaclara.ai</Section>
+
+      <View style={styles.footerWrap}>
+        <Text style={styles.powered}>
+          Powered by <Text style={styles.brand}>Alphaclara</Text>
+        </Text>
+        <Text style={styles.footer}>© 2026 Alphaclara</Text>
+      </View>
     </ScrollView>
   );
 }
 
+function Section({ title, children }) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.subTitle}>{title}</Text>
+      <Text style={styles.text}>{children}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000", padding: 20 },
-  title: { color: "#00E396", fontSize: 24, fontWeight: "700", marginBottom: 10 },
-  updated: { color: "#999", fontSize: 13, marginBottom: 20 },
-  subTitle: {
-    color: "#00E396",
-    fontSize: 18,
-    fontWeight: "600",
-    marginTop: 20,
+  container: {
+    flex: 1,
+    backgroundColor: BRAND.bg,
+  },
+
+  content: {
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 90,
+  },
+
+  title: {
+    color: BRAND.accent,
+    fontSize: 25,
+    fontWeight: "900",
+    textAlign: "center",
     marginBottom: 6,
   },
-  text: { color: "#CCC", fontSize: 15, lineHeight: 22 },
-  footer: {
-    color: "#666",
+
+  updated: {
+    color: BRAND.muted,
     fontSize: 12,
     textAlign: "center",
-    marginTop: 40,
+    marginBottom: 18,
+  },
+
+  card: {
+    backgroundColor: BRAND.card,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+
+  subTitle: {
+    color: BRAND.accent,
+    fontSize: 15,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+
+  text: {
+    color: BRAND.sub,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+
+  footerWrap: {
+    alignItems: "center",
+    marginTop: 20,
+  },
+
+  powered: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginBottom: 6,
+  },
+
+  brand: {
+    color: BRAND.accent,
+    fontWeight: "700",
+  },
+
+  footer: {
+    color: BRAND.muted,
+    fontSize: 11,
   },
 });

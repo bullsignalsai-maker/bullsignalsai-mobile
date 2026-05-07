@@ -1,140 +1,182 @@
 import React from "react";
-import {
-  View,
-  ScrollView,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-} from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ScrollView, View, Text, StyleSheet } from "react-native";
+import { BRAND } from "../constants/theme";
 
-export default function TermsOfUseScreen({ navigation }) {
-  const handleAccept = async () => {
-    await AsyncStorage.setItem("termsAccepted", "true");
-    Alert.alert("Thank you", "You’ve accepted the terms.");
-    navigation.goBack();
-  };
-
-  const handleDecline = () => {
-    Alert.alert(
-      "Notice",
-      "You must accept the terms to continue using Alphaclara."
-    );
-    navigation.goBack();
-  };
-
+export default function TermsOfUseScreen() {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.body}>
-        <Text style={styles.intro}>
-          These Terms of Use ("Terms") govern your access to and use of the
-          Alphaclara mobile application ("App"), owned and operated for
-          informational and educational purposes only.
-        </Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={styles.updated}>Last Updated: May 2026</Text>
 
+      <View style={styles.card}>
         <Text style={styles.text}>
-          By using Alphaclara, you acknowledge that it does not provide
-          financial, investment, or legal advice. The App provides AI-driven
-          signals and sentiment summaries for informational purposes only.
-          Trading and investing involve risk, and Alphaclara is not liable
-          for any losses resulting from user decisions.
+          These Terms of Use govern your access to and use of the Alphaclara
+          mobile application. By using Alphaclara, you agree to these Terms.
         </Text>
+      </View>
 
-        <Text style={styles.text}>
-          We reserve the right to modify or discontinue parts of the App or
-          these Terms at any time. Continued use of the App after updates
-          constitutes acceptance of the new Terms.
+      <Section title="1. Informational Use Only">
+        Alphaclara provides AI-powered market insights, AI ratings, portfolio
+        context, crypto movement alerts, and related information for educational
+        and informational purposes only. Alphaclara does not provide financial,
+        investment, trading, tax, legal, or professional advice.
+      </Section>
+
+      <Section title="2. No Investment Recommendation">
+        Any ratings, alerts, summaries, or AI-generated explanations are not
+        recommendations to buy, sell, hold, or trade any security,
+        cryptocurrency, or financial instrument. You are solely responsible for
+        your own decisions.
+      </Section>
+
+      <Section title="3. Market Risk">
+        Investing and trading involve risk, including possible loss of
+        principal. Market data may be delayed, incomplete, inaccurate, or
+        unavailable. Alphaclara does not guarantee accuracy, performance,
+        outcomes, or future results.
+      </Section>
+
+      <Section title="4. AI-Generated Content">
+        Alphaclara may use automated analysis and AI-generated explanations to
+        provide market context, alerts, summaries, and confidence indicators.
+        AI-generated content may contain errors or omissions and should not be
+        relied upon as the sole basis for any financial decision.
+      </Section>
+
+      <Section title="5. User Responsibilities">
+        You agree to use Alphaclara lawfully and responsibly. You must not
+        misuse, disrupt, reverse engineer, overload, or attempt unauthorized
+        access to the app, backend systems, APIs, or data.
+      </Section>
+
+      <Section title="6. Third-Party Data and Services">
+        Alphaclara may use third-party services for market data, analytics,
+        authentication, cloud storage, and notifications. We are not responsible
+        for interruptions, inaccuracies, or changes in third-party services.
+      </Section>
+
+      <Section title="7. Alerts and Notifications">
+        Alerts are provided for convenience and may be delayed, missed,
+        duplicated, or unavailable. You can manage notification preferences
+        within the app. Alerts should not be treated as financial advice or
+        emergency notices.
+      </Section>
+
+      <Section title="8. Limitation of Liability">
+        To the maximum extent permitted by law, Alphaclara and its operators are
+        not liable for losses, damages, missed opportunities, investment
+        outcomes, or decisions made based on app content, alerts, ratings, or
+        market information.
+      </Section>
+
+      <Section title="9. Changes to the App or Terms">
+        We may update, modify, suspend, or discontinue features at any time. We
+        may also update these Terms from time to time. Continued use of the app
+        means you accept the updated Terms.
+      </Section>
+
+      <Section title="10. Privacy">
+        Your use of Alphaclara is also governed by our Privacy Policy, which
+        explains how data is collected, used, and protected.
+      </Section>
+
+      <Section title="11. Contact">
+        For questions about these Terms, contact us at support@alphaclara.ai
+      </Section>
+
+      <View style={styles.footerWrap}>
+        <Text style={styles.powered}>
+          Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
         </Text>
-
-        <Text style={styles.text}>
-          You agree not to use the App for illegal, fraudulent, or malicious
-          activities. Any attempt to misuse or disrupt App functionality may
-          result in suspension of access.
-        </Text>
-
-        <Text style={styles.text}>
-          Alphaclara uses anonymized analytics and may integrate with APIs
-          from trusted partners (e.g., X, Finnhub, Grok AI) to retrieve market
-          data. No personal financial information is collected or stored.
-        </Text>
-
-        <Text style={styles.text}>
-          For further details, please review our Privacy Policy. If you disagree
-          with any terms, please stop using the App immediately.
-        </Text>
-
-        {/* Accept / Decline Buttons */}
-        <View style={styles.buttonRow}>
-          <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept}>
-            <Text style={styles.btnText}>Accept</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.declineBtn} onPress={handleDecline}>
-            <Text style={styles.btnText}>Decline</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Version and Footer */}
-        <Text style={styles.version}>
-          Version 1.0 • Last Updated: October 2025
-        </Text>
-
         <Text style={styles.footer}>
-          © 2025 Alphaclara. All rights reserved.{"\n"}
-          This app is for informational use only and does not provide legal,
-          financial, or investment advice.
+          © 2026 Alphaclara. All rights reserved.
         </Text>
       </View>
     </ScrollView>
   );
 }
 
+function Section({ title, children }) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.subTitle}>{title}</Text>
+      <Text style={styles.text}>{children}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
-  content: { paddingBottom: 40 },
-  body: { paddingHorizontal: 20, paddingTop: 20 },
-  intro: {
-    color: "#EEE",
-    fontSize: 16,
-    lineHeight: 24,
+  container: {
+    flex: 1,
+    backgroundColor: BRAND.bg,
+  },
+
+  content: {
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 90,
+  },
+
+  title: {
+    color: BRAND.accent,
+    fontSize: 25,
+    fontWeight: "900",
+    marginBottom: 6,
+    textAlign: "center",
+  },
+
+  updated: {
+    color: BRAND.muted,
+    fontSize: 12.5,
     marginBottom: 18,
-    fontWeight: "600",
+    textAlign: "center",
+    fontWeight: "700",
   },
+
+  card: {
+    backgroundColor: BRAND.card,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+
+  subTitle: {
+    color: BRAND.accent,
+    fontSize: 15.5,
+    fontWeight: "900",
+    marginBottom: 7,
+  },
+
   text: {
-    color: "#DDD",
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 14,
+    color: BRAND.sub,
+    fontSize: 14,
+    lineHeight: 21,
   },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-evenly",
-    marginTop: 24,
+
+  footerWrap: {
+    alignItems: "center",
+    marginTop: 22,
   },
-  acceptBtn: {
-    backgroundColor: "#00E396",
-    paddingVertical: 12,
-    paddingHorizontal: 28,
-    borderRadius: 8,
-  },
-  declineBtn: {
-    backgroundColor: "#EF4444",
-    paddingVertical: 12,
-    paddingHorizontal: 28,
-    borderRadius: 8,
-  },
-  btnText: { color: "#FFF", fontWeight: "600", fontSize: 16 },
-  version: {
-    color: "#9CA3AF",
-    fontSize: 13,
-    textAlign: "center",
-    marginTop: 30,
-    marginBottom: 10,
-  },
-  footer: {
-    color: "#666",
+
+  powered: {
+    color: BRAND.sub,
     fontSize: 12,
+    marginBottom: 8,
+  },
+
+  footerBrand: {
+    color: BRAND.accent,
+    fontWeight: "700",
+  },
+
+  footer: {
+    color: BRAND.muted,
+    fontSize: 11,
     textAlign: "center",
-    lineHeight: 18,
   },
 });

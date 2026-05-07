@@ -39,7 +39,9 @@ function normalizeStockDetail(raw) {
 
   const change =
     quoteSrc.change ??
-    (currentPrice != null && prevClose != null ? currentPrice - prevClose : null);
+    (currentPrice != null && prevClose != null
+      ? currentPrice - prevClose
+      : null);
 
   let changePct = quoteSrc.changePct;
   if (changePct != null && !isNaN(changePct)) {
@@ -66,8 +68,8 @@ function normalizeStockDetail(raw) {
     typeof signal?.confidence === "number"
       ? signal.confidence
       : typeof headerSignal?.confidence === "number"
-      ? headerSignal.confidence
-      : null;
+        ? headerSignal.confidence
+        : null;
 
   const patternInsight =
     pattern && pattern.name
@@ -114,14 +116,6 @@ function normalizeStockDetail(raw) {
       summary: tech?.volume?.explanation || "",
       volume_vs_ma20_pct: tech?.volume?.volumeVsMa20Pct ?? null,
       volume_zscore_20: tech?.volume?.volumeZscore20 ?? null,
-    },
-
-    candle: {
-      intraday_range_pct: null,
-      gap_pct: null,
-      body_pct: null,
-      upper_shadow_pct: null,
-      lower_shadow_pct: null,
     },
   };
 

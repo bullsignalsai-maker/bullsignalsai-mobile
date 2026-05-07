@@ -10,7 +10,6 @@ import {
   TextInput,
   Image,
   Alert,
-  Switch,
   Animated,
 } from "react-native";
 
@@ -20,8 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { registerForPushNotifications } from "../services/pushNotificationService";
 import { auth, db } from "../firebaseConfig";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-
+import { SafeAreaView } from "react-native";
 const BRAND = {
   bg: "#000000",
   card: "#0B1220",
@@ -45,13 +43,6 @@ export default function ProfileSettingsHub({ navigation }) {
 
   const [editable, setEditable] = useState(false);
   
-  const [notifPrefs, setNotifPrefs] = useState({
-  enabled: true,
-  watchlist: true,
-  portfolio: true,
-  crypto: true,
-  });
-
   const toastAnim = useState(new Animated.Value(0))[0];
   const [toastMessage, setToastMessage] = useState("");
 
@@ -74,36 +65,6 @@ export default function ProfileSettingsHub({ navigation }) {
           bio: saved.bio || "",
           avatar: saved.avatar || null,
         });
-       
-    
-
-if (userId) {
-  const prefRef = doc(db, "users", userId, "preferences", "notifications");
-  const prefSnap = await getDoc(prefRef);
-
-  if (prefSnap.exists()) {
-    const data = prefSnap.data() || {};
-
-    setNotifPrefs({
-  enabled: data.enabled ?? true,
-  watchlist: data.watchlist ?? true,
-  portfolio: data.portfolio ?? true,
-  crypto: data.crypto ?? true,
-    });
-  } else {
-    await setDoc(
-      prefRef,
-      {
-        enabled: true,
-        watchlist: true,
-        portfolio: true,
-        crypto: true,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
-  }
-}
 
       })();
     }, [])
@@ -184,56 +145,31 @@ if (userId) {
     }
   };
 
-const updateNotifPref = async (key, value) => {
-  try {
-    const userId = auth.currentUser?.uid;
+  const handleLogout = () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to log out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Logout",
+          style: "destructive",
+          onPress: async () => {
+            await AsyncStorage.removeItem("userToken");
 
-
-    if (!userId) {
-      showToast("Please login again");
-      return;
-    }
-
-    const updated = {
-      ...notifPrefs,
-      [key]: value,
-    };
-
-    setNotifPrefs(updated);
-
-    const prefRef = doc(db, "users", userId, "preferences", "notifications");
-
-    await setDoc(
-      prefRef,
-      {
-        ...updated,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "Login" }],
+            });
+          },
+        },
+      ]
     );
-
-   
-
-    showToast("Notification preference updated");
-  } catch (e) {
-    console.warn("❌ Notification pref save failed:", e.message || e);
-    showToast("Could not save notification preference");
-  }
-};
-
-  const handleLogout = async () => {
-    await AsyncStorage.removeItem("userToken");
-
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "Login" }],
-    });
   };
-
   const handleDeleteAccount = () => {
     Alert.alert(
       "Delete Account",
-      "This will permanently remove your local profile data from this device.",
+      "This will remove your account data from this device. To permanently delete your account, contact support.",
       [
         {
           text: "Cancel",
@@ -268,11 +204,12 @@ const updateNotifPref = async (key, value) => {
     onPress,
     right,
     danger = false,
+    style,
   }) => (
     <TouchableOpacity
       activeOpacity={0.8}
       onPress={onPress}
-      style={styles.row}
+      style={[styles.row, style]}
     >
       <View style={styles.rowLeft}>
         <Ionicons
@@ -303,10 +240,14 @@ const updateNotifPref = async (key, value) => {
   );
 
   return (
+  <SafeAreaView style={{ flex: 1, backgroundColor: BRAND.bg }}>
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
     >
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Profile & Settings</Text>
+      </View>
       {/* PROFILE CARD */}
       <View style={styles.profileCard}>
         <TouchableOpacity
@@ -314,16 +255,11 @@ const updateNotifPref = async (key, value) => {
           onPress={editable ? handleAvatarChange : null}
         >
           {user.avatar ? (
-            <Image
-              source={{ uri: user.avatar }}
-              style={styles.avatar}
-            />
+            <Image source={{ uri: user.avatar }} style={styles.avatar} />
           ) : (
-            <Ionicons
-              name="person-circle-outline"
-              size={82}
-              color="#3B3B3B"
-            />
+            <View style={styles.avatarPlaceholder}>
+              <Ionicons name="person" size={36} color={BRAND.sub} />
+            </View>
           )}
         </TouchableOpacity>
 
@@ -359,149 +295,83 @@ const updateNotifPref = async (key, value) => {
         {!editable ? (
           
           <TouchableOpacity
-            style={styles.editBtn}
+            style={styles.editInline}
             onPress={() => setEditable(true)}
           >
-            <Ionicons
-              name="create-outline"
-              size={16}
-              color="#000"
-            />
-            <Text style={styles.editBtnText}>
-              Edit Profile
-            </Text>
+            <Ionicons name="pencil" size={16} color={BRAND.accent} />
+            <Text style={styles.editInlineText}>Edit</Text>
           </TouchableOpacity>
         ) : null}
       </View>
 
       {/* EDIT MODE */}
       {editable && (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>
-            Personal Information
-          </Text>
+        <View style={styles.editCard}>
+          <View style={styles.editHeaderRow}>
+            <Text style={styles.sectionTitle}>Edit Profile</Text>
+            <Ionicons name="person-outline" size={18} color={BRAND.accent} />
+          </View>
 
-          <TextInput
-            placeholder="First Name"
-            placeholderTextColor="#555"
-            style={styles.input}
-            value={user.firstName}
-            onChangeText={(v) =>
-              handleFieldChange("firstName", v)
-            }
-          />
+          <View style={styles.fieldBlock}>
+            <Text style={styles.fieldLabel}>First Name</Text>
+            <TextInput
+              placeholder="First name"
+              placeholderTextColor={BRAND.muted}
+              style={styles.input}
+              value={user.firstName}
+              onChangeText={(v) => handleFieldChange("firstName", v)}
+            />
+          </View>
 
-          <TextInput
-            placeholder="Last Name"
-            placeholderTextColor="#555"
-            style={styles.input}
-            value={user.lastName}
-            onChangeText={(v) =>
-              handleFieldChange("lastName", v)
-            }
-          />
+          <View style={styles.fieldBlock}>
+            <Text style={styles.fieldLabel}>Last Name</Text>
+            <TextInput
+              placeholder="Last name"
+              placeholderTextColor={BRAND.muted}
+              style={styles.input}
+              value={user.lastName}
+              onChangeText={(v) => handleFieldChange("lastName", v)}
+            />
+          </View>
 
-          <TextInput
-            style={[styles.input, { color: "#777" }]}
-            value={user.email}
-            editable={false}
-          />
+          <View style={styles.fieldBlock}>
+            <Text style={styles.fieldLabel}>Email</Text>
+            <View style={styles.lockedInputWrap}>
+              <TextInput
+                style={styles.lockedInput}
+                value={user.email}
+                editable={false}
+              />
+              <Ionicons name="lock-closed-outline" size={16} color={BRAND.muted} />
+            </View>
+          </View>
 
-          <TextInput
-            placeholder="Short Bio"
-            placeholderTextColor="#555"
-            style={[styles.input, { height: 90 }]}
-            multiline
-            value={user.bio}
-            onChangeText={(v) =>
-              handleFieldChange("bio", v)
-            }
-          />
+          <View style={styles.fieldBlock}>
+            <Text style={styles.fieldLabel}>Short Bio</Text>
+            <TextInput
+              placeholder="Add a short profile note"
+              placeholderTextColor={BRAND.muted}
+              style={[styles.input, styles.bioInput]}
+              multiline
+              value={user.bio}
+              onChangeText={(v) => handleFieldChange("bio", v)}
+            />
+          </View>
 
           <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.saveBtn}
-              onPress={handleSave}
-            >
-              <Text style={styles.saveText}>
-                Save Changes
-              </Text>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditable(false)}>
+              <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={() => setEditable(false)}
-            >
-              <Text style={styles.cancelText}>
-                Cancel
-              </Text>
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+              <Text style={styles.saveText}>Save</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
-
-      {/* PREFERENCES */}
-      <Text style={styles.groupTitle}>Notification Settings</Text>
-
-      <View style={styles.card}>
-        <SettingsRow
-          icon="notifications-outline"
-          label="Push Notifications"
-          right={
-            <Switch
-              value={notifPrefs.enabled}
-              onValueChange={(v) => updateNotifPref("enabled", v)}
-              trackColor={{ false: "#444", true: BRAND.accent }}
-              thumbColor="#FFF"
-            />
-          }
-        />
-
-        <SettingsRow
-          icon="star-outline"
-          label="Watchlist Alerts"
-          right={
-            <Switch
-              value={notifPrefs.watchlist}
-              disabled={!notifPrefs.enabled}
-              onValueChange={(v) => updateNotifPref("watchlist", v)}
-              trackColor={{ false: "#444", true: BRAND.accent }}
-              thumbColor="#FFF"
-            />
-          }
-        />
-
-        <SettingsRow
-          icon="wallet-outline"
-          label="Portfolio Alerts"
-          right={
-            <Switch
-              value={notifPrefs.portfolio}
-              disabled={!notifPrefs.enabled}
-              onValueChange={(v) => updateNotifPref("portfolio", v)}
-              trackColor={{ false: "#444", true: BRAND.accent }}
-              thumbColor="#FFF"
-            />
-          }
-        />
-
-        <SettingsRow
-          icon="logo-bitcoin"
-          label="Crypto Alerts"
-          right={
-            <Switch
-              value={notifPrefs.crypto}
-              disabled={!notifPrefs.enabled}
-              onValueChange={(v) => updateNotifPref("crypto", v)}
-              trackColor={{ false: "#444", true: BRAND.accent }}
-              thumbColor="#FFF"
-            />
-          }
-        />
-      </View>
       
       {/* INFORMATION */}
-      <Text style={styles.groupTitle}>Information</Text>
+      <Text style={styles.groupTitle}>Legal & Info</Text>
 
       <View style={styles.card}>
         <SettingsRow
@@ -519,7 +389,11 @@ const updateNotifPref = async (key, value) => {
             navigation.navigate("About")
           }
         />
-
+        <SettingsRow
+          icon="help-circle-outline"
+          label="Support & Help"
+          onPress={() => navigation.navigate("Support")}
+        />
         <SettingsRow
           icon="shield-outline"
           label="Privacy Policy"
@@ -570,7 +444,13 @@ const updateNotifPref = async (key, value) => {
           {toastMessage}
         </Text>
       </Animated.View>
+        <Text style={styles.powered}>
+        Powered by <Text style={{ color: BRAND.accent }}>Alphaclara</Text>
+      </Text>
 
+      <Text style={styles.disclaimer}>
+        Information provided is for educational purposes only and is not financial advice.
+      </Text>
       <View style={styles.versionWrap}>
         <Text style={styles.versionText}>Alphaclara v1.0.0</Text>
         <Text style={styles.versionSubText}>AI-Powered Market Intelligence</Text>
@@ -578,6 +458,7 @@ const updateNotifPref = async (key, value) => {
 
       <View style={{ height: 90 }} />
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -595,7 +476,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BRAND.border,
     alignItems: "center",
-    marginTop: 38,
+    marginTop: 10,
   },
 
   avatar: {
@@ -731,7 +612,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#111",
+    borderBottomColor: BRAND.border,
   },
 
   rowLeft: {
@@ -795,5 +676,148 @@ versionSubText: {
   color: BRAND.muted,
   fontSize: 11,
   marginTop: 4,
+},
+header: {
+  marginBottom: 10,
+},
+
+headerTitle: {
+  color: BRAND.text,
+  fontSize: 22,
+  fontWeight: "900",
+},  
+avatarPlaceholder: {
+  width: 82,
+  height: 82,
+  borderRadius: 41,
+  backgroundColor: BRAND.card2,
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1,
+  borderColor: BRAND.border,
+},
+powered: {
+  color: BRAND.sub,
+  fontSize: 12,
+  textAlign: "center",
+  marginTop: 14,
+},
+
+disclaimer: {
+  color: BRAND.muted,
+  fontSize: 10,
+  textAlign: "center",
+  marginTop: 6,
+  paddingHorizontal: 20,
+},
+editInline: {
+  position: "absolute",
+  top: 16,
+  right: 16,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 6,
+},
+
+editInlineText: {
+  color: BRAND.accent,
+  fontSize: 13,
+  fontWeight: "700",
+},
+editCard: {
+  backgroundColor: BRAND.card,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: BRAND.border,
+  padding: 16,
+  marginTop: 14,
+},
+
+editHeaderRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: 14,
+},
+
+fieldBlock: {
+  marginBottom: 12,
+},
+
+fieldLabel: {
+  color: BRAND.sub,
+  fontSize: 12,
+  fontWeight: "800",
+  marginBottom: 7,
+},
+
+input: {
+  backgroundColor: BRAND.card2,
+  borderRadius: 14,
+  paddingHorizontal: 14,
+  paddingVertical: 13,
+  color: BRAND.text,
+  fontSize: 15,
+  fontWeight: "700",
+  borderWidth: 1,
+  borderColor: BRAND.softBorder,
+},
+
+bioInput: {
+  height: 90,
+  textAlignVertical: "top",
+},
+
+lockedInputWrap: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: BRAND.card2,
+  borderRadius: 14,
+  paddingHorizontal: 14,
+  borderWidth: 1,
+  borderColor: BRAND.softBorder,
+  opacity: 0.65,
+},
+
+lockedInput: {
+  flex: 1,
+  paddingVertical: 13,
+  color: BRAND.muted,
+  fontSize: 15,
+  fontWeight: "700",
+},
+
+actionRow: {
+  flexDirection: "row",
+  gap: 10,
+  marginTop: 8,
+},
+
+saveBtn: {
+  flex: 1,
+  backgroundColor: BRAND.accent,
+  paddingVertical: 13,
+  borderRadius: 14,
+  alignItems: "center",
+},
+
+saveText: {
+  color: BRAND.bg,
+  fontWeight: "900",
+},
+
+cancelBtn: {
+  flex: 1,
+  backgroundColor: BRAND.card2,
+  borderWidth: 1,
+  borderColor: BRAND.border,
+  paddingVertical: 13,
+  borderRadius: 14,
+  alignItems: "center",
+},
+
+cancelText: {
+  color: BRAND.text,
+  fontWeight: "800",
 },
 });

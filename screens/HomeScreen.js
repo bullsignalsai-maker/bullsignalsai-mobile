@@ -10,33 +10,28 @@ import {
   TouchableOpacity,
   Animated,
   RefreshControl,
-  Modal,
-  TextInput,
   Image,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { getHomeScreen } from "../services/HomeService";
+import { BRAND } from "../constants/theme";
 
 const LOGO = require("../assets/alpha-transparent.png");
-
-const BRAND = {
-  bg: "#000000",
-  card: "#111827",
-  border: "#1F2937",
-  text: "#FFFFFF",
-  sub: "#9CA3AF",
-  accent: "#00E396",
-  red: "#FF4560",
-  amber: "#FEB019",
-};
-
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const CAROUSEL_CARD_WIDTH = SCREEN_WIDTH - 40;
+const CAROUSEL_GAP = 12;
 // % formatter (market style)
 const fmtPct = (v) =>
   typeof v === "number" && !Number.isNaN(v)
     ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
     : "--";
-
+const displayRating = (signal) => {
+  if (signal === "BUY") return "Bullish";
+  if (signal === "SELL") return "Bearish";
+  return "Neutral";
+};
 
 // --- Helper: human-readable timestamps
 function timeAgo(isoString) {
@@ -51,7 +46,6 @@ function timeAgo(isoString) {
   return `Updated ${days}d ago`;
 }
 
-
 function formatPattern(pattern, winRate) {
   if (!pattern) return null;
   if (typeof winRate === "number") {
@@ -59,7 +53,6 @@ function formatPattern(pattern, winRate) {
   }
   return pattern;
 }
-
 
 function getPatternColor(winRate) {
   if (typeof winRate !== "number") return "#374151"; // neutral gray
@@ -108,7 +101,6 @@ function renderColoredSegments(value, styles, BRAND) {
   );
 }
 
-
 // Session label from timestamp (RESTORE — DO NOT CHANGE)
 function getMarketSession(ts) {
   if (!ts) return null;
@@ -120,32 +112,29 @@ function getMarketSession(ts) {
   return "LIVE";
 }
 
-
 export default function HomeScreen({ navigation }) {
   const [home, setHome] = useState(null);
   // 🔥 price flash animation per symbol
-const priceFlash = useRef({}).current;
-const REFRESH_INTERVAL_MS = 15000; // ✅ matches quotes ttl (30s)
-
-
-const [refreshing, setRefreshing] = useState(false);
+  const priceFlash = useRef({}).current;
+  const REFRESH_INTERVAL_MS = 30000;
+  const [refreshing, setRefreshing] = useState(false);
   /* ---------------------------------------------------------
      Load + Auto Refresh (5s)
   --------------------------------------------------------- */
   useFocusEffect(
-  React.useCallback(() => {
-    let active = true;
+    React.useCallback(() => {
+      let active = true;
 
-    const load = async () => {
-      if (!active) return;
+      const load = async () => {
+        if (!active) return;
 
-      const data = await getHomeScreen();
-      if (!data) return;
+        const data = await getHomeScreen();
+        if (!data) return;
 
-      setHome(data);
+        setHome(data);
 
-      // 🔥 trigger price flash
-   
+        // 🔥 trigger price flash
+
         (data.signals || []).forEach((it) => {
           // ✅ ensure animation exists
           if (!priceFlash[it.symbol]) {
@@ -160,63 +149,57 @@ const [refreshing, setRefreshing] = useState(false);
             useNativeDriver: false,
           }).start();
         });
+      };
 
+      // initial load
+      load();
 
-    };
+      // auto refresh
+      const interval = setInterval(load, REFRESH_INTERVAL_MS);
 
-    // initial load
-    load();
-
-    // auto refresh
-    const interval = setInterval(load, REFRESH_INTERVAL_MS);
-
-    // cleanup when screen loses focus
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [])
-);
-
+      // cleanup when screen loses focus
+      return () => {
+        active = false;
+        clearInterval(interval);
+      };
+    }, []),
+  );
 
   /* ---------------------------------------------------------
      Pull To Refresh
   --------------------------------------------------------- */
   const onRefresh = async () => {
-  if (refreshing) return;
+    if (refreshing) return;
 
-  setRefreshing(true);
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-  const data = await getHomeScreen();
-  if (data) {
-    setHome(data);
+    const data = await getHomeScreen();
+    if (data) {
+      setHome(data);
 
-    (data.signals || []).forEach((it) => {
-      if (!priceFlash[it.symbol]) {
-        priceFlash[it.symbol] = new Animated.Value(0);
-      }
+      (data.signals || []).forEach((it) => {
+        if (!priceFlash[it.symbol]) {
+          priceFlash[it.symbol] = new Animated.Value(0);
+        }
 
-      priceFlash[it.symbol].setValue(1);
-      Animated.timing(priceFlash[it.symbol], {
-        toValue: 0,
-        duration: 900,
-        useNativeDriver: false,
-      }).start();
-    });
+        priceFlash[it.symbol].setValue(1);
+        Animated.timing(priceFlash[it.symbol], {
+          toValue: 0,
+          duration: 900,
+          useNativeDriver: false,
+        }).start();
+      });
+    }
 
-  }
-
-  setRefreshing(false);
-};
-
-
+    setRefreshing(false);
+  };
 
   if (!home) {
     return (
       <View style={styles.container}>
         <Text style={{ color: BRAND.sub, textAlign: "center", marginTop: 100 }}>
-          Loading…
+          Loading market intelligence…
         </Text>
       </View>
     );
@@ -233,16 +216,29 @@ const [refreshing, setRefreshing] = useState(false);
           <Text style={styles.title}>Alphaclara</Text>
         </View>
         <Text style={styles.subtitle}>AI-Powered Market Intelligence</Text>
-         <View style={styles.syncRow}>
-        <Text style={styles.marketStatusText}>
-          {header.marketStatus}
-        </Text>
-      </View>
-      <Text style={styles.moodText}>
-        Market: {header.marketMood}
-      </Text>
+        <View style={styles.marketRow}>
+          <View
+            style={[
+              styles.marketDot,
+              {
+                backgroundColor: String(header.marketStatus || "")
+                  .toLowerCase()
+                  .includes("positive")
+                  ? BRAND.accent
+                  : String(header.marketStatus || "")
+                        .toLowerCase()
+                        .includes("negative")
+                    ? BRAND.red
+                    : BRAND.amber,
+              },
+            ]}
+          />
 
-
+          <Text style={styles.marketText}>
+            {header.marketStatus || "Market"} ·{" "}
+            {header.marketMood || "Overview"}
+          </Text>
+        </View>
       </View>
 
       {/* FEATURE CARDS */}
@@ -251,6 +247,10 @@ const [refreshing, setRefreshing] = useState(false);
         showsHorizontalScrollIndicator={false}
         style={styles.carousel}
         contentContainerStyle={styles.carouselContent}
+        snapToInterval={CAROUSEL_CARD_WIDTH + CAROUSEL_GAP}
+        decelerationRate="fast"
+        snapToAlignment="start"
+        disableIntervalMomentum
       >
         {carousel.map((c, i) => (
           <View key={i} style={styles.featureCard}>
@@ -268,24 +268,30 @@ const [refreshing, setRefreshing] = useState(false);
 
             {c.id === "sectors" ? (
               <View style={styles.sectorWrap}>
-                {c.value.split(/\s*·\s*|\n/).filter(Boolean).map((seg, idx) => {
-                  const isUp = seg.includes("▲");
-                  const isDown = seg.includes("▼");
+                {c.value
+                  .split(/\s*·\s*|\n/)
+                  .filter(Boolean)
+                  .map((seg, idx) => {
+                    const isUp = seg.includes("▲");
+                    const isDown = seg.includes("▼");
 
-                  return (
-                    <Text
-                      key={idx}
-                      style={[
-                        styles.sectorText,
-                        isUp && { color: BRAND.accent },
-                        isDown && { color: BRAND.red },
-                      ]}
-                    >
-                      {seg}
-                      {idx < c.value.split(/\s*·\s*|\n/).filter(Boolean).length - 1 ? " · " : ""}
-                    </Text>
-                  );
-                })}
+                    return (
+                      <Text
+                        key={idx}
+                        style={[
+                          styles.sectorText,
+                          isUp && { color: BRAND.accent },
+                          isDown && { color: BRAND.red },
+                        ]}
+                      >
+                        {seg}
+                        {idx <
+                        c.value.split(/\s*·\s*|\n/).filter(Boolean).length - 1
+                          ? " · "
+                          : ""}
+                      </Text>
+                    );
+                  })}
               </View>
             ) : (
               renderColoredSegments(c.value, styles, BRAND)
@@ -294,11 +300,10 @@ const [refreshing, setRefreshing] = useState(false);
         ))}
       </ScrollView>
 
-
       {/* MAIN LIST */}
       <ScrollView
         scrollEventThrottle={16}
-        keyboardShouldPersistTaps="handled"   // ✅ REQUIRED
+        keyboardShouldPersistTaps="handled" // ✅ REQUIRED
         refreshControl={
           <RefreshControl
             tintColor={BRAND.accent}
@@ -309,39 +314,37 @@ const [refreshing, setRefreshing] = useState(false);
         }
         contentContainerStyle={{ paddingBottom: 50 }}
       >
+        <Text style={styles.listHelper}>
+          AI-ranked market ideas from Alphaclara’s tracked universe.
+        </Text>
         {signals.map((item, idx) => {
-      const session = getMarketSession(item.lastUpdated);
-      const isLive = session === "LIVE";
+          const session = getMarketSession(item.lastUpdated);
+          const isLive = session === "LIVE";
 
-      const isUp =
-        typeof item.changePct === "number"
-          ? item.changePct >= 0
-          : true;
+          const isUp =
+            typeof item.changePct === "number" ? item.changePct >= 0 : true;
 
           const signalColor =
             item.signal === "BUY"
               ? BRAND.accent
               : item.signal === "SELL"
-              ? BRAND.red
-              : BRAND.amber;
-            const hasLivePrice = typeof item.price === "number";
-  
+                ? BRAND.red
+                : BRAND.amber;
+          const hasLivePrice = typeof item.price === "number";
 
-          const changeColor =
-            item.changePct >= 0 ? BRAND.accent : BRAND.red;
+          const changeColor = item.changePct >= 0 ? BRAND.accent : BRAND.red;
           // ensure animation value exists per symbol
           if (!priceFlash[item.symbol]) {
             priceFlash[item.symbol] = new Animated.Value(0);
           }
 
           return (
-           <TouchableOpacity
-              key={item.symbol + idx}
+            <TouchableOpacity
+              key={item.symbol}
               activeOpacity={0.85}
               delayPressIn={0}
               style={styles.card}
               onPress={() => {
-               
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 navigation.navigate("StockDetailScreen", {
                   symbol: item.symbol,
@@ -351,133 +354,139 @@ const [refreshing, setRefreshing] = useState(false);
               }}
             >
               <View style={styles.cardHeader}>
-
                 {/* LEFT */}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.symbol}>{item.symbol}</Text>
                   <Text style={styles.name}>{item.companyName}</Text>
-
                 </View>
 
                 {/* RIGHT */}
-              <View style={{ alignItems: "flex-end" }}>
-                {/* PRICE */}
-                <Animated.Text
-                  style={[
-                    styles.price,
-                    {
-                      color: isLive
-                        ? isUp
-                          ? BRAND.accent
-                          : BRAND.red
-                        : BRAND.sub,
-
-                      backgroundColor: priceFlash[item.symbol]?.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [
-                          "transparent",
-                          isUp
-                            ? "rgba(0,227,150,0.30)"
-                            : "rgba(255,69,96,0.30)",
-                        ],
-                      }),
-                      paddingHorizontal: 6,
-                      borderRadius: 6,
-                    },
-                  ]}
-                >
-                  {item.price != null ? `$${item.price.toFixed(2)}` : "--"}
-                </Animated.Text>
-
-                {/* CHANGE + % */}
-                {(() => {
-                const session = getMarketSession(item.lastUpdated);
-                const isLive = session === "LIVE";
-
-                const change =
-                  typeof item.change === "number" ? item.change : null;
-                const pct =
-                  typeof item.changePct === "number" ? item.changePct : null;
-
-                if (change == null || pct == null) {
-                  return (
-                    <Text style={[styles.changePct, { color: BRAND.sub }]}>
-                      -- {session || ""}
-                    </Text>
-                  );
-                }
-
-                const isUp = pct >= 0;
-
-                return (
-                  <Text
+                <View style={{ alignItems: "flex-end" }}>
+                  {/* PRICE */}
+                  <Animated.Text
                     style={[
-                      styles.changePct,
+                      styles.price,
                       {
                         color: isLive
                           ? isUp
                             ? BRAND.accent
                             : BRAND.red
                           : BRAND.sub,
-                        opacity: isLive ? 1 : 0.75,
+
+                        backgroundColor: priceFlash[item.symbol]?.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [
+                            "transparent",
+                            isUp
+                              ? "rgba(0,227,150,0.30)"
+                              : "rgba(255,69,96,0.30)",
+                          ],
+                        }),
+                        paddingHorizontal: 6,
+                        borderRadius: 6,
                       },
                     ]}
                   >
-                    {isUp ? "▲" : "▼"} ${Math.abs(change).toFixed(2)} (
-                    {isUp ? "+" : "-"}
-                    {Math.abs(pct).toFixed(2)}%) {session}
-                  </Text>
-                );
-              })()}
+                    {item.price != null ? `$${item.price.toFixed(2)}` : "--"}
+                  </Animated.Text>
 
+                  {/* CHANGE + % */}
+                  {(() => {
+                    const session = getMarketSession(item.lastUpdated);
+                    const isLive = session === "LIVE";
 
-              </View>
+                    const change =
+                      typeof item.change === "number" ? item.change : null;
+                    const pct =
+                      typeof item.changePct === "number"
+                        ? item.changePct
+                        : null;
+
+                    if (change == null || pct == null) {
+                      return (
+                        <Text style={[styles.changePct, { color: BRAND.sub }]}>
+                          -- {session || ""}
+                        </Text>
+                      );
+                    }
+
+                    const isUp = pct >= 0;
+
+                    return (
+                      <Text
+                        style={[
+                          styles.changePct,
+                          {
+                            color: isLive
+                              ? isUp
+                                ? BRAND.accent
+                                : BRAND.red
+                              : BRAND.sub,
+                            opacity: isLive ? 1 : 0.75,
+                          },
+                        ]}
+                      >
+                        {isUp ? "▲" : "▼"} ${Math.abs(change).toFixed(2)} (
+                        {isUp ? "+" : "-"}
+                        {Math.abs(pct).toFixed(2)}%) {session}
+                      </Text>
+                    );
+                  })()}
+                </View>
               </View>
 
               <View style={styles.signalRow}>
                 <View
-                  style={[
-                    styles.signalBadge,
-                    { backgroundColor: signalColor },
-                  ]}
+                  style={[styles.signalBadge, { backgroundColor: signalColor }]}
                 >
-                  <Text style={styles.signalText}>{item.signal}</Text>
+                  <Text style={styles.signalText}>
+                    {displayRating(item.signal)}
+                  </Text>
                 </View>
-                <Text style={styles.confLabel}>Confidence</Text>
-                <Text
-                  style={[styles.confValue, { color: signalColor }]}
-                >
-                  {item.confidence}%
+
+                <Text style={[styles.confInline, { color: signalColor }]}>
+                  {item.confidence}% confidence
                 </Text>
               </View>
 
+              <View style={styles.cardDivider} />
+
               <Text style={styles.summary} numberOfLines={4}>
-              {item.grokSummary ||
-                (typeof item.summary === "string"
-                  ? item.summary
-                  : item.summary?.primary)}
-            </Text>
+                {item.grokSummary ||
+                  (typeof item.summary === "string"
+                    ? item.summary
+                    : item.summary?.primary)}
+              </Text>
 
               {item.pattern && (
-                <View
-                  style={[
-                    styles.patternBadge,
-                    { backgroundColor: getPatternColor(item.patternWinRate) },
-                  ]}
-                >
-                  <Text style={styles.patternText}>
+                <View style={styles.patternRow}>
+                  <Text style={styles.patternLabel}>Pattern</Text>
+                  <Text style={styles.patternValue}>
                     {formatPatternLabel(item.pattern, item.patternWinRate)}
                   </Text>
                 </View>
               )}
 
-
-              <Text style={styles.lastUpdated}>
-                {timeAgo(item.lastUpdated)}
-              </Text>
+              <View style={styles.cardFooterRow}>
+                <Text style={styles.lastUpdated}>
+                  {timeAgo(item.lastUpdated)}
+                </Text>
+                <Text style={styles.tapHint}>Tap for details</Text>
+              </View>
             </TouchableOpacity>
           );
         })}
+        <View style={styles.footerWrap}>
+          <Text style={styles.footerText}>
+            Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
+          </Text>
+
+          <Text style={styles.disclaimer}>
+            Market data, AI ratings, patterns, and insights are provided for
+            informational and educational purposes only and are not financial,
+            investment, trading, or tax advice.
+          </Text>
+        </View>
       </ScrollView>
     </View>
   );
@@ -491,36 +500,50 @@ const styles = StyleSheet.create({
   logo: { width: 25, height: 25, marginRight: 6 },
   title: { color: BRAND.accent, fontSize: 25, fontWeight: "800" },
   subtitle: { color: BRAND.sub, fontSize: 12, marginTop: 4 },
-  syncRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
-  moodText: { color: BRAND.sub, fontSize: 12, marginLeft: 2 },
+  carousel: {
+    marginTop: 5,
+    marginBottom: 8,
+  },
 
-   carousel: { marginTop: 5, marginBottom: 8 },
-  carouselContent: { paddingHorizontal: 12, paddingBottom: 16 },
+  carouselContent: {
+    paddingLeft: 14,
+    paddingRight: 14,
+    paddingBottom: 10,
+  },
+
   featureCard: {
     backgroundColor: BRAND.card,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 12,
-    width: 220,
-    height: 80,
-    marginRight: 12,
+    width: CAROUSEL_CARD_WIDTH,
+    minHeight: 86,
+    marginRight: CAROUSEL_GAP,
     borderWidth: 1,
     borderColor: BRAND.border,
     justifyContent: "center",
-    marginBottom: 25,
+    marginBottom: 30,
   },
-  featureHeader: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
-  featureTitle: { color: BRAND.text, fontWeight: "700", fontSize: 14 },
+  featureHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  featureTitle: {
+    color: BRAND.text,
+    fontWeight: "800",
+    fontSize: 14,
+  },
   featureValue: { color: BRAND.sub, fontSize: 12 },
 
   card: {
-  backgroundColor: BRAND.card,
-  borderRadius: 16,
-  padding: 14,           // slightly more inner space
-  marginHorizontal: 10,  // ✅ wider cards
-  marginBottom: 10,
-  borderWidth: 1,
-  borderColor: BRAND.border,
-},
+    backgroundColor: BRAND.card,
+    borderRadius: 18,
+    padding: 12,
+    marginHorizontal: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+  },
 
   cardHeader: {
     flexDirection: "row",
@@ -529,27 +552,62 @@ const styles = StyleSheet.create({
   },
   symbol: { color: BRAND.text, fontSize: 17, fontWeight: "700" },
   name: { color: BRAND.sub, fontSize: 12, marginTop: 2 },
-  price: { color: BRAND.text, fontSize: 16, fontWeight: "600" },
+  price: {
+    color: BRAND.text,
+    fontSize: 18,
+    fontWeight: "900",
+  },
   changePct: { fontSize: 12, fontWeight: "600" },
 
-  signalRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
+  signalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+  },
   signalBadge: {
-    borderRadius: 8,
+    borderRadius: 999,
     paddingVertical: 4,
     paddingHorizontal: 10,
-    marginRight: 10,
+    marginRight: 8,
   },
-  signalText: { color: "#000", fontSize: 12, fontWeight: "700" },
-  confLabel: { color: BRAND.sub, fontSize: 12, marginRight: 4 },
-  confValue: { fontSize: 12, fontWeight: "700" },
+  confInline: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: BRAND.border,
+    marginTop: 6,
+    marginBottom: 6,
+    opacity: 0.65,
+  },
+  signalText: {
+    color: "#000",
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
 
-  summary: { color: BRAND.sub, fontSize: 13, marginTop: 6 },
-  lastUpdated: {
+  cardFooterRow: {
+    marginTop: 5,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  summary: {
     color: BRAND.sub,
-    fontSize: 11,
-    marginTop: 2,
-    fontStyle: "italic",
-    opacity: 0.7,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  lastUpdated: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontWeight: "700",
+    opacity: 0.85,
+  },
+  tapHint: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontWeight: "700",
   },
 
   modalOverlay: {
@@ -586,59 +644,111 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: "row", justifyContent: "space-between" },
   cancelText: { color: BRAND.sub, fontSize: 14, fontWeight: "600" },
   addText: { color: BRAND.accent, fontSize: 14, fontWeight: "700" },
-  marketStatusText: {
-  color: BRAND.sub,
-  fontSize: 12,
-  fontWeight: "600",
-},
-priceBlock: {
-  alignItems: "flex-end",
-  minWidth: 90,
-},
-patternText: {
-  color: BRAND.sub,
-  fontSize: 12,
-  marginTop: 2,
-  opacity: 0.85,
-},
-patternBadge: {
-  alignSelf: "flex-start",
-  marginTop: 6,
-  paddingVertical: 4,
-  paddingHorizontal: 10,
-  borderRadius: 999,
-},
+  priceBlock: {
+    alignItems: "flex-end",
+    minWidth: 90,
+  },
+  sectorWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
 
-patternText: {
-  color: "#000",
-  fontSize: 11,
-  fontWeight: "700",
-  letterSpacing: 0.3,
-},
-sectorWrap: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-},
+  sectorText: {
+    fontSize: 12,
+    color: BRAND.sub,
+    fontWeight: "700",
+    lineHeight: 17,
+  },
+  segmentWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
 
-sectorText: {
-  fontSize: 12,
-  color: BRAND.sub,
-  fontWeight: "600",
-},
-segmentWrap: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-},
+  segmentText: {
+    fontSize: 12,
+    color: BRAND.sub,
+    fontWeight: "700",
+    lineHeight: 17,
+  },
+  changeLine: {
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  listHelper: {
+    color: BRAND.muted,
+    fontSize: 11,
+    textAlign: "center",
+    marginBottom: 8,
+    fontWeight: "700",
+  },
 
-segmentText: {
-  fontSize: 12,
-  color: BRAND.sub,
-  fontWeight: "600",
-},
-changeLine: {
-  fontSize: 12,
-  fontWeight: "700",
-  marginTop: 2,
-},
+  footerWrap: {
+    marginTop: 24,
+    marginBottom: 30,
+    paddingHorizontal: 22,
+    alignItems: "center",
+  },
 
+  footerText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginBottom: 8,
+  },
+
+  footerBrand: {
+    color: BRAND.accent,
+    fontWeight: "600",
+  },
+
+  disclaimer: {
+    color: BRAND.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+  },
+  marketRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 7,
+  },
+
+  marketDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+
+  marketText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  patternRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    marginTop: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: 999,
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+  },
+
+  patternLabel: {
+    color: BRAND.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    marginRight: 6,
+    textTransform: "uppercase",
+  },
+
+  patternValue: {
+    color: BRAND.sub,
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
 });

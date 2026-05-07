@@ -1,5 +1,5 @@
 // screens/LoginScreen.js
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -10,203 +10,403 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Pressable,
+  StatusBar,
 } from "react-native";
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { Ionicons } from "@expo/vector-icons";
+
 import { auth, db } from "../firebaseConfig";
+import { BRAND } from "../constants/theme";
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [securePassword, setSecurePassword] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  // === HANDLE LOGIN ===
+  const passwordRef = useRef(null);
+
+  const cleanEmail = email.trim().toLowerCase();
+  const canLogin = cleanEmail.length > 0 && password.length > 0 && !loading;
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Missing Info", "Please enter both email and password.");
+    if (!cleanEmail || !password) {
+      Alert.alert("Missing Information", "Please enter your email and password.");
       return;
     }
 
     try {
       setLoading(true);
+      Keyboard.dismiss();
 
-      // ✅ Firebase Auth login
       const userCredential = await signInWithEmailAndPassword(
         auth,
-        email,
+        cleanEmail,
         password
       );
+
       const user = userCredential.user;
 
-      // ✅ Fetch profile from Firestore
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
+
       if (docSnap.exists()) {
-        const profileData = docSnap.data();
         await AsyncStorage.setItem(
           "profile_" + user.email,
-          JSON.stringify(profileData)
+          JSON.stringify(docSnap.data())
         );
       }
 
-      // ✅ Cache user session
       await AsyncStorage.setItem("userToken", user.email);
       navigation.replace("Main");
     } catch (error) {
-      console.error("Login Error:", error);
-      let message = "Unable to log in. Please try again.";
-      if (error.code === "auth/user-not-found")
-        message = "No user found with this email.";
-      else if (error.code === "auth/wrong-password")
-        message = "Incorrect password.";
-      else if (error.code === "auth/invalid-email")
-        message = "Invalid email address.";
-      Alert.alert("Login Failed", message);
+      console.warn("Login failed:", error?.code);
+
+      Alert.alert(
+        "Login Failed",
+        "Please check your email and password, then try again."
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // === HANDLE PASSWORD RESET ===
   const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      Alert.alert("Input Required", "Please enter your email first.");
+    if (!cleanEmail) {
+      Alert.alert("Email Required", "Please enter your email address first.");
       return;
     }
 
     try {
-      await sendPasswordResetEmail(auth, email.trim());
+      await sendPasswordResetEmail(auth, cleanEmail);
+
       Alert.alert(
-        "Password Reset Email Sent",
-        "Check your inbox for a link to reset your password."
+        "Password Reset Sent",
+        "If an account exists for this email, a reset link will be sent shortly."
       );
     } catch (error) {
-      console.error("Password Reset Error:", error);
-      let message = "Unable to send reset email.";
-      if (error.code === "auth/user-not-found")
-        message = "No user found with this email.";
-      else if (error.code === "auth/invalid-email")
-        message = "Invalid email format.";
-      Alert.alert("Error", message);
+      console.warn("Password reset failed:", error?.code);
+
+      Alert.alert(
+        "Password Reset",
+        "If an account exists for this email, a reset link will be sent shortly."
+      );
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      {/* === LOGO + APP NAME === */}
-      <View style={styles.header}>
-        <Image
-          source={require("../assets/alpha-transparent.png")}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.title}>Alphaclara</Text>
-        <Text style={styles.subtitle}>Welcome Back</Text>
-      </View>
+    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+      <KeyboardAvoidingView
+        style={styles.screen}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
 
-      {/* === FORM INPUTS === */}
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#666"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#666"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
-        {/* === FORGOT PASSWORD === */}
-        <TouchableOpacity
-          onPress={handleForgotPassword}
-          style={styles.forgotContainer}
-          activeOpacity={0.7}
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.wrapper}
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.forgotText}>Forgot Password?</Text>
-        </TouchableOpacity>
+          <View style={styles.header}>
+            <Image
+              source={require("../assets/alpha-transparent.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
 
-        {/* === LOGIN BUTTON === */}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleLogin}
-          activeOpacity={0.8}
-          disabled={loading}
-        >
-          <Text style={styles.buttonText}>
-            {loading ? "Logging In..." : "Log In"}
-          </Text>
-        </TouchableOpacity>
+            <Text style={styles.title}>Alphaclara</Text>
+            <Text style={styles.subtitle}>Welcome back</Text>
+            <Text style={styles.tagline}>
+              Access your AI-powered market intelligence.
+            </Text>
+          </View>
 
-        {/* === SIGNUP LINK === */}
-        <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
-          <Text style={styles.link}>
-            Don’t have an account?{" "}
-            <Text style={styles.linkHighlight}>Sign Up</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          <View style={styles.formCard}>
+            <View style={styles.fieldBlock}>
+              <Text style={styles.label}>Email</Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={BRAND.muted}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                importantForAutofill="yes"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+              />
+            </View>
+
+            <View style={styles.fieldBlock}>
+              <Text style={styles.label}>Password</Text>
+
+              <View style={styles.passwordWrap}>
+                <TextInput
+                  ref={passwordRef}
+                  style={styles.passwordInput}
+                  placeholder="Enter your password"
+                  placeholderTextColor={BRAND.muted}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={securePassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="password"
+                  textContentType="password"
+                  importantForAutofill="yes"
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                />
+
+                <Pressable
+                  onPress={() => setSecurePassword((v) => !v)}
+                  style={styles.eyeBtn}
+                >
+                  <Ionicons
+                    name={securePassword ? "eye-outline" : "eye-off-outline"}
+                    size={19}
+                    color={BRAND.sub}
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleForgotPassword}
+              style={styles.forgotContainer}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </TouchableOpacity>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.button,
+                !canLogin && styles.buttonDisabled,
+                pressed && canLogin && { opacity: 0.72 },
+              ]}
+              onPress={handleLogin}
+              disabled={!canLogin || loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? "Signing in…" : "Sign In"}
+              </Text>
+            </Pressable>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate("Signup")}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.link}>
+                Don’t have an account?{" "}
+                <Text style={styles.linkHighlight}>Sign Up</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.footerWrap}>
+            <Text style={styles.footerText}>
+              By continuing, you agree to Alphaclara’s{" "}
+              <Text
+                style={styles.footerLink}
+                onPress={() => navigation.navigate("TermsOfUseScreen")}
+              >
+                Terms of Use
+              </Text>{" "}
+              and{" "}
+              <Text
+                style={styles.footerLink}
+                onPress={() => navigation.navigate("PrivacyPolicy")}
+              >
+                Privacy Policy
+              </Text>
+              .
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 
-// === STYLES ===
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: "#000",
-    paddingHorizontal: 24,
-    justifyContent: "center",
+    backgroundColor: BRAND.bg,
   },
-  header: { alignItems: "center", marginBottom: 40 },
-  logo: { width: 70, height: 70, marginBottom: 8 },
-  title: { color: "#00E396", fontSize: 26, fontWeight: "800" },
-  subtitle: { color: "#9CA3AF", fontSize: 18, marginTop: 6 },
 
-  form: { marginTop: 20 },
-  input: {
-    backgroundColor: "#111",
-    color: "#FFF",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 14,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#1F2937",
+  wrapper: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 22,
+    paddingTop: 54,
+    paddingBottom: 40,
   },
-  forgotContainer: {
-    alignItems: "flex-end",
-    marginTop: -8,
-    marginBottom: 12,
-  },
-  forgotText: {
-    color: "#00E396",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  button: {
-    backgroundColor: "#00E396",
-    paddingVertical: 14,
-    borderRadius: 12,
+
+  header: {
     alignItems: "center",
+    marginBottom: 20,
+  },
+
+  logo: {
+    width: 72,
+    height: 72,
+    marginBottom: 8,
+  },
+
+  title: {
+    color: BRAND.accent,
+    fontSize: 28,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
+
+  subtitle: {
+    color: BRAND.text,
+    fontSize: 20,
+    fontWeight: "900",
     marginTop: 10,
   },
-  buttonText: { color: "#000", fontWeight: "700", fontSize: 17 },
-  link: { color: "#9CA3AF", textAlign: "center", marginTop: 22, fontSize: 15 },
-  linkHighlight: { color: "#00E396", fontWeight: "600" },
+
+  tagline: {
+    color: BRAND.muted,
+    fontSize: 12.5,
+    textAlign: "center",
+    lineHeight: 18,
+    marginTop: 6,
+    paddingHorizontal: 10,
+  },
+
+  formCard: {
+    backgroundColor: BRAND.card,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    borderRadius: 22,
+    padding: 16,
+  },
+
+  fieldBlock: {
+    marginBottom: 14,
+  },
+
+  label: {
+    color: BRAND.sub,
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 7,
+  },
+
+  input: {
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    color: BRAND.text,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  passwordWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    borderRadius: 14,
+  },
+
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    color: BRAND.text,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  eyeBtn: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  forgotContainer: {
+    alignItems: "flex-end",
+    marginTop: -2,
+    marginBottom: 12,
+  },
+
+  forgotText: {
+    color: BRAND.accent,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  button: {
+    backgroundColor: BRAND.accent,
+    paddingVertical: 15,
+    borderRadius: 16,
+    alignItems: "center",
+    marginTop: 4,
+  },
+
+  buttonDisabled: {
+    backgroundColor: "#374151",
+    opacity: 0.85,
+  },
+
+  buttonText: {
+    color: BRAND.bg,
+    fontWeight: "900",
+    fontSize: 15,
+  },
+
+  link: {
+    color: BRAND.sub,
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  linkHighlight: {
+    color: BRAND.accent,
+    fontWeight: "900",
+  },
+
+  footerWrap: {
+    marginTop: 22,
+    paddingHorizontal: 10,
+    alignItems: "center",
+  },
+
+  footerText: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    lineHeight: 15,
+    textAlign: "center",
+  },
+
+  footerLink: {
+    color: BRAND.accent,
+    fontWeight: "800",
+  },
 });

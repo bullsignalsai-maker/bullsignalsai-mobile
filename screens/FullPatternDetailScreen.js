@@ -11,33 +11,24 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  Modal,          // ✅ ADD
-  Pressable,      // ✅ ADD
+  Modal, // ✅ ADD
+  Pressable, // ✅ ADD
   ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { getPatternDetail } from "../services/patternDetailService";
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-
-// === Brand palette (match StockDetail) ===
-const BRAND = {
-  bg: "#000000",
-  card: "#111827",
-  border: "#1F2937",
-  text: "#FFFFFF",
-  sub: "#9CA3AF",
-  accent: "#00E396",
-  red: "#EF4444",
-  amber: "#FACC15",
-  blue: "#60A5FA",
-};
+import { BRAND } from "../constants/theme";
 
 const TOOLTIP = {
   EXPECTED_RANGE: {
-    title: "Expected Range",
+    title: "Historical Range",
     body:
       "This range is built from historical outcomes after this pattern appeared. " +
       "Low / Mid / High represent typical downside, average outcome, and upside over the next few days. " +
@@ -72,7 +63,6 @@ const biasColor = (bias) => {
   return BRAND.amber;
 };
 
-
 const labelColorFromConfidence = (pct) => {
   if (pct == null) return BRAND.amber;
   if (pct >= 70) return BRAND.accent;
@@ -93,17 +83,22 @@ const getRangeBias = (anchor, mid) => {
   return "Neutral bias";
 };
 
-function pickPatternBundle({ patternInsight, smartPattern, patternStats, probabilityCone }) {
-  // Prefer patternInsight (premium-ready), fallback to smartPattern, then stats
- 
-
+function pickPatternBundle({
+  patternInsight,
+  smartPattern,
+  patternStats,
+  probabilityCone,
+}) {
   const pi = patternInsight || null;
   const sp = smartPattern || null;
   const ps = patternStats || null;
   const cone = probabilityCone || null;
 
   const patternName =
-    pi?.pattern || sp?.pattern || ps?.currentPattern?.pattern || "NO CLEAR PATTERN";
+    pi?.pattern ||
+    sp?.pattern ||
+    ps?.currentPattern?.pattern ||
+    "NO CLEAR PATTERN";
 
   const explanation =
     pi?.explanation ||
@@ -117,30 +112,34 @@ function pickPatternBundle({ patternInsight, smartPattern, patternStats, probabi
   const current = pi?.current || ps?.currentPattern || null;
 
   const forwardReturns =
-    pi?.history?.forwardReturns || ps?.historyForCurrent?.forwardReturns || null;
+    pi?.history?.forwardReturns ||
+    ps?.historyForCurrent?.forwardReturns ||
+    null;
 
   const occurrences =
     pi?.history?.occurrences ??
     ps?.historyForCurrent?.occurrences ??
-    (safeNum(cone?.occurrences) ?? null);
+    safeNum(cone?.occurrences) ??
+    null;
 
-  const recentSamples = pi?.history?.recentSamples || ps?.historyForCurrent?.samples || [];
+  const recentSamples =
+    pi?.history?.recentSamples || ps?.historyForCurrent?.samples || [];
 
   const allPatterns =
-  ps?.allPatterns?.length > 0
-    ? ps.allPatterns
-    : patternName
-    ? [
-        {
-          pattern: patternName,
-          occurrences:
-            pi?.history?.occurrences ??
-            ps?.historyForCurrent?.occurrences ??
-            safeNum(cone?.occurrences) ??
-            0,
-        },
-      ]
-    : [];
+    ps?.allPatterns?.length > 0
+      ? ps.allPatterns
+      : patternName
+        ? [
+            {
+              pattern: patternName,
+              occurrences:
+                pi?.history?.occurrences ??
+                ps?.historyForCurrent?.occurrences ??
+                safeNum(cone?.occurrences) ??
+                0,
+            },
+          ]
+        : [];
 
   // ✅ Normalize probability cone for BOTH shapes:
   // A) { ranges: { days5, days10 }, anchorPrice, pattern, occurrences, note }
@@ -179,14 +178,15 @@ function pickPatternBundle({ patternInsight, smartPattern, patternStats, probabi
   };
 }
 
-
 /* -----------------------------
    MINI HISTOGRAM (Forward Returns)
    Uses sample fwd5d/fwd10d values
 ----------------------------- */
 const MiniHistogram = memo(function MiniHistogram({ values, label }) {
   const bins = useMemo(() => {
-    const v = (values || []).filter((x) => x != null && Number.isFinite(Number(x))).map(Number);
+    const v = (values || [])
+      .filter((x) => x != null && Number.isFinite(Number(x)))
+      .map(Number);
     if (v.length === 0) return null;
 
     const min = Math.min(...v);
@@ -194,7 +194,10 @@ const MiniHistogram = memo(function MiniHistogram({ values, label }) {
     const span = Math.max(1e-6, max - min);
 
     const BIN_COUNT = 7;
-    const edges = Array.from({ length: BIN_COUNT + 1 }, (_, i) => min + (span * i) / BIN_COUNT);
+    const edges = Array.from(
+      { length: BIN_COUNT + 1 },
+      (_, i) => min + (span * i) / BIN_COUNT,
+    );
     const counts = Array.from({ length: BIN_COUNT }, () => 0);
 
     for (const x of v) {
@@ -237,7 +240,8 @@ const MiniHistogram = memo(function MiniHistogram({ values, label }) {
         <Text style={styles.histMetaText}>{bins.max.toFixed(2)}%</Text>
       </View>
       <Text style={styles.smallNote}>
-        Histogram built from this pattern’s recent historical occurrences (sample forward returns).
+        Histogram built from this pattern’s recent historical occurrences
+        (sample forward returns).
       </Text>
     </View>
   );
@@ -246,7 +250,13 @@ const MiniHistogram = memo(function MiniHistogram({ values, label }) {
 /* -----------------------------
    Animated Range Bar
 ----------------------------- */
-const AnimatedRangeBar = memo(function AnimatedRangeBar({ low, mid, high, label, animKey }) {
+const AnimatedRangeBar = memo(function AnimatedRangeBar({
+  low,
+  mid,
+  high,
+  label,
+  animKey,
+}) {
   const lo = safeNum(low);
   const mi = safeNum(mid);
   const hi = safeNum(high);
@@ -291,12 +301,13 @@ const AnimatedRangeBar = memo(function AnimatedRangeBar({ low, mid, high, label,
 
   return (
     <View style={{ marginTop: 10 }}>
-     <Text style={styles.rangeTitle}>{label}</Text>
-
+      <Text style={styles.rangeTitle}>{label}</Text>
 
       <View style={styles.rangeTrack}>
         <Animated.View style={[styles.rangeLeft, { flex: leftFlex }]} />
-        <Animated.View style={[styles.rangeMidDot, { transform: [{ scaleY: dotScale }] }]} />
+        <Animated.View
+          style={[styles.rangeMidDot, { transform: [{ scaleY: dotScale }] }]}
+        />
         <Animated.View style={[styles.rangeRight, { flex: rightFlex }]} />
       </View>
 
@@ -316,12 +327,9 @@ const AnimatedRangeBar = memo(function AnimatedRangeBar({ low, mid, high, label,
           <Text style={styles.rangeCaption}>High</Text>
         </View>
       </View>
-
     </View>
   );
 });
-
-
 
 export default function FullPatternDetailScreen({ route, navigation }) {
   const {
@@ -332,96 +340,85 @@ export default function FullPatternDetailScreen({ route, navigation }) {
     smartPattern,
     patternStats,
     probabilityCone,
-    // optional: pass this later when you add premium
-    isPremium: isPremiumParam,
   } = route.params || {};
- 
-  // ✅ You said: "when user comes to this screen means they are premium users"
-  // So default premium to TRUE unless explicitly passed false.
-  const isPremium = isPremiumParam === undefined ? true : !!isPremiumParam;
   const [patternDetail, setPatternDetail] = useState(null);
-const [loadingPattern, setLoadingPattern] = useState(true);
-const [patternError, setPatternError] = useState(null);
-// Debug removed for production
+  const [loadingPattern, setLoadingPattern] = useState(true);
+  const [patternError, setPatternError] = useState(null);
+  // Debug removed for production
 
-useEffect(() => {
-  let mounted = true;
+  useEffect(() => {
+    let mounted = true;
 
-  async function loadPatternDetail() {
-    try {
-      setLoadingPattern(true);
-      setPatternError(null);
+    async function loadPatternDetail() {
+      try {
+        setLoadingPattern(true);
+        setPatternError(null);
 
-      const data = await getPatternDetail(symbol);
+        const data = await getPatternDetail(symbol);
 
-      if (mounted) {
-        setPatternDetail(data);
-      }
-    } catch (err) {
-      console.warn("Pattern detail load failed:", err);
-      if (mounted) {
-        setPatternError("Pattern details unavailable.");
-      }
-    } finally {
-      if (mounted) {
-        setLoadingPattern(false);
+        if (mounted) {
+          setPatternDetail(data);
+        }
+      } catch (err) {
+        console.warn("Pattern detail load failed:", err);
+        if (mounted) {
+          setPatternError("Pattern details unavailable.");
+        }
+      } finally {
+        if (mounted) {
+          setLoadingPattern(false);
+        }
       }
     }
-  }
 
-  if (symbol) {
-    loadPatternDetail();
-  } else {
-    setLoadingPattern(false);
-    setPatternError("Missing symbol.");
-  }
+    if (symbol) {
+      loadPatternDetail();
+    } else {
+      setLoadingPattern(false);
+      setPatternError("Missing symbol.");
+    }
 
-  return () => {
-    mounted = false;
-  };
-}, [symbol]);
+    return () => {
+      mounted = false;
+    };
+  }, [symbol]);
 
-// --------------------
-// Tooltip state (MUST be here)
-// --------------------
-const [tipKey, setTipKey] = useState(null);
+  // --------------------
+  // Tooltip state (MUST be here)
+  // --------------------
+  const [tipKey, setTipKey] = useState(null);
 
+  const openTip = (key) => setTipKey(key);
 
-const openTip = (key) => setTipKey(key);
+  const closeTip = () => setTipKey(null);
 
-
-
-const closeTip = () => setTipKey(null);
-
-const tip = tipKey ? TOOLTIP[tipKey] : null;
-
+  const tip = tipKey ? TOOLTIP[tipKey] : null;
 
   const sourcePatternInsight = patternDetail?.patternInsight || patternInsight;
-const sourceSmartPattern = patternDetail?.smartPattern || smartPattern;
-const sourcePatternStats = patternDetail?.patternStats || patternStats;
-const sourceProbabilityCone = patternDetail?.probabilityCone || probabilityCone;
+  const sourceSmartPattern = patternDetail?.smartPattern || smartPattern;
+  const sourcePatternStats = patternDetail?.patternStats || patternStats;
+  const sourceProbabilityCone =
+    patternDetail?.probabilityCone || probabilityCone;
 
-const bundle = useMemo(
-  () =>
-    pickPatternBundle({
-      patternInsight: sourcePatternInsight,
-      smartPattern: sourceSmartPattern,
-      patternStats: sourcePatternStats,
-      probabilityCone: sourceProbabilityCone,
-    }),
-  [
-    sourcePatternInsight,
-    sourceSmartPattern,
-    sourcePatternStats,
-    sourceProbabilityCone,
-  ]
-);
+  const bundle = useMemo(
+    () =>
+      pickPatternBundle({
+        patternInsight: sourcePatternInsight,
+        smartPattern: sourceSmartPattern,
+        patternStats: sourcePatternStats,
+        probabilityCone: sourceProbabilityCone,
+      }),
+    [
+      sourcePatternInsight,
+      sourceSmartPattern,
+      sourcePatternStats,
+      sourceProbabilityCone,
+    ],
+  );
 
   // ---- Animations ----
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(10)).current;
-  const pulse = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fade, {
@@ -437,41 +434,33 @@ const bundle = useMemo(
         useNativeDriver: true,
       }),
     ]).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 900, useNativeDriver: true }),
-      ])
-    ).start();
-  }, [fade, slide, pulse]);
+  }, [fade, slide]);
 
   const cone = bundle.cone;
 
   const headerQuote = patternDetail?.quote || quote || {};
 
-const headerSymbol =
-  patternDetail?.symbol || symbol || headerQuote?.symbol || "—";
+  const headerSymbol =
+    patternDetail?.symbol || symbol || headerQuote?.symbol || "—";
 
-const headerName =
-  patternDetail?.companyName || companyName || headerQuote?.name || "—";
+  const headerName =
+    patternDetail?.companyName || companyName || headerQuote?.name || "—";
 
-const headerPrice =
-  headerQuote?.current ?? headerQuote?.price ?? headerQuote?.close ?? null;
+  const headerPrice =
+    headerQuote?.current ?? headerQuote?.price ?? headerQuote?.close ?? null;
 
-const headerChangePct = headerQuote?.changePct ?? null;
+  const headerChangePct = headerQuote?.changePct ?? null;
 
-// Toggle for forward returns view
-const [horizon, setHorizon] = useState("days5");
+  // Toggle for forward returns view
+  const [horizon, setHorizon] = useState("days5");
 
-// FORCE refresh when horizon changes
-const forwardReturns = bundle.forwardReturns || {};
-const fr = forwardReturns[horizon] || null;
+  // FORCE refresh when horizon changes
+  const forwardReturns = bundle.forwardReturns || {};
+  const fr = forwardReturns[horizon] || null;
 
-// Debug-safe fallback
-const has5D = !!forwardReturns.days5;
-const has10D = !!forwardReturns.days10;
-
+  // Debug-safe fallback
+  const has5D = !!forwardReturns.days5;
+  const has10D = !!forwardReturns.days10;
 
   // normalize fr values
   const frAvg = safeNum(fr?.avg);
@@ -490,22 +479,15 @@ const has10D = !!forwardReturns.days10;
   const occurrences = safeNum(bundle.occurrences);
 
   // --- Probability cone (prices already computed by backend) ---
-const cone5 =
-  cone?.ranges?.days5 ??
-  cone?.days5 ??
-  null;
+  const cone5 = cone?.ranges?.days5 ?? cone?.days5 ?? null;
 
-const cone10 =
-  cone?.ranges?.days10 ??
-  cone?.days10 ??
-  null;
-
+  const cone10 = cone?.ranges?.days10 ?? cone?.days10 ?? null;
 
   const coneAnchor =
-  safeNum(cone?.anchorPrice) ??
-  safeNum(headerQuote?.current) ??
-  safeNum(headerQuote?.price) ??
-  null;
+    safeNum(cone?.anchorPrice) ??
+    safeNum(headerQuote?.current) ??
+    safeNum(headerQuote?.price) ??
+    null;
 
   const conePattern = cone?.pattern || bundle.patternName;
   const coneOcc = safeNum(cone?.occurrences ?? occurrences);
@@ -524,33 +506,6 @@ const cone10 =
     );
   });
 
-  const Bar = memo(function Bar({ label, value, maxAbs = 10 }) {
-    const v = safeNum(value);
-    const w = v == null ? 0 : Math.min(1, Math.abs(v) / (maxAbs || 1));
-    const isPos = (v ?? 0) >= 0;
-    return (
-      <View style={{ marginTop: 10 }}>
-        <View style={styles.barRowTop}>
-          <Text style={styles.barLabel}>{label}</Text>
-          <Text style={[styles.barValue, { color: v == null ? BRAND.sub : isPos ? BRAND.accent : BRAND.red }]}>
-            {fmtReturn(v)}
-          </Text>
-        </View>
-        <View style={styles.barTrack}>
-          <View
-            style={[
-              styles.barFill,
-              {
-                width: `${w * 100}%`,
-                backgroundColor: v == null ? BRAND.border : isPos ? BRAND.accent : BRAND.red,
-              },
-            ]}
-          />
-        </View>
-      </View>
-    );
-  });
-
   const allPatternsTop = useMemo(() => {
     const arr = Array.isArray(bundle.allPatterns) ? bundle.allPatterns : [];
     return arr
@@ -561,29 +516,32 @@ const cone10 =
 
   const maxOcc = useMemo(() => {
     if (!allPatternsTop.length) return 1;
-    return Math.max(...allPatternsTop.map((p) => safeNum(p.occurrences) || 0), 1);
+    return Math.max(
+      ...allPatternsTop.map((p) => safeNum(p.occurrences) || 0),
+      1,
+    );
   }, [allPatternsTop]);
 
   // Recent samples normalization
   const samples = useMemo(() => {
-  const rs = Array.isArray(bundle.recentSamples) ? bundle.recentSamples : [];
-  return rs.slice(0, 8).map((s) => ({
-    date: s?.date ? new Date(s.date) : null,
-    headline: s?.headline || "",
-    bias: s?.bias || null,
-    changePct: safeNum(s?.changePct),
-    fwd5d: safeNum(s?.fwd5d ?? s?.fwd_5d),
-    fwd10d: safeNum(s?.fwd10d ?? s?.fwd_10d),
-    pattern: s?.pattern || bundle.patternName,
-    winRate: safeNum(s?.winRate),
-  }));
-}, [bundle.recentSamples, bundle.patternName]);
-
+    const rs = Array.isArray(bundle.recentSamples) ? bundle.recentSamples : [];
+    return rs.slice(0, 8).map((s) => ({
+      date: s?.date ? new Date(s.date) : null,
+      headline: s?.headline || "",
+      bias: s?.bias || null,
+      changePct: safeNum(s?.changePct),
+      fwd5d: safeNum(s?.fwd5d ?? s?.fwd_5d),
+      fwd10d: safeNum(s?.fwd10d ?? s?.fwd_10d),
+      pattern: s?.pattern || bundle.patternName,
+      winRate: safeNum(s?.winRate),
+    }));
+  }, [bundle.recentSamples, bundle.patternName]);
 
   // ✅ Mini histogram values from samples (forward returns)
   const histValues = useMemo(() => {
     if (!samples.length) return [];
-    if (horizon === "days10") return samples.map((s) => s.fwd10d).filter((x) => x != null);
+    if (horizon === "days10")
+      return samples.map((s) => s.fwd10d).filter((x) => x != null);
     return samples.map((s) => s.fwd5d).filter((x) => x != null);
   }, [samples, horizon]);
 
@@ -593,43 +551,47 @@ const cone10 =
   }, [headerSymbol, coneAnchor, coneOcc]);
 
   if (loadingPattern && !patternDetail) {
-  return (
-    <View
-      style={[
-        styles.container,
-        { justifyContent: "center", alignItems: "center" },
-      ]}
-    >
-      <ActivityIndicator color={BRAND.accent} />
-      <Text style={{ color: BRAND.sub, marginTop: 10 }}>
-        Loading pattern details...
-      </Text>
-    </View>
-  );
-}
+    return (
+      <View
+        style={[
+          styles.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <ActivityIndicator color={BRAND.accent} />
+        <Text style={{ color: BRAND.sub, marginTop: 10 }}>
+          Loading pattern details...
+        </Text>
+      </View>
+    );
+  }
 
-if (patternError && !patternDetail) {
+  if (patternError && !patternDetail) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <Ionicons name="warning-outline" size={24} color={BRAND.amber} />
+        <Text style={{ color: BRAND.sub, marginTop: 10 }}>{patternError}</Text>
+      </View>
+    );
+  }
   return (
-    <View
-      style={[
-        styles.container,
-        { justifyContent: "center", alignItems: "center" },
-      ]}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 40 }}
     >
-      <Ionicons name="warning-outline" size={24} color={BRAND.amber} />
-      <Text style={{ color: BRAND.sub, marginTop: 10 }}>
-        {patternError}
-      </Text>
-    </View>
-  );
-}
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }}>
+      <Animated.View
+        style={{ opacity: fade, transform: [{ translateY: slide }] }}
+      >
         {/* HEADER CARD */}
-        <LinearGradient colors={["#0f172a", "#020617"]} style={styles.headerCard}>
-          
-         
+        <LinearGradient
+          colors={["#0f172a", "#020617"]}
+          style={styles.headerCard}
+        >
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.symbol}>{headerSymbol}</Text>
@@ -646,21 +608,41 @@ if (patternError && !patternDetail) {
                   headerChangePct >= 0 ? styles.positive : styles.negative,
                 ]}
               >
-                {headerChangePct == null ? "—" : fmtPctSigned(headerChangePct, 2)}
+                {headerChangePct == null
+                  ? "—"
+                  : fmtPctSigned(headerChangePct, 2)}
               </Text>
             </View>
           </View>
 
           <View style={styles.headerMiniRow}>
             <View style={styles.headerMiniPill}>
-              <Ionicons name="sparkles-outline" size={14} color={BRAND.accent} />
+              <Ionicons
+                name="sparkles-outline"
+                size={14}
+                color={BRAND.accent}
+              />
               <Text style={styles.headerMiniText}>Pattern Intelligence</Text>
             </View>
 
             {!!currentBias && (
-              <View style={[styles.headerMiniPill, { borderColor: biasColor(currentBias) }]}>
-                <Ionicons name="trending-up-outline" size={14} color={biasColor(currentBias)} />
-                <Text style={[styles.headerMiniText, { color: biasColor(currentBias) }]}>
+              <View
+                style={[
+                  styles.headerMiniPill,
+                  { borderColor: biasColor(currentBias) },
+                ]}
+              >
+                <Ionicons
+                  name="trending-up-outline"
+                  size={14}
+                  color={biasColor(currentBias)}
+                />
+                <Text
+                  style={[
+                    styles.headerMiniText,
+                    { color: biasColor(currentBias) },
+                  ]}
+                >
                   {String(currentBias).toUpperCase()}
                 </Text>
               </View>
@@ -675,25 +657,7 @@ if (patternError && !patternDetail) {
                 </Text>
               </View>
             )}
-
-            {isPremium && (
-              <View style={[styles.headerMiniPill, { borderColor: BRAND.accent, backgroundColor: "#022c22" }]}>
-                <Ionicons name="diamond-outline" size={14} color={BRAND.accent} />
-                <Text style={[styles.headerMiniText, { color: BRAND.accent }]}>Premium</Text>
-              </View>
-            )}
           </View>
-
-          {!!currentDate && (
-            <Text style={styles.asofText}>
-              As of{" "}
-              {currentDate.toLocaleString(undefined, {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </Text>
-          )}
         </LinearGradient>
 
         {/* PATTERN OVERVIEW */}
@@ -709,7 +673,12 @@ if (patternError && !patternDetail) {
           <View style={styles.overviewRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.subLabel}>Confidence</Text>
-              <Text style={[styles.bigValue, { color: labelColorFromConfidence(confidencePct) }]}>
+              <Text
+                style={[
+                  styles.bigValue,
+                  { color: labelColorFromConfidence(confidencePct) },
+                ]}
+              >
                 {confidencePct == null ? "—" : `${confidencePct.toFixed(0)}%`}
               </Text>
             </View>
@@ -721,14 +690,16 @@ if (patternError && !patternDetail) {
                   (confidencePct == null
                     ? "—"
                     : confidencePct >= 70
-                    ? "Historically Strong"
-                    : "Weak / Neutral")}
+                      ? "Historically Strong"
+                      : "Weak / Neutral")}
               </Text>
             </View>
 
             <View style={{ flex: 1 }}>
               <Text style={styles.subLabel}>Occurrences</Text>
-              <Text style={styles.bigValue}>{occurrences == null ? "—" : String(occurrences)}</Text>
+              <Text style={styles.bigValue}>
+                {occurrences == null ? "—" : String(occurrences)}
+              </Text>
             </View>
           </View>
 
@@ -746,8 +717,6 @@ if (patternError && !patternDetail) {
           </View>
 
           <Text style={styles.explanation}>{bundle.explanation}</Text>
-
-          
         </View>
 
         {/* ==== DEEP ANALYTICS WRAPPER (locked overlay if not premium) ==== */}
@@ -756,107 +725,107 @@ if (patternError && !patternDetail) {
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
               <View style={styles.sectionAccent} />
-              <Text style={styles.sectionTitle}>Forward Returns</Text>
+              <Text style={styles.sectionTitle}>
+                Historical Forward Returns
+              </Text>
               <View style={{ flex: 1 }} />
 
               {/* Toggle */}
-                <View style={styles.toggleRow}>
+              <View style={styles.toggleRow}>
                 {[
-                    { key: "days5", label: "5D" },
-                    { key: "days10", label: "10D" },
+                  { key: "days5", label: "5D" },
+                  { key: "days10", label: "10D" },
                 ].map((t) => {
-                    const isActive = horizon === t.key;
+                  const isActive = horizon === t.key;
 
-                    return (
+                  return (
                     <TouchableOpacity
-                        key={t.key}
-                        onPress={() => {
+                      key={t.key}
+                      onPress={() => {
                         // 🔒 force UI refresh + state update
                         LayoutAnimation.configureNext(
-                            LayoutAnimation.Presets.easeInEaseOut
+                          LayoutAnimation.Presets.easeInEaseOut,
                         );
                         setHorizon(t.key);
-                        }}
-                        style={[
+                      }}
+                      style={[
                         styles.togglePill,
                         isActive && styles.togglePillActive,
-                        ]}
-                        activeOpacity={0.85}
+                      ]}
+                      activeOpacity={0.85}
                     >
-                        <Text
+                      <Text
                         style={[
-                            styles.toggleText,
-                            isActive && styles.toggleTextActive,
+                          styles.toggleText,
+                          isActive && styles.toggleTextActive,
                         ]}
-                        >
+                      >
                         {t.label}
-                        </Text>
+                      </Text>
                     </TouchableOpacity>
-                    );
+                  );
                 })}
-                </View>
-
+              </View>
             </View>
 
             {/* Metric tiles */}
             <View style={styles.metricGrid}>
               <ReturnMetric label="Average" value={frAvg} />
               <ReturnMetric label="Median" value={frMedian} />
-              <ReturnMetric label="Best" value={frBest} />
-              <ReturnMetric label="Worst" value={frWorst} />
+              <ReturnMetric label="Upside Range" value={frBest} />
+              <ReturnMetric label="Downside Range" value={frWorst} />
             </View>
 
             {/* Mini Histogram */}
             <MiniHistogram
               values={histValues}
-              label={horizon === "days10" ? "Distribution (10D)" : "Distribution (5D)"}
+              label={
+                horizon === "days10"
+                  ? "Historical Distribution (10D)"
+                  : "Historical Distribution (5D)"
+              }
             />
 
             {/* Bar visuals (use best/worst to scale) */}
-            {(() => {
-              const maxAbs = Math.max(
-                5,
-                Math.abs(frBest ?? 0),
-                Math.abs(frWorst ?? 0),
-                Math.abs(frAvg ?? 0),
-                Math.abs(frMedian ?? 0)
-              );
-
-              if (frAvg == null && frMedian == null && frBest == null && frWorst == null) {
-                return (
-                  <View style={styles.emptyBox}>
-                    <Ionicons name="information-circle-outline" size={18} color={BRAND.sub} />
-                    <Text style={styles.emptyText}>
-                      Forward return statistics unavailable for this pattern (not enough historical samples yet).
-                    </Text>
-                  </View>
-                );
-              }
-
-              return (
-                <View style={{ marginTop: 6 }}>
-                  <Bar label="Average" value={frAvg} maxAbs={maxAbs} />
-                  <Bar label="Median" value={frMedian} maxAbs={maxAbs} />
-                  <Bar label="Best" value={frBest} maxAbs={maxAbs} />
-                  <Bar label="Worst" value={frWorst} maxAbs={maxAbs} />
-                  <Text style={styles.smallNote}>
-                    Based on {frCount == null ? "—" : frCount} historical occurrences for this horizon.
-                  </Text>
-                </View>
-              );
-            })()}
+            {frAvg == null &&
+            frMedian == null &&
+            frBest == null &&
+            frWorst == null ? (
+              <View style={styles.emptyBox}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color={BRAND.sub}
+                />
+                <Text style={styles.emptyText}>
+                  Forward return statistics are unavailable for this pattern
+                  because there are not enough completed historical samples yet.
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.smallNote}>
+                Based on {frCount == null ? "—" : frCount} historical
+                occurrences for this horizon.
+              </Text>
+            )}
           </View>
 
           {/* PROBABILITY CONE */}
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionAccent} />
-            <Text style={styles.sectionTitle}>Expected Range</Text>
-            <TouchableOpacity onPress={() => openTip("EXPECTED_RANGE")} style={{ marginLeft: "auto" }}>
-              <Ionicons name="help-circle-outline" size={18} color={BRAND.sub} />
-            </TouchableOpacity>
-          </View>
-
+              <View style={styles.sectionAccent} />
+              <Text style={styles.sectionTitle}>Historical Expected Range</Text>
+              <TouchableOpacity
+                onPress={() => openTip("EXPECTED_RANGE")}
+                style={{ marginLeft: "auto" }}
+              >
+                <Ionicons
+                  name="help-circle-outline"
+                  size={18}
+                  color={BRAND.sub}
+                />
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.coneHeaderRow}>
               {/* LEFT: Anchor */}
@@ -870,18 +839,20 @@ if (patternError && !patternDetail) {
                       name={
                         getRangeBias(coneAnchor, cone5.mid) === "Bullish bias"
                           ? "trending-up"
-                          : getRangeBias(coneAnchor, cone5.mid) === "Bearish bias"
-                          ? "trending-down"
-                          : "remove-outline"
+                          : getRangeBias(coneAnchor, cone5.mid) ===
+                              "Bearish bias"
+                            ? "trending-down"
+                            : "remove-outline"
                       }
                       size={14}
                       color={
-                      getRangeBias(coneAnchor, cone5.mid) === "Bullish bias"
-                        ? BRAND.accent
-                        : getRangeBias(coneAnchor, cone5.mid) === "Bearish bias"
-                        ? BRAND.red
-                        : BRAND.amber
-                    }
+                        getRangeBias(coneAnchor, cone5.mid) === "Bullish bias"
+                          ? BRAND.accent
+                          : getRangeBias(coneAnchor, cone5.mid) ===
+                              "Bearish bias"
+                            ? BRAND.red
+                            : BRAND.amber
+                      }
                     />
                     <Text style={styles.biasText}>
                       {getRangeBias(coneAnchor, cone5.mid)} (5D)
@@ -902,15 +873,12 @@ if (patternError && !patternDetail) {
               </View>
             </View>
 
-
-
-           {cone && (cone5 || cone10) ? (
-
+            {cone && (cone5 || cone10) ? (
               <>
                 {cone5 && (
                   <AnimatedRangeBar
                     animKey={`${coneAnimKey}-5`}
-                    label="5-Day Expected Range"
+                    label="5-Day Historical Range"
                     low={cone5?.low}
                     mid={cone5?.mid}
                     high={cone5?.high}
@@ -920,54 +888,64 @@ if (patternError && !patternDetail) {
                 {cone10 && (
                   <AnimatedRangeBar
                     animKey={`${coneAnimKey}-10`}
-                    label="10-Day Expected Range"
+                    label="10-Day Historical Range"
                     low={cone10?.low}
                     mid={cone10?.mid}
                     high={cone10?.high}
                   />
                 )}
                 <View style={styles.sampleQualityBox}>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={15}
-                  color={BRAND.amber}
-                />
-                <Text style={styles.sampleQualityText}>
-                  {(horizon === "days10" ? cone10 : cone5)?.sampleQuality ||
-                    "Sample quality unavailable"}
-                  {((horizon === "days10" ? cone10 : cone5)?.count != null)
-                    ? ` • Based on ${(horizon === "days10" ? cone10 : cone5).count} completed samples`
-                    : ""}
-                </Text>
-              </View>
-                {(() => {
-                const selectedCone = horizon === "days10" ? cone10 : cone5;
-
-                return (
-                  <Text style={styles.rangeNarrative}>
-                    Historically, price tends to gravitate near{" "}
-                    <Text style={styles.bold}>{fmtMoney(selectedCone?.mid)}</Text>{" "}
-                    over the selected horizon, with downside near{" "}
-                    <Text style={styles.bold}>{fmtMoney(selectedCone?.low)}</Text>{" "}
-                    and upside toward{" "}
-                    <Text style={styles.bold}>{fmtMoney(selectedCone?.high)}</Text>.
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={15}
+                    color={BRAND.amber}
+                  />
+                  <Text style={styles.sampleQualityText}>
+                    {(horizon === "days10" ? cone10 : cone5)?.sampleQuality ||
+                      "Sample quality unavailable"}
+                    {(horizon === "days10" ? cone10 : cone5)?.count != null
+                      ? ` • Based on ${(horizon === "days10" ? cone10 : cone5).count} completed samples`
+                      : ""}
                   </Text>
-                );
-              })()}
+                </View>
+                {(() => {
+                  const selectedCone = horizon === "days10" ? cone10 : cone5;
 
-              <Text style={styles.smallNote}>
-                {cone?.note ||
-                  `Based on ${coneOcc ?? "multiple"} historical occurrences of the "${conePattern}" pattern.
+                  return (
+                    <Text style={styles.rangeNarrative}>
+                      Historically, outcomes have centered near{" "}
+                      <Text style={styles.bold}>
+                        {fmtMoney(selectedCone?.mid)}
+                      </Text>{" "}
+                      over the selected horizon, with downside near{" "}
+                      <Text style={styles.bold}>
+                        {fmtMoney(selectedCone?.low)}
+                      </Text>{" "}
+                      and upside toward{" "}
+                      <Text style={styles.bold}>
+                        {fmtMoney(selectedCone?.high)}
+                      </Text>
+                      .
+                    </Text>
+                  );
+                })()}
+
+                <Text style={styles.smallNote}>
+                  {cone?.note ||
+                    `Based on ${coneOcc ?? "multiple"} historical occurrences of the "${conePattern}" pattern.
                   This is a statistical range, not a prediction.`}
-              </Text>
-
-
+                </Text>
               </>
             ) : (
               <View style={styles.emptyBox}>
-                <Ionicons name="analytics-outline" size={18} color={BRAND.sub} />
+                <Ionicons
+                  name="analytics-outline"
+                  size={18}
+                  color={BRAND.sub}
+                />
                 <Text style={styles.emptyText}>
-                  Expected range is unavailable for this symbol/pattern right now.
+                  Historical range is unavailable for this symbol/pattern right
+                  now.
                 </Text>
               </View>
             )}
@@ -978,108 +956,136 @@ if (patternError && !patternDetail) {
             <View style={styles.sectionHeaderRow}>
               <View style={styles.sectionAccent} />
               <Text style={styles.sectionTitle}>Recent Occurrences</Text>
-              <TouchableOpacity onPress={() => openTip("RECENT_OCCURRENCES")} style={{ marginLeft: "auto" }}>
-              <Ionicons name="help-circle-outline" size={18} color={BRAND.sub} />
-            </TouchableOpacity>
-
+              <TouchableOpacity
+                onPress={() => openTip("RECENT_OCCURRENCES")}
+                style={{ marginLeft: "auto" }}
+              >
+                <Ionicons
+                  name="help-circle-outline"
+                  size={18}
+                  color={BRAND.sub}
+                />
+              </TouchableOpacity>
             </View>
-             <Text style={styles.sectionSubtitle}>
-                Past instances when this pattern appeared, showing how price reacted on the day
-                and what followed over the next 5 and 10 trading days.
-              </Text>
-              <Text style={styles.sectionMeta}>
-              Historical win rate for this pattern:{" "}
-            <Text style={{ color: BRAND.accent, fontWeight: "700" }}>
-              {confidencePct == null ? "—" : `${confidencePct.toFixed(0)}%`}
+            <Text style={styles.sectionSubtitle}>
+              Past instances when this pattern appeared, showing how price
+              reacted on the day and what followed over the next 5 and 10
+              trading days.
             </Text>
+            <Text style={styles.sectionMeta}>
+              Historical win rate for this pattern:{" "}
+              <Text style={{ color: BRAND.accent, fontWeight: "700" }}>
+                {confidencePct == null ? "—" : `${confidencePct.toFixed(0)}%`}
+              </Text>
             </Text>
             {samples.length > 0 ? (
               <View style={{ marginTop: 6 }}>
                 {samples.map((s, idx) => {
-                const bColor = biasColor(s.bias);
-                const d = s.date
-                  ? s.date.toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })
-                  : "—";
+                  const bColor = biasColor(s.bias);
+                  const d = s.date
+                    ? s.date.toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "—";
 
-                return (
-                  <View key={`sample-${idx}`} style={styles.sampleCard}>
-                    {/* LEFT TIMELINE DOT */}
-                    <View style={styles.timelineCol}>
-                      <View style={[styles.sampleDot, { backgroundColor: bColor }]} />
-                      {idx < samples.length - 1 && <View style={styles.timelineLine} />}
-                    </View>
+                  return (
+                    <View key={`sample-${idx}`} style={styles.sampleCard}>
+                      {/* LEFT TIMELINE DOT */}
+                      <View style={styles.timelineCol}>
+                        <View
+                          style={[
+                            styles.sampleDot,
+                            { backgroundColor: bColor },
+                          ]}
+                        />
+                        {idx < samples.length - 1 && (
+                          <View style={styles.timelineLine} />
+                        )}
+                      </View>
 
-                    {/* CONTENT */}
-                    <View style={styles.sampleContent}>
-                      {/* TOP ROW */}
-                      <View style={styles.sampleTopRow}>
-                        <Text style={styles.sampleDate}>{d}</Text>
-                        <View style={[styles.biasPill, { borderColor: bColor }]}>
-                          <Text style={[styles.biasPillText, { color: bColor }]}>
-                            {(s.bias || "neutral").toUpperCase()}
+                      {/* CONTENT */}
+                      <View style={styles.sampleContent}>
+                        {/* TOP ROW */}
+                        <View style={styles.sampleTopRow}>
+                          <Text style={styles.sampleDate}>{d}</Text>
+                          <View
+                            style={[styles.biasPill, { borderColor: bColor }]}
+                          >
+                            <Text
+                              style={[styles.biasPillText, { color: bColor }]}
+                            >
+                              {(s.bias || "neutral").toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* RETURNS ROW */}
+                        <View style={styles.returnsRow}>
+                          <Text style={styles.returnItem}>
+                            Day{" "}
+                            <Text
+                              style={{
+                                color:
+                                  (s.changePct ?? 0) >= 0
+                                    ? BRAND.accent
+                                    : BRAND.red,
+                                fontWeight: "600",
+                              }}
+                            >
+                              {fmtReturn(s.changePct)}
+                            </Text>
+                          </Text>
+
+                          <Text style={styles.returnItem}>
+                            5D{" "}
+                            <Text
+                              style={{
+                                color:
+                                  (s.fwd5d ?? 0) >= 0
+                                    ? BRAND.accent
+                                    : BRAND.red,
+                                fontWeight: "600",
+                              }}
+                            >
+                              {fmtReturn(s.fwd5d)}
+                            </Text>
+                          </Text>
+
+                          <Text style={styles.returnItem}>
+                            10D{" "}
+                            <Text
+                              style={{
+                                color:
+                                  (s.fwd10d ?? 0) >= 0
+                                    ? BRAND.accent
+                                    : BRAND.red,
+                                fontWeight: "600",
+                              }}
+                            >
+                              {fmtReturn(s.fwd10d)}
+                            </Text>
                           </Text>
                         </View>
+
+                        {/* HEADLINE */}
+                        {idx === 0 ||
+                        s.headline !== samples[idx - 1]?.headline ? (
+                          <Text style={styles.sampleHeadline} numberOfLines={2}>
+                            {s.headline}
+                          </Text>
+                        ) : (
+                          <Text
+                            style={[styles.sampleHeadline, { opacity: 0.55 }]}
+                          >
+                            Same setup as previous occurrence
+                          </Text>
+                        )}
                       </View>
-
-                      {/* RETURNS ROW */}
-                      <View style={styles.returnsRow}>
-                        <Text style={styles.returnItem}>
-                          Day{" "}
-                          <Text
-                            style={{
-                              color: (s.changePct ?? 0) >= 0 ? BRAND.accent : BRAND.red,
-                              fontWeight: "600",
-                            }}
-                          >
-                            {fmtReturn(s.changePct)}
-                          </Text>
-                        </Text>
-
-                        <Text style={styles.returnItem}>
-                          5D{" "}
-                          <Text
-                            style={{
-                              color: (s.fwd5d ?? 0) >= 0 ? BRAND.accent : BRAND.red,
-                              fontWeight: "600",
-                            }}
-                          >
-                            {fmtReturn(s.fwd5d)}
-                          </Text>
-                        </Text>
-
-                        <Text style={styles.returnItem}>
-                          10D{" "}
-                          <Text
-                            style={{
-                              color: (s.fwd10d ?? 0) >= 0 ? BRAND.accent : BRAND.red,
-                              fontWeight: "600",
-                            }}
-                          >
-                            {fmtReturn(s.fwd10d)}
-                          </Text>
-                        </Text>
-                      </View>
-
-                      {/* HEADLINE */}
-                      {idx === 0 || s.headline !== samples[idx - 1]?.headline ? (
-                      <Text style={styles.sampleHeadline} numberOfLines={2}>
-                        {s.headline}
-                      </Text>
-                    ) : (
-                      <Text style={[styles.sampleHeadline, { opacity: 0.55 }]}>
-                        Same setup as previous occurrence
-                      </Text>
-                    )}
-
                     </View>
-                  </View>
-                );
-              })}
-
+                  );
+                })}
               </View>
             ) : (
               <View style={styles.emptyBox}>
@@ -1095,30 +1101,41 @@ if (patternError && !patternDetail) {
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
               <View style={styles.sectionAccent} />
-              <Text style={styles.sectionTitle}>Pattern Landscape</Text>
+              <Text style={styles.sectionTitle}>Pattern Frequency</Text>
             </View>
 
             {allPatternsTop.length > 0 ? (
               <View style={{ marginTop: 6 }}>
                 {/* Explanation line (you asked for user clarity) */}
                 <Text style={styles.smallNote}>
-                  This shows how often each pattern appears for {headerSymbol}. Higher counts can indicate recurring
-                  institutional behavior.
+                  This shows how often each pattern appears for {headerSymbol}.
+                  Higher counts can indicate recurring institutional behavior.
                 </Text>
 
                 {allPatternsTop.map((p, idx) => {
                   const occ = safeNum(p?.occurrences) ?? 0;
                   const w = Math.max(0.08, Math.min(1, occ / (maxOcc || 1)));
                   const isCurrent =
-                    String(p?.pattern || "").toUpperCase() === String(bundle.patternName || "").toUpperCase();
+                    String(p?.pattern || "").toUpperCase() ===
+                    String(bundle.patternName || "").toUpperCase();
 
                   return (
                     <View key={`pbar-${idx}`} style={{ marginTop: 10 }}>
                       <View style={styles.barRowTop}>
-                        <Text style={[styles.barLabel, isCurrent && { color: BRAND.accent }]}>
+                        <Text
+                          style={[
+                            styles.barLabel,
+                            isCurrent && { color: BRAND.accent },
+                          ]}
+                        >
                           {p?.pattern || "—"}
                         </Text>
-                        <Text style={[styles.barValue, isCurrent && { color: BRAND.accent }]}>
+                        <Text
+                          style={[
+                            styles.barValue,
+                            isCurrent && { color: BRAND.accent },
+                          ]}
+                        >
                           {occ}x
                         </Text>
                       </View>
@@ -1128,7 +1145,9 @@ if (patternError && !patternDetail) {
                             styles.barFill,
                             {
                               width: `${w * 100}%`,
-                              backgroundColor: isCurrent ? BRAND.accent : BRAND.border,
+                              backgroundColor: isCurrent
+                                ? BRAND.accent
+                                : BRAND.border,
                             },
                           ]}
                         />
@@ -1147,19 +1166,17 @@ if (patternError && !patternDetail) {
             )}
           </View>
 
-          <View style={styles.disclaimerCard}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="shield-checkmark-outline" size={17} color={BRAND.amber} />
-            <Text style={styles.disclaimerTitle}>Educational Note</Text>
-          </View>
+          <View style={styles.footerWrap}>
+            <Text style={styles.powered}>
+              Powered by <Text style={styles.brandText}>Alphaclara</Text>
+            </Text>
 
-          <Text style={styles.disclaimerText}>
-            Pattern statistics are based on historical occurrences and do not guarantee
-            future results. Expected ranges, win rates, and forward returns are for
-            educational and research purposes only and should not be treated as
-            financial advice.
-          </Text>
-        </View>
+            <Text style={styles.footerDisclaimer}>
+              Pattern analytics, expected ranges, and historical return data are
+              provided for informational and educational purposes only and do
+              not constitute financial or investment advice.
+            </Text>
+          </View>
         </View>
       </Animated.View>
       <Modal
@@ -1167,7 +1184,7 @@ if (patternError && !patternDetail) {
         transparent
         animationType="fade"
         onRequestClose={closeTip}
-        >
+      >
         <Pressable style={styles.tooltipOverlay} onPress={closeTip}>
           <Pressable style={styles.tooltipCard} onPress={() => {}}>
             <View style={styles.tooltipHeader}>
@@ -1184,12 +1201,12 @@ if (patternError && !patternDetail) {
 
             <Text style={styles.tooltipBody}>{tip?.body}</Text>
             <Text style={styles.tooltipFoot}>
-              Educational only • Not financial advice
+              Educational context only • Not financial advice
             </Text>
           </Pressable>
         </Pressable>
       </Modal>
-</ScrollView>
+    </ScrollView>
   );
 }
 
@@ -1210,26 +1227,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     overflow: "hidden",
   },
-  premiumRibbon: {
-    position: "absolute",
-    top: 10,
-    right: -36,
-    transform: [{ rotate: "35deg" }],
-    backgroundColor: "rgba(0,227,150,0.18)",
-    borderWidth: 1,
-    borderColor: "rgba(0,227,150,0.35)",
-    paddingVertical: 4,
-    paddingHorizontal: 42,
-  },
-  premiumRibbonText: {
-    color: BRAND.accent,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1,
-    textAlign: "center",
-  },
 
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   symbol: { color: BRAND.text, fontSize: 26, fontWeight: "800" },
   name: { color: BRAND.sub, fontSize: 13, marginTop: 2 },
   priceBlock: { alignItems: "flex-end", maxWidth: "50%" },
@@ -1237,9 +1240,19 @@ const styles = StyleSheet.create({
   pct: { fontSize: 13, fontWeight: "600", marginTop: 2 },
   positive: { color: BRAND.accent },
   negative: { color: BRAND.red },
-  asofText: { color: BRAND.sub, fontSize: 11, marginTop: 8, textAlign: "right" },
+  asofText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    marginTop: 8,
+    textAlign: "right",
+  },
 
-  headerMiniRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  headerMiniRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+  },
   headerMiniPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -1258,10 +1271,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BRAND.border,
     paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginTop: 10,
+    paddingVertical: 10,
+    marginTop: 8,
   },
-  sectionHeaderRow: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
   sectionAccent: {
     width: 4,
     height: 18,
@@ -1271,11 +1288,27 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { color: BRAND.accent, fontSize: 15, fontWeight: "800" },
 
-  patternTitle: { color: BRAND.text, fontSize: 20, fontWeight: "900", marginTop: 4 },
-  explanation: { color: BRAND.text, fontSize: 13.5, lineHeight: 19, marginTop: 10 },
+  patternTitle: {
+    color: BRAND.text,
+    fontSize: 20,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  explanation: {
+    color: BRAND.text,
+    fontSize: 13.5,
+    lineHeight: 19,
+    marginTop: 10,
+  },
 
   overviewRow: { flexDirection: "row", marginTop: 12, gap: 10 },
-  subLabel: { color: BRAND.sub, fontSize: 11, marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 },
+  subLabel: {
+    color: BRAND.sub,
+    fontSize: 11,
+    marginBottom: 3,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   bigValue: { color: BRAND.text, fontSize: 14.5, fontWeight: "800" },
 
   confTrack: {
@@ -1288,7 +1321,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   confFill: { height: "100%", borderRadius: 999 },
-
 
   toggleRow: { flexDirection: "row", gap: 6 },
   togglePill: {
@@ -1347,8 +1379,18 @@ const styles = StyleSheet.create({
   },
   histMetaText: { color: BRAND.sub, fontSize: 11, fontWeight: "700" },
 
-  barRowTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  barLabel: { color: BRAND.text, fontSize: 13, fontWeight: "700", flex: 1, paddingRight: 12 },
+  barRowTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  barLabel: {
+    color: BRAND.text,
+    fontSize: 13,
+    fontWeight: "700",
+    flex: 1,
+    paddingRight: 12,
+  },
   barValue: { color: BRAND.sub, fontSize: 13, fontWeight: "800" },
   barTrack: {
     height: 10,
@@ -1374,20 +1416,12 @@ const styles = StyleSheet.create({
   },
   emptyText: { color: BRAND.sub, fontSize: 12.5, flex: 1, lineHeight: 18 },
   emptyRow: { marginTop: 10 },
-  smallNote: { color: BRAND.sub, fontSize: 11.5, marginTop: 10, lineHeight: 16 },
-
- 
-  coneTile: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    backgroundColor: "#020617",
-    borderRadius: 10,
-    padding: 10,
+  smallNote: {
+    color: BRAND.sub,
+    fontSize: 11.5,
+    marginTop: 10,
+    lineHeight: 16,
   },
-  rangeTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  rangeLabel: { color: BRAND.text, fontSize: 13, fontWeight: "800" },
-  rangeMeta: { color: BRAND.sub, fontSize: 11.5, fontWeight: "600" },
   rangeTrack: {
     height: 12,
     borderRadius: 999,
@@ -1407,22 +1441,13 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: BRAND.accent,
   },
-  rangeCaptionRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
   rangeCaption: { color: BRAND.sub, fontSize: 11, fontWeight: "700" },
-
-  // Samples
-  sampleRow: {
-    flexDirection: "row",
-    gap: 10,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    backgroundColor: "#020617",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-  },
   sampleDot: { width: 10, height: 10, borderRadius: 999, marginTop: 6 },
-  sampleTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  sampleTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   sampleDate: { color: BRAND.text, fontSize: 12.5, fontWeight: "800" },
   biasPill: {
     borderWidth: 1,
@@ -1431,274 +1456,248 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   biasPillText: { fontSize: 11, fontWeight: "900" },
-  sampleHeadline: { color: BRAND.sub, fontSize: 12.5, marginTop: 6, lineHeight: 18 },
-  sampleStatsRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 10 },
-  sampleStat: { flex: 1 },
-  sampleStatLabel: { color: BRAND.sub, fontSize: 11, fontWeight: "700" },
-  sampleStatValue: { color: BRAND.text, fontSize: 12.5, fontWeight: "900", marginTop: 4 },
+  sampleHeadline: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    marginTop: 6,
+    lineHeight: 18,
+  },
 
-  // Lock overlay
-  lockOverlay: {
+  rangeNarrative: {
+    marginTop: 10,
+    color: BRAND.text,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+
+  bold: {
+    fontWeight: "900",
+    color: BRAND.accent,
+  },
+
+  rangeTitle: {
+    color: "#E8F0FF",
+    fontWeight: "600",
+    fontSize: 14,
+    marginBottom: 6,
+  },
+
+  rangeValueRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+    paddingHorizontal: 2,
+  },
+
+  rangeCol: {
+    alignItems: "center",
+    flex: 1,
+  },
+
+  rangeValue: {
+    color: BRAND.accent,
+    fontWeight: "700",
+    fontSize: 13,
+    marginBottom: 2,
+  },
+
+  rangeCaption: {
+    color: BRAND.sub,
+    fontSize: 11,
+  },
+  coneHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+
+  coneLeft: {
+    flex: 1,
+  },
+
+  coneRight: {
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+
+  metaText: {
+    color: BRAND.sub,
+    fontSize: 11,
+  },
+
+  metaStrong: {
+    color: "#E8F0FF",
+    fontWeight: "600",
+    fontSize: 12,
+  },
+
+  biasRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+  },
+
+  biasText: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: "600",
+    color: BRAND.accent,
+  },
+  sampleCard: {
+    flexDirection: "row",
+    marginBottom: 10,
+  },
+
+  timelineCol: {
+    width: 18,
+    alignItems: "center",
+  },
+
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginTop: 4,
+  },
+
+  sampleContent: {
+    flex: 1,
+    paddingLeft: 8,
+  },
+
+  returnsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+    marginBottom: 6,
+  },
+
+  returnItem: {
+    color: BRAND.sub,
+    fontSize: 12,
+  },
+
+  sampleHeadline: {
+    color: "#D6E2FF",
+    fontSize: 13,
+    lineHeight: 18,
+    opacity: 0.85,
+  },
+  sectionSubtitle: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 17,
+    marginBottom: 6,
+  },
+  sectionMeta: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  tooltipOverlay: {
     position: "absolute",
     left: 0,
     right: 0,
     top: 0,
     bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "center",
-    alignItems: "center",
     padding: 18,
   },
-  lockCard: {
-    width: "100%",
+  tooltipCard: {
+    backgroundColor: "#020617",
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: BRAND.border,
-    borderRadius: 16,
-    backgroundColor: "rgba(2, 6, 23, 0.92)",
-    padding: 16,
+    padding: 14,
+  },
+  tooltipHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
   },
-  lockTitle: { color: BRAND.text, fontSize: 16, fontWeight: "900", marginTop: 8 },
-  lockText: { color: BRAND.sub, fontSize: 12.5, lineHeight: 18, textAlign: "center", marginTop: 8 },
-  unlockBtn: {
+  tooltipTitle: {
+    color: BRAND.text,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  tooltipBody: {
+    marginTop: 10,
+    color: BRAND.sub,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  tooltipFoot: {
     marginTop: 12,
-    width: "100%",
+    color: BRAND.sub,
+    fontSize: 11,
+    opacity: 0.8,
+  },
+
+  sampleQualityBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: "rgba(250,204,21,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(250,204,21,0.18)",
+  },
+
+  sampleQualityText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    lineHeight: 17,
+    flex: 1,
+  },
+  disclaimerCard: {
+    backgroundColor: "#020617",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: BRAND.accent,
+    borderColor: BRAND.border,
+    paddingHorizontal: 12,
     paddingVertical: 12,
-    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 20,
   },
-  unlockBtnText: { color: BRAND.accent, fontSize: 14, fontWeight: "900" },
-  lockFinePrint: { marginTop: 10, color: BRAND.sub, fontSize: 11, textAlign: "center" },
-rangeNarrative: {
-  marginTop: 10,
-  color: BRAND.text,
-  fontSize: 12.5,
-  lineHeight: 18,
-},
 
-bold: {
-  fontWeight: "900",
-  color: BRAND.accent,
-},
-premiumPill: {
-  flexDirection: "row",
-  alignItems: "center",
-  backgroundColor: "#F5C56B",
-  paddingHorizontal: 10,
-  paddingVertical: 4,
-  borderRadius: 14,
-},
+  disclaimerTitle: {
+    color: BRAND.amber,
+    fontSize: 14,
+    fontWeight: "800",
+    marginLeft: 8,
+  },
 
-premiumText: {
-  marginLeft: 4,
-  fontWeight: "700",
-  color: "#1E1B10",
-  fontSize: 12,
-},
-rangeTitle: {
-  color: "#E8F0FF",
-  fontWeight: "600",
-  fontSize: 14,
-  marginBottom: 6,
-},
+  disclaimerText: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginTop: 6,
+  },
+  footerWrap: {
+    alignItems: "center",
+    marginTop: 40,
+    marginBottom: 24,
+    paddingHorizontal: 12,
+  },
 
-rangeValueRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  marginTop: 8,
-  paddingHorizontal: 2,
-},
+  powered: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginBottom: 8,
+  },
 
-rangeCol: {
-  alignItems: "center",
-  flex: 1,
-},
+  brandText: {
+    color: BRAND.accent,
+    fontWeight: "700",
+  },
 
-rangeValue: {
-  color: BRAND.accent,
-  fontWeight: "700",
-  fontSize: 13,
-  marginBottom: 2,
-},
-
-rangeCaption: {
-  color: BRAND.sub,
-  fontSize: 11,
-},
-coneHeaderRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  marginBottom: 14,
-},
-
-coneLeft: {
-  flex: 1,
-},
-
-coneRight: {
-  alignItems: "flex-end",
-  justifyContent: "center",
-},
-
-metaText: {
-  color: BRAND.sub,
-  fontSize: 11,
-},
-
-metaStrong: {
-  color: "#E8F0FF",
-  fontWeight: "600",
-  fontSize: 12,
-},
-
-biasRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  marginTop: 6,
-},
-
-biasText: {
-  marginLeft: 6,
-  fontSize: 12,
-  fontWeight: "600",
-  color: BRAND.accent,
-},
-sampleCard: {
-  flexDirection: "row",
-  marginBottom: 14,
-},
-
-timelineCol: {
-  width: 18,
-  alignItems: "center",
-},
-
-timelineLine: {
-  width: 2,
-  flex: 1,
-  backgroundColor: "rgba(255,255,255,0.08)",
-  marginTop: 4,
-},
-
-sampleContent: {
-  flex: 1,
-  paddingLeft: 8,
-},
-
-returnsRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  marginTop: 6,
-  marginBottom: 6,
-},
-
-returnItem: {
-  color: BRAND.sub,
-  fontSize: 12,
-},
-
-sampleHeadline: {
-  color: "#D6E2FF",
-  fontSize: 13,
-  lineHeight: 18,
-  opacity: 0.85,
-},
-sectionSubtitle: {
-  color: BRAND.sub,
-  fontSize: 12.5,
-  lineHeight: 17,
-  marginBottom: 6,
-},
-sectionMeta: {
-  color: BRAND.sub,
-  fontSize: 12,
-  marginBottom: 4,
-},
-tooltipOverlay: {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  top: 0,
-  bottom: 0,
-  backgroundColor: "rgba(0,0,0,0.55)",
-  justifyContent: "center",
-  padding: 18,
-},
-tooltipCard: {
-  backgroundColor: "#020617",
-  borderRadius: 16,
-  borderWidth: 1,
-  borderColor: BRAND.border,
-  padding: 14,
-},
-tooltipHeader: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-},
-tooltipTitle: {
-  color: BRAND.text,
-  fontSize: 15,
-  fontWeight: "800",
-},
-tooltipBody: {
-  marginTop: 10,
-  color: BRAND.sub,
-  fontSize: 13,
-  lineHeight: 18,
-},
-tooltipFoot: {
-  marginTop: 12,
-  color: BRAND.sub,
-  fontSize: 11,
-  opacity: 0.8,
-},
-tooltipFloating: {
-  position: "absolute",
-  zIndex: 999,
-  width: 320,
-},
-sampleQualityBox: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 6,
-  marginTop: 10,
-  padding: 8,
-  borderRadius: 10,
-  backgroundColor: "rgba(250,204,21,0.08)",
-  borderWidth: 1,
-  borderColor: "rgba(250,204,21,0.18)",
-},
-
-sampleQualityText: {
-  color: BRAND.sub,
-  fontSize: 12,
-  lineHeight: 17,
-  flex: 1,
-},
-disclaimerCard: {
-  backgroundColor: "#020617",
-  borderRadius: 12,
-  borderWidth: 1,
-  borderColor: BRAND.border,
-  paddingHorizontal: 12,
-  paddingVertical: 12,
-  marginTop: 10,
-  marginBottom: 20,
-},
-
-disclaimerTitle: {
-  color: BRAND.amber,
-  fontSize: 14,
-  fontWeight: "800",
-  marginLeft: 8,
-},
-
-disclaimerText: {
-  color: BRAND.sub,
-  fontSize: 12.5,
-  lineHeight: 18,
-  marginTop: 6,
-},
+  footerDisclaimer: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    lineHeight: 16,
+    textAlign: "center",
+  },
 });

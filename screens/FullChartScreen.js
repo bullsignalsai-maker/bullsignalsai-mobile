@@ -1,5 +1,11 @@
 // screens/FullChartScreen.js
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   View,
   Text,
@@ -12,7 +18,6 @@ import {
   Pressable,
   PanResponder,
   ActivityIndicator,
-  Share,
   Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,21 +25,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path, Line, Circle, Rect } from "react-native-svg";
 import { getFullYearCandles } from "../services/candleService";
 import { StatusBar } from "react-native";
-
-
-/* ================= BRAND ================= */
-const BRAND = {
-  bg: "#000000",
-  card: "#111827",
-  border: "#1F2937",
-  text: "#FFFFFF",
-  sub: "#9CA3AF",
-  accent: "#00E396",
-  red: "#EF4444",
-  amber: "#FACC15",
-  blue: "#60A5FA",
-};
-
+import { BRAND } from "../constants/theme";
 /* ================= HELPERS ================= */
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
@@ -53,7 +44,12 @@ function signalPillColor(signal) {
   if (s.includes("HOLD")) return BRAND.amber;
   return BRAND.sub;
 }
-
+function displayRatingLabel(signal) {
+  const s = String(signal || "").toUpperCase();
+  if (s.includes("BUY")) return "Bullish";
+  if (s.includes("SELL")) return "Bearish";
+  return "Neutral";
+}
 function formatDateShort(iso) {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return "—";
@@ -122,18 +118,15 @@ function buildPath(points) {
 const TOOLTIP = {
   VOL: {
     title: "Volatility (Realized)",
-    body:
-      "This screen estimates realized volatility from daily returns. Higher volatility means wider swings and wider risk bands.",
+    body: "This screen estimates realized volatility from daily returns. Higher volatility means wider swings and wider risk bands.",
   },
   DD: {
-    title: "Drawdown",
-    body:
-      "Drawdown measures the peak-to-trough decline during the period. Bigger drawdowns mean deeper pullbacks from highs.",
+    title: "Pullback",
+    body: "Pullback measures the peak-to-trough decline during the period. Bigger drawdowns mean deeper pullbacks from highs.",
   },
   VOLCONF: {
-    title: "Volume Confirmation",
-    body:
-      "Volume can confirm price moves: higher volume on breakouts supports conviction. Falling price on rising volume can signal distribution.",
+    title: "Volume Context",
+    body: "Volume can confirm price moves: higher volume on breakouts supports conviction. Falling price on rising volume can signal distribution.",
   },
 };
 
@@ -156,7 +149,7 @@ export default function FullChartScreen({ route, navigation }) {
   const openTip = useCallback((k) => setTipKey(k), []);
   const closeTip = useCallback(() => setTipKey(null), []);
   const tip = tipKey ? TOOLTIP[tipKey] : null;
-const [chartTouch, setChartTouch] = useState(false);
+  const [chartTouch, setChartTouch] = useState(false);
 
   // tooltip interaction
   const [activeIdx, setActiveIdx] = useState(null);
@@ -214,6 +207,8 @@ const [chartTouch, setChartTouch] = useState(false);
         first: null,
         high: null,
         low: null,
+        intradayHigh: null,
+        intradayLow: null,
         highIdx: null,
         lowIdx: null,
         ret1yPct: null,
@@ -227,7 +222,9 @@ const [chartTouch, setChartTouch] = useState(false);
       };
     }
 
-    const closes = candles.map((c) => safeNum(c.close)).filter((x) => x != null);
+    const closes = candles
+      .map((c) => safeNum(c.close))
+      .filter((x) => x != null);
 
     const first = candles[0]?.close ?? null;
     const last = candles[candles.length - 1]?.close ?? null;
@@ -237,21 +234,38 @@ const [chartTouch, setChartTouch] = useState(false);
     let hiIdx = null;
     let loIdx = null;
 
+    let intradayHigh = -Infinity;
+    let intradayLow = Infinity;
+
     for (let i = 0; i < candles.length; i++) {
       const c = safeNum(candles[i]?.close);
-      if (c == null) continue;
-      if (c > hi) {
-        hi = c;
-        hiIdx = i;
+      const h = safeNum(candles[i]?.high);
+      const l = safeNum(candles[i]?.low);
+
+      if (c != null) {
+        if (c > hi) {
+          hi = c;
+          hiIdx = i;
+        }
+
+        if (c < lo) {
+          lo = c;
+          loIdx = i;
+        }
       }
-      if (c < lo) {
-        lo = c;
-        loIdx = i;
+
+      if (h != null && h > intradayHigh) {
+        intradayHigh = h;
+      }
+
+      if (l != null && l < intradayLow) {
+        intradayLow = l;
       }
     }
-
     const ret1yPct =
-      first != null && last != null && first !== 0 ? ((last - first) / first) * 100 : null;
+      first != null && last != null && first !== 0
+        ? ((last - first) / first) * 100
+        : null;
 
     // daily returns
     const rets = [];
@@ -292,14 +306,20 @@ const [chartTouch, setChartTouch] = useState(false);
     }
 
     const volState =
-      volAnn == null ? "unknown" : volAnn >= 60 ? "high" : volAnn >= 35 ? "moderate" : "low";
+      volAnn == null
+        ? "unknown"
+        : volAnn >= 60
+          ? "high"
+          : volAnn >= 35
+            ? "moderate"
+            : "low";
 
     const trendNote =
       trendLabel === "Uptrend"
         ? `Price has generally climbed over the last year with ${volState} volatility. Pullbacks were present, but trend direction stayed constructive.`
         : trendLabel === "Downtrend"
-        ? `Price has generally declined over the last year with ${volState} volatility. Rallies have struggled to hold, suggesting weaker structure.`
-        : `Price has been range-bound overall with ${volState} volatility. Breakouts may need volume confirmation to be trusted.`;
+          ? `Price has generally declined over the last year with ${volState} volatility. Rallies have struggled to hold, suggesting weaker structure.`
+          : `Price has been range-bound overall with ${volState} volatility. Breakouts may need volume confirmation to be trusted.`;
 
     // volume confirmation
     const upVol = [];
@@ -318,12 +338,15 @@ const [chartTouch, setChartTouch] = useState(false);
       volForCorr.push(v);
     }
 
-    const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+    const avg = (a) =>
+      a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
     const upAvg = avg(upVol);
     const downAvg = avg(downVol);
 
     const volumeUpDownRatio =
-      upAvg != null && downAvg != null && downAvg !== 0 ? upAvg / downAvg : null;
+      upAvg != null && downAvg != null && downAvg !== 0
+        ? upAvg / downAvg
+        : null;
 
     const volAbsRetCorr = corr(absRetForCorr, volForCorr);
 
@@ -344,11 +367,14 @@ const [chartTouch, setChartTouch] = useState(false);
     // add volatility confirmation sentence
     if (volAbsRetCorr != null) {
       if (volAbsRetCorr > 0.25) {
-        volumeNote += " Also, bigger moves often come with higher volume (strong participation).";
+        volumeNote +=
+          " Also, bigger moves often come with higher volume (strong participation).";
       } else if (volAbsRetCorr < -0.15) {
-        volumeNote += " Interestingly, bigger moves are not consistently supported by volume (mixed participation).";
+        volumeNote +=
+          " Interestingly, bigger moves are not consistently supported by volume (mixed participation).";
       } else {
-        volumeNote += " Participation is inconsistent — not every big move is strongly backed by volume.";
+        volumeNote +=
+          " Participation is inconsistent — not every big move is strongly backed by volume.";
       }
     }
 
@@ -357,6 +383,8 @@ const [chartTouch, setChartTouch] = useState(false);
       first,
       high: hi === -Infinity ? null : hi,
       low: lo === Infinity ? null : lo,
+      intradayHigh: intradayHigh === -Infinity ? null : intradayHigh,
+      intradayLow: intradayLow === Infinity ? null : intradayLow,
       highIdx: hiIdx,
       lowIdx: loIdx,
       ret1yPct,
@@ -379,8 +407,12 @@ const [chartTouch, setChartTouch] = useState(false);
   const chart = useMemo(() => {
     if (!candles.length) return null;
 
-    const closes = candles.map((c) => safeNum(c.close)).map((v) => (v == null ? 0 : v));
-    const vols = candles.map((c) => safeNum(c.volume)).map((v) => (v == null ? 0 : v));
+    const closes = candles
+      .map((c) => safeNum(c.close))
+      .map((v) => (v == null ? 0 : v));
+    const vols = candles
+      .map((c) => safeNum(c.volume))
+      .map((v) => (v == null ? 0 : v));
 
     let min = Infinity;
     let max = -Infinity;
@@ -427,35 +459,34 @@ const [chartTouch, setChartTouch] = useState(false);
       const idx = Math.round(rel * (candles.length - 1));
       return clamp(idx, 0, candles.length - 1);
     },
-    [chart, candles.length, CHART_W, PAD_X]
+    [chart, candles.length, CHART_W, PAD_X],
   );
 
-        const pan = useRef(
-        PanResponder.create({
-          onStartShouldSetPanResponder: () => true,
-          onMoveShouldSetPanResponder: () => true,
-          onStartShouldSetPanResponderCapture: () => true,
-          onMoveShouldSetPanResponderCapture: () => true,
-          onPanResponderTerminationRequest: () => false,
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
 
-          onPanResponderGrant: (evt) => {
-            setChartTouch(true);
-            const x = evt.nativeEvent.locationX;
-            setActiveIdx(xToIndex(x));
-          },
-          onPanResponderMove: (evt) => {
-            const x = evt.nativeEvent.locationX;
-            setActiveIdx(xToIndex(x));
-          },
-          onPanResponderRelease: () => {
-            setChartTouch(false);
-          },
-          onPanResponderTerminate: () => {
-            setChartTouch(false);
-          },
-        })
-      ).current;
-
+      onPanResponderGrant: (evt) => {
+        setChartTouch(true);
+        const x = evt.nativeEvent.locationX;
+        setActiveIdx(xToIndex(x));
+      },
+      onPanResponderMove: (evt) => {
+        const x = evt.nativeEvent.locationX;
+        setActiveIdx(xToIndex(x));
+      },
+      onPanResponderRelease: () => {
+        setChartTouch(false);
+      },
+      onPanResponderTerminate: () => {
+        setChartTouch(false);
+      },
+    }),
+  ).current;
 
   const active = useMemo(() => {
     if (activeIdx == null || !chart) return null;
@@ -474,31 +505,17 @@ const [chartTouch, setChartTouch] = useState(false);
       t: c.t,
     };
   }, [activeIdx, chart, candles]);
-
-  const onShare = useCallback(async () => {
-    const msg =
-      `${symbol} — 1Y Chart Summary\n` +
-      `Return: ${derived.ret1yPct == null ? "—" : pct(derived.ret1yPct)}\n` +
-      `High: ${money(derived.high)} • Low: ${money(derived.low)}\n` +
-      `Trend: ${derived.trendLabel}\n` +
-      `Volatility: ${derived.volAnn == null ? "—" : pct(derived.volAnn)}\n` +
-      `Drawdown: ${derived.maxDrawdownPct == null ? "—" : pct(derived.maxDrawdownPct)}\n\n` +
-      `Educational only.`;
-
-    try {
-      await Share.share({ title: `${symbol} Full Chart`, message: msg });
-    } catch {
-      // ignore
-    }
-  }, [symbol, derived]);
-
   const headerPrice = quote?.current ?? derived.last ?? null;
   const headerChangePct = quote?.changePct ?? null;
   const signal = bullbrain?.signal ?? params.hybridSignal ?? null;
   const confidence = bullbrain?.confidence ?? params.hybridScore ?? null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} scrollEnabled={!chartTouch}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 40 }}
+      scrollEnabled={!chartTouch}
+    >
       {/* ✅ NEW: Top spacing + back row like you asked */}
       <View style={styles.topBar}>
         <TouchableOpacity
@@ -508,13 +525,18 @@ const [chartTouch, setChartTouch] = useState(false);
         >
           <Ionicons name="chevron-back" size={22} color={BRAND.accent} />
         </TouchableOpacity>
-        <Text style={styles.topBarTitle}>Full Chart Details</Text>
+        <Text style={styles.topBarTitle}>Chart Details</Text>
         <View style={{ width: 44 }} />
       </View>
 
-      <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }}>
+      <Animated.View
+        style={{ opacity: fade, transform: [{ translateY: slide }] }}
+      >
         {/* ===== HEADER ===== */}
-        <LinearGradient colors={["#0f172a", "#020617"]} style={styles.headerCard}>
+        <LinearGradient
+          colors={["#0f172a", "#020617"]}
+          style={styles.headerCard}
+        >
           <View style={styles.headerTopRow}>
             <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={styles.symbol}>{symbol || "—"}</Text>
@@ -525,7 +547,12 @@ const [chartTouch, setChartTouch] = useState(false);
 
             <View style={{ alignItems: "flex-end" }}>
               <Text style={styles.price}>{money(headerPrice)}</Text>
-              <Text style={[styles.change, headerChangePct >= 0 ? styles.pos : styles.neg]}>
+              <Text
+                style={[
+                  styles.change,
+                  headerChangePct >= 0 ? styles.pos : styles.neg,
+                ]}
+              >
                 {headerChangePct == null
                   ? "—"
                   : `${headerChangePct >= 0 ? "+" : ""}${Number(headerChangePct).toFixed(2)}%`}
@@ -535,24 +562,39 @@ const [chartTouch, setChartTouch] = useState(false);
 
           <View style={styles.headerActionsRow}>
             <View style={styles.premiumBadge}>
-              <Ionicons name="analytics-outline" size={14} color={BRAND.accent} />
-              <Text style={styles.premiumBadgeText}>Premium • Full Chart</Text>
+              <Ionicons
+                name="analytics-outline"
+                size={14}
+                color={BRAND.accent}
+              />
+              <Text style={styles.premiumBadgeText}>Full Chart View</Text>
             </View>
 
             {signal ? (
-              <View style={[styles.signalPill, { borderColor: signalPillColor(signal) }]}>
-                <Ionicons name="sparkles-outline" size={14} color={signalPillColor(signal)} />
-                <Text style={[styles.signalPillText, { color: signalPillColor(signal) }]}>
-                  {String(signal).toUpperCase()}
-                  {confidence != null ? ` • ${Number(confidence).toFixed(1)}%` : ""}
+              <View
+                style={[
+                  styles.signalPill,
+                  { borderColor: signalPillColor(signal) },
+                ]}
+              >
+                <Ionicons
+                  name="sparkles-outline"
+                  size={14}
+                  color={signalPillColor(signal)}
+                />
+                <Text
+                  style={[
+                    styles.signalPillText,
+                    { color: signalPillColor(signal) },
+                  ]}
+                >
+                  {displayRatingLabel(signal)}
+                  {confidence != null
+                    ? ` • ${Number(confidence).toFixed(1)}%`
+                    : ""}
                 </Text>
               </View>
             ) : null}
-
-            <TouchableOpacity onPress={onShare} style={styles.shareBtn} activeOpacity={0.85}>
-              <Ionicons name="share-outline" size={16} color={BRAND.text} />
-              <Text style={styles.shareBtnText}>Share</Text>
-            </TouchableOpacity>
           </View>
 
           <Text style={styles.summary}>
@@ -566,12 +608,19 @@ const [chartTouch, setChartTouch] = useState(false);
         <View style={styles.card}>
           <View style={styles.sectionRow}>
             {/* ✅ renamed title */}
-            <Text style={styles.section}>Price Chart (1Y)</Text>
-            <TouchableOpacity onPress={load} style={styles.refreshBtn} activeOpacity={0.85}>
+            <Text style={styles.section}>1-Year Price Movement</Text>
+            <TouchableOpacity
+              onPress={load}
+              style={styles.refreshBtn}
+              activeOpacity={0.85}
+            >
               <Ionicons name="refresh-outline" size={16} color={BRAND.sub} />
             </TouchableOpacity>
           </View>
-
+          <Text style={styles.helperText}>
+            Daily price history with volume activity for market context. Data
+            may be delayed or unavailable.
+          </Text>
           {loading ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator />
@@ -579,9 +628,17 @@ const [chartTouch, setChartTouch] = useState(false);
             </View>
           ) : err ? (
             <View style={styles.errorBox}>
-              <Ionicons name="alert-circle-outline" size={18} color={BRAND.red} />
+              <Ionicons
+                name="alert-circle-outline"
+                size={18}
+                color={BRAND.red}
+              />
               <Text style={styles.errorText}>{err}</Text>
-              <TouchableOpacity onPress={load} style={styles.retryBtn} activeOpacity={0.85}>
+              <TouchableOpacity
+                onPress={load}
+                style={styles.retryBtn}
+                activeOpacity={0.85}
+              >
                 <Text style={styles.retryText}>Retry</Text>
               </TouchableOpacity>
             </View>
@@ -592,10 +649,12 @@ const [chartTouch, setChartTouch] = useState(false);
             <View
               style={styles.chartWrap}
               onLayout={(e) => {
-                const w = Math.max(240, Math.floor(e.nativeEvent.layout.width) - 20); // minus padding
+                const w = Math.max(
+                  240,
+                  Math.floor(e.nativeEvent.layout.width) - 20,
+                ); // minus padding
                 if (Number.isFinite(w) && w > 0 && w !== chartW) setChartW(w);
               }}
-              
             >
               {/* Tooltip (top) */}
               {active ? (
@@ -604,136 +663,149 @@ const [chartTouch, setChartTouch] = useState(false);
                     {formatDateShort(active.t)} • {money(active.close)}
                   </Text>
                   <Text style={styles.tooltipSub}>
-                    O {money(active.open)}  H {money(active.high)}  L {money(active.low)}  V{" "}
-                    {active.volume == null ? "—" : `${Math.round(active.volume).toLocaleString()}`}
+                    O {money(active.open)} H {money(active.high)} L{" "}
+                    {money(active.low)} V{" "}
+                    {active.volume == null
+                      ? "—"
+                      : `${Math.round(active.volume).toLocaleString()}`}
                   </Text>
                 </View>
               ) : (
                 <View style={styles.tooltipMuted}>
-                  <Text style={styles.tooltipMutedText}>Drag to inspect price</Text>
+                  <Text style={styles.tooltipMutedText}>
+                    Drag to inspect price
+                  </Text>
                 </View>
               )}
 
               <View style={{ position: "relative" }}>
-              {/* SVG = visual only */}
-              <Svg
-                width={CHART_W}
-                height={CHART_H}
-                pointerEvents="none"
-              >
-                {/* baseline */}
-                <Line
-                  x1={PAD_X}
-                  y1={CHART_H - PAD_Y}
-                  x2={CHART_W - PAD_X}
-                  y2={CHART_H - PAD_Y}
-                  stroke="rgba(148,163,184,0.20)"
-                  strokeWidth="1"
+                {/* SVG = visual only */}
+                <Svg width={CHART_W} height={CHART_H} pointerEvents="none">
+                  {/* baseline */}
+                  <Line
+                    x1={PAD_X}
+                    y1={CHART_H - PAD_Y}
+                    x2={CHART_W - PAD_X}
+                    y2={CHART_H - PAD_Y}
+                    stroke="rgba(148,163,184,0.20)"
+                    strokeWidth="1"
+                  />
+
+                  {/* price line */}
+                  <Path
+                    d={chart.path}
+                    stroke="rgba(0,227,150,0.95)"
+                    strokeWidth="2.2"
+                    fill="none"
+                  />
+
+                  {/* crosshair */}
+                  {active && (
+                    <>
+                      <Line
+                        x1={active.x}
+                        y1={PAD_Y}
+                        x2={active.x}
+                        y2={CHART_H - PAD_Y}
+                        stroke="rgba(255,255,255,0.22)"
+                        strokeWidth="1"
+                      />
+                      <Circle
+                        cx={active.x}
+                        cy={active.y}
+                        r="4.2"
+                        fill="rgba(255,255,255,0.9)"
+                      />
+                    </>
+                  )}
+
+                  {/* volume bars */}
+                  {chart.volBars.map((b, i) => {
+                    const w =
+                      (CHART_W - PAD_X * 2) / Math.max(1, chart.volBars.length);
+                    const x = clamp(b.x - w / 2, PAD_X, CHART_W - PAD_X);
+                    const h = clamp(b.h, 0, 46);
+                    const y = CHART_H - PAD_Y - h;
+
+                    return (
+                      <Rect
+                        key={`v_${i}`}
+                        x={x}
+                        y={y}
+                        width={Math.max(1, w * 0.75)}
+                        height={h}
+                        fill="rgba(96,165,250,0.18)"
+                      />
+                    );
+                  })}
+                </Svg>
+
+                {/* 🔥 TOUCH CAPTURE LAYER */}
+                <View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    {
+                      zIndex: 10,
+                      backgroundColor: "transparent",
+                    },
+                  ]}
+                  pointerEvents="box-only"
+                  onStartShouldSetResponderCapture={() => true}
+                  onMoveShouldSetResponderCapture={() => true}
+                  onTouchStart={(e) => {
+                    setChartTouch(true);
+                    const x = e.nativeEvent.locationX;
+                    setActiveIdx(xToIndex(x));
+                  }}
+                  onTouchMove={(e) => {
+                    const x = e.nativeEvent.locationX;
+                    setActiveIdx(xToIndex(x));
+                  }}
+                  onTouchEnd={() => {
+                    setChartTouch(false);
+                  }}
+                  {...pan.panHandlers}
                 />
-
-                {/* price line */}
-                <Path
-                  d={chart.path}
-                  stroke="rgba(0,227,150,0.95)"
-                  strokeWidth="2.2"
-                  fill="none"
-                />
-
-                {/* crosshair */}
-                {active && (
-                  <>
-                    <Line
-                      x1={active.x}
-                      y1={PAD_Y}
-                      x2={active.x}
-                      y2={CHART_H - PAD_Y}
-                      stroke="rgba(255,255,255,0.22)"
-                      strokeWidth="1"
-                    />
-                    <Circle
-                      cx={active.x}
-                      cy={active.y}
-                      r="4.2"
-                      fill="rgba(255,255,255,0.9)"
-                    />
-                  </>
-                )}
-
-                {/* volume bars */}
-                {chart.volBars.map((b, i) => {
-                  const w =
-                    (CHART_W - PAD_X * 2) /
-                    Math.max(1, chart.volBars.length);
-                  const x = clamp(b.x - w / 2, PAD_X, CHART_W - PAD_X);
-                  const h = clamp(b.h, 0, 46);
-                  const y = CHART_H - PAD_Y - h;
-
-                  return (
-                    <Rect
-                      key={`v_${i}`}
-                      x={x}
-                      y={y}
-                      width={Math.max(1, w * 0.75)}
-                      height={h}
-                      fill="rgba(96,165,250,0.18)"
-                    />
-                  );
-                })}
-              </Svg>
-
-              {/* 🔥 TOUCH CAPTURE LAYER */}
-              <View
-                style={[
-                  StyleSheet.absoluteFill,
-                  {
-                    zIndex: 10,
-                    backgroundColor: "transparent",
-                  },
-                ]}
-                pointerEvents="box-only"
-
-                onStartShouldSetResponderCapture={() => true}
-                onMoveShouldSetResponderCapture={() => true}
-
-                onTouchStart={(e) => {
-                  setChartTouch(true);
-                  const x = e.nativeEvent.locationX;
-                  setActiveIdx(xToIndex(x));
-                }}
-
-                onTouchMove={(e) => {
-                  const x = e.nativeEvent.locationX;
-                  setActiveIdx(xToIndex(x));
-                }}
-
-                onTouchEnd={() => {
-                  setChartTouch(false);
-                }}
-
-                {...pan.panHandlers}
-              />
-
-            </View>
-
+              </View>
 
               {/* Range labels */}
               <View style={styles.rangeRow}>
-                <Text style={styles.rangeText}>Low: {money(chart.min)}</Text>
-                <Text style={styles.rangeText}>High: {money(chart.max)}</Text>
+                <Text style={styles.rangeText}>
+                  Close Low: {money(chart.min)}
+                </Text>
+                <Text style={styles.rangeText}>
+                  Close High: {money(chart.max)}
+                </Text>
               </View>
             </View>
           )}
-
         </View>
 
         {/* ===== BEHAVIOR ===== */}
         <View style={styles.card}>
           {/* ✅ renamed title */}
-          <SectionHeader title="Performance Snapshot" />
+          <SectionHeader title="1-Year Performance" />
           <View style={styles.row}>
-            <Metric label="1Y Return" value={derived.ret1yPct} suffix="%" color={colorFromSigned(derived.ret1yPct)} />
-            <Metric label="Volatility" value={derived.volAnn} suffix="%" color={BRAND.sub} onInfo={() => openTip("VOL")} />
-            <Metric label="Max Drawdown" value={derived.maxDrawdownPct} suffix="%" color={BRAND.sub} onInfo={() => openTip("DD")} />
+            <Metric
+              label="1Y Return"
+              value={derived.ret1yPct}
+              suffix="%"
+              color={colorFromSigned(derived.ret1yPct)}
+            />
+            <Metric
+              label="Realized Volatility"
+              value={derived.volAnn}
+              suffix="%"
+              color={BRAND.sub}
+              onInfo={() => openTip("VOL")}
+            />
+            <Metric
+              label="Largest Pullback"
+              value={derived.maxDrawdownPct}
+              suffix="%"
+              color={BRAND.sub}
+              onInfo={() => openTip("DD")}
+            />
           </View>
           <Text style={styles.note}>{derived.trendNote}</Text>
         </View>
@@ -741,10 +813,22 @@ const [chartTouch, setChartTouch] = useState(false);
         {/* ===== HIGHS / LOWS ===== */}
         <View style={styles.card}>
           {/* ✅ renamed title */}
-          <SectionHeader title="Key Highs & Lows" />
+          <SectionHeader title="High & Low Zones" />
           <View style={styles.row}>
-            <Metric label="1Y High" value={derived.high} prefix="$" color={BRAND.text} formatMoney />
-            <Metric label="1Y Low" value={derived.low} prefix="$" color={BRAND.text} formatMoney />
+            <Metric
+              label="1Y Close High"
+              value={derived.high}
+              prefix="$"
+              color={BRAND.text}
+              formatMoney
+            />
+            <Metric
+              label="1Y Close Low"
+              value={derived.low}
+              prefix="$"
+              color={BRAND.text}
+              formatMoney
+            />
           </View>
 
           {candles.length ? (
@@ -767,24 +851,67 @@ const [chartTouch, setChartTouch] = useState(false);
                 color={BRAND.blue}
                 icon="arrow-down-outline"
               />
-              <Pill label={`Trend: ${derived.trendLabel}`} color={BRAND.amber} icon="trending-up-outline" />
+              <Pill
+                label={`Trend: ${derived.trendLabel}`}
+                color={BRAND.amber}
+                icon="trending-up-outline"
+              />
             </View>
           ) : null}
 
           <Text style={styles.note}>
-            Key highs/lows help you spot where price previously met strong resistance (highs) or support (lows). If price revisits
-            those zones, reactions often matter more than the exact number.
+            These zones show where price previously reached major highs and lows
+            during the selected period. They are useful for context, but future
+            reactions can differ.
           </Text>
         </View>
+        {/* ===== INTRADAY EXTREMES ===== */}
+        <View style={styles.card}>
+          <SectionHeader title="Intraday Extremes" />
 
+          <Text style={styles.helperText}>
+            Based on the highest traded high and lowest traded low during the
+            1-year candle period.
+          </Text>
+
+          <View style={styles.row}>
+            <Metric
+              label="Intraday High"
+              value={derived.intradayHigh}
+              prefix="$"
+              color={BRAND.text}
+              formatMoney
+            />
+
+            <Metric
+              label="Intraday Low"
+              value={derived.intradayLow}
+              prefix="$"
+              color={BRAND.text}
+              formatMoney
+            />
+          </View>
+        </View>
         {/* ===== TREND QUALITY ===== */}
         <View style={styles.card}>
           {/* ✅ renamed title */}
-          <SectionHeader title="Trend Quality" />
+          <SectionHeader title="Trend Context" />
           <View style={styles.semanticRow}>
             <Pill
-              label={derived.trendLabel === "Uptrend" ? "Healthy / Constructive" : derived.trendLabel === "Downtrend" ? "Breaking Down" : "Range / Mixed"}
-              color={derived.trendLabel === "Uptrend" ? BRAND.accent : derived.trendLabel === "Downtrend" ? BRAND.red : BRAND.amber}
+              label={
+                derived.trendLabel === "Uptrend"
+                  ? "Healthy / Constructive"
+                  : derived.trendLabel === "Downtrend"
+                    ? "Breaking Down"
+                    : "Range / Mixed"
+              }
+              color={
+                derived.trendLabel === "Uptrend"
+                  ? BRAND.accent
+                  : derived.trendLabel === "Downtrend"
+                    ? BRAND.red
+                    : BRAND.amber
+              }
               icon="pulse-outline"
             />
             <Pill
@@ -792,12 +919,20 @@ const [chartTouch, setChartTouch] = useState(false);
                 derived.volAnn == null
                   ? "Volatility: —"
                   : derived.volAnn >= 60
-                  ? "Volatility: High"
-                  : derived.volAnn >= 35
-                  ? "Volatility: Moderate"
-                  : "Volatility: Low"
+                    ? "Volatility: High"
+                    : derived.volAnn >= 35
+                      ? "Volatility: Moderate"
+                      : "Volatility: Low"
               }
-              color={derived.volAnn == null ? BRAND.sub : derived.volAnn >= 60 ? BRAND.red : derived.volAnn >= 35 ? BRAND.amber : BRAND.accent}
+              color={
+                derived.volAnn == null
+                  ? BRAND.sub
+                  : derived.volAnn >= 60
+                    ? BRAND.red
+                    : derived.volAnn >= 35
+                      ? BRAND.amber
+                      : BRAND.accent
+              }
               icon="analytics-outline"
             />
           </View>
@@ -806,8 +941,8 @@ const [chartTouch, setChartTouch] = useState(false);
             {derived.trendLabel === "Uptrend"
               ? "An uptrend is healthiest when pullbacks are controlled and recoveries happen on meaningful participation."
               : derived.trendLabel === "Downtrend"
-              ? "Downtrends often keep rejecting rallies. Watch for a series of higher lows and stronger up-move volume to signal recovery."
-              : "Sideways regimes can produce fakeouts. Wait for a clean break and volume confirmation."}
+                ? "Downtrends often keep rejecting rallies. Watch for a series of higher lows and stronger up-move volume to signal recovery."
+                : "Sideways periods can produce mixed signals. Clearer direction usually appears when price movement and volume align."}
           </Text>
         </View>
 
@@ -815,44 +950,89 @@ const [chartTouch, setChartTouch] = useState(false);
         <View style={styles.card}>
           <View style={styles.sectionRow}>
             {/* ✅ renamed title */}
-            <Text style={styles.section}>Volume Confirmation</Text>
-            <TouchableOpacity onPress={() => openTip("VOLCONF")} style={styles.infoBtn} activeOpacity={0.85}>
-              <Ionicons name="help-circle-outline" size={18} color={BRAND.sub} />
+            <Text style={styles.section}>Volume Context</Text>
+            <TouchableOpacity
+              onPress={() => openTip("VOLCONF")}
+              style={styles.infoBtn}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name="help-circle-outline"
+                size={18}
+                color={BRAND.sub}
+              />
             </TouchableOpacity>
           </View>
 
           <View style={styles.row}>
             <Metric
               label="Up/Down Volume"
-              value={derived.volumeUpDownRatio == null ? null : derived.volumeUpDownRatio}
-              color={derived.volumeUpDownRatio == null ? BRAND.sub : derived.volumeUpDownRatio >= 1 ? BRAND.accent : BRAND.red}
+              value={
+                derived.volumeUpDownRatio == null
+                  ? null
+                  : derived.volumeUpDownRatio
+              }
+              color={
+                derived.volumeUpDownRatio == null
+                  ? BRAND.sub
+                  : derived.volumeUpDownRatio >= 1
+                    ? BRAND.accent
+                    : BRAND.red
+              }
               format={(v) => (v == null ? "—" : `${v.toFixed(2)}x`)}
             />
             <Metric
-              label="Vol ↔ Move Corr"
+              label="Volume–Move Link"
               value={derived.volAbsRetCorr}
-              color={derived.volAbsRetCorr == null ? BRAND.sub : derived.volAbsRetCorr >= 0 ? BRAND.accent : BRAND.red}
+              color={
+                derived.volAbsRetCorr == null
+                  ? BRAND.sub
+                  : derived.volAbsRetCorr >= 0
+                    ? BRAND.accent
+                    : BRAND.red
+              }
               format={(v) => (v == null ? "—" : v.toFixed(2))}
             />
           </View>
 
           <Text style={styles.note}>{derived.volumeNote}</Text>
         </View>
+        <View style={styles.footerWrap}>
+          <Text style={styles.powered}>
+            Powered by <Text style={styles.brandText}>Alphaclara</Text>
+          </Text>
+
+          <Text style={styles.disclaimer}>
+            Chart analytics are provided for informational and educational
+            purposes only and do not constitute financial or investment advice.
+          </Text>
+        </View>
       </Animated.View>
 
       {/* ===== TOOLTIP MODAL ===== */}
-      <Modal visible={!!tip} transparent animationType="fade" onRequestClose={closeTip}>
+      <Modal
+        visible={!!tip}
+        transparent
+        animationType="fade"
+        onRequestClose={closeTip}
+      >
         <Pressable style={styles.modalBackdrop} onPress={closeTip}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <View style={styles.modalHeader}>
-              <Ionicons name="information-circle-outline" size={20} color={BRAND.accent} />
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color={BRAND.accent}
+              />
               <Text style={styles.modalTitle}>{tip?.title || ""}</Text>
               <TouchableOpacity onPress={closeTip} hitSlop={10}>
                 <Ionicons name="close-outline" size={22} color={BRAND.sub} />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalBody}>{tip?.body || ""}</Text>
-            <Text style={styles.modalFoot}>Educational only • Not financial advice</Text>
+            <Text style={styles.modalFoot}>
+              Educational only • Not financial advice
+            </Text>
           </Pressable>
         </Pressable>
       </Modal>
@@ -881,7 +1061,8 @@ const Metric = React.memo(function Metric({
 }) {
   const display = useMemo(() => {
     if (format) return format(value);
-    if (formatMoney) return value == null ? "—" : `$${Number(value).toFixed(2)}`;
+    if (formatMoney)
+      return value == null ? "—" : `$${Number(value).toFixed(2)}`;
     if (value == null) return "—";
     const n = Number(value);
     if (!Number.isFinite(n)) return "—";
@@ -890,7 +1071,13 @@ const Metric = React.memo(function Metric({
 
   return (
     <View style={styles.metric}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
         <Text style={styles.metricLabel}>{label}</Text>
         {onInfo ? (
           <TouchableOpacity onPress={onInfo} hitSlop={10} activeOpacity={0.85}>
@@ -898,7 +1085,9 @@ const Metric = React.memo(function Metric({
           </TouchableOpacity>
         ) : null}
       </View>
-      <Text style={[styles.metricValue, { color: color || BRAND.text }]}>{display}</Text>
+      <Text style={[styles.metricValue, { color: color || BRAND.text }]}>
+        {display}
+      </Text>
     </View>
   );
 });
@@ -907,7 +1096,10 @@ const Pill = React.memo(function Pill({ label, color, icon }) {
   return (
     <View style={[styles.pill, { borderColor: color || BRAND.border }]}>
       <Ionicons name={icon} size={14} color={color || BRAND.sub} />
-      <Text style={[styles.pillText, { color: color || BRAND.sub }]} numberOfLines={1}>
+      <Text
+        style={[styles.pillText, { color: color || BRAND.sub }]}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </View>
@@ -916,17 +1108,22 @@ const Pill = React.memo(function Pill({ label, color, icon }) {
 
 /* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BRAND.bg, paddingHorizontal: 16, paddingBottom: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: BRAND.bg,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
 
   // ✅ NEW: top space + back arrow
   topBar: {
-  paddingTop: Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 16,
-  paddingBottom: 10,
-  marginBottom: 10,
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-},
+    paddingTop: Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 16,
+    paddingBottom: 10,
+    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
 
   backBtn: {
     width: 44,
@@ -951,7 +1148,11 @@ const styles = StyleSheet.create({
     borderColor: BRAND.border,
     padding: 14,
   },
-  headerTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  headerTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   symbol: { color: BRAND.text, fontSize: 26, fontWeight: "900" },
   name: { color: BRAND.sub, fontSize: 13, marginTop: 2 },
   price: { color: BRAND.text, fontSize: 22, fontWeight: "800" },
@@ -959,7 +1160,13 @@ const styles = StyleSheet.create({
   pos: { color: BRAND.accent },
   neg: { color: BRAND.red },
 
-  headerActionsRow: { flexDirection: "row", alignItems: "center", marginTop: 10, gap: 10, flexWrap: "wrap" },
+  headerActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    gap: 10,
+    flexWrap: "wrap",
+  },
   premiumBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -984,21 +1191,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(2,6,23,0.75)",
   },
   signalPillText: { fontSize: 12, fontWeight: "900" },
-
-  shareBtn: {
-    marginLeft: "auto",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  shareBtnText: { color: BRAND.text, fontSize: 12, fontWeight: "900" },
-
   summary: {
     marginTop: 10,
     color: BRAND.sub,
@@ -1015,7 +1207,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
 
-  sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   section: {
     color: BRAND.accent,
     fontSize: 15,
@@ -1048,7 +1244,12 @@ const styles = StyleSheet.create({
 
   note: { marginTop: 8, color: BRAND.sub, fontSize: 12.5, lineHeight: 18 },
 
-  semanticRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  semanticRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+  },
 
   pill: {
     flexDirection: "row",
@@ -1083,7 +1284,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   tooltipTitle: { color: BRAND.text, fontSize: 13, fontWeight: "900" },
-  tooltipSub: { marginTop: 2, color: BRAND.sub, fontSize: 11.5, fontWeight: "700" },
+  tooltipSub: {
+    marginTop: 2,
+    color: BRAND.sub,
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
 
   tooltipMuted: {
     borderWidth: 1,
@@ -1096,7 +1302,11 @@ const styles = StyleSheet.create({
   },
   tooltipMutedText: { color: BRAND.sub, fontSize: 12, fontWeight: "800" },
 
-  rangeRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
+  rangeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
   rangeText: { color: BRAND.sub, fontSize: 11.5, fontWeight: "800" },
 
   foot: { marginTop: 10, color: BRAND.sub, fontSize: 11, opacity: 0.85 },
@@ -1152,4 +1362,35 @@ const styles = StyleSheet.create({
   modalTitle: { color: BRAND.text, fontSize: 14.5, fontWeight: "900", flex: 1 },
   modalBody: { marginTop: 10, color: BRAND.sub, fontSize: 13, lineHeight: 18 },
   modalFoot: { marginTop: 12, color: BRAND.sub, fontSize: 11, opacity: 0.85 },
+  helperText: {
+    color: BRAND.muted,
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: "700",
+    marginTop: -2,
+    marginBottom: 8,
+  },
+  footerWrap: {
+    alignItems: "center",
+    marginTop: 22,
+    paddingHorizontal: 12,
+  },
+
+  powered: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginBottom: 8,
+  },
+
+  brandText: {
+    color: BRAND.accent,
+    fontWeight: "700",
+  },
+
+  disclaimer: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    lineHeight: 16,
+    textAlign: "center",
+  },
 });

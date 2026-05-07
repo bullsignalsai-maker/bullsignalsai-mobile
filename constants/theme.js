@@ -1,0 +1,15 @@
+export const BRAND = {
+  bg: "#000000",
+  card: "#0B1220",
+  card2: "#020617",
+  border: "#1F2937",
+  softBorder: "#111827",
+  text: "#FFFFFF",
+  sub: "#9CA3AF",
+  muted: "#6B7280",
+  accent: "#00E396",
+  green: "#00E396",
+  red: "#EF4444",
+  amber: "#FACC15",
+  blue: "#60A5FA",
+};

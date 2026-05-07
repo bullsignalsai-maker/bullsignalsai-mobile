@@ -1,5 +1,4 @@
 // components/AstraChat.js
-
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -16,110 +15,97 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { askAstra as askAstraService } from "../services/astraService";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
+import { BRAND } from "../constants/theme";
+
 export default function AstraChat({ visible, onClose, portfolioData }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [askedIds, setAskedIds] = useState([]); // which predefined questions already used
+  const [askedIds, setAskedIds] = useState([]);
   const [suggestedFollowups, setSuggestedFollowups] = useState([]);
   const scrollRef = useRef(null);
 
-  
-  // -----------------------------------------------------
-// DYNAMIC QUESTION BUILDER (based on portfolio size)
-// -----------------------------------------------------
-const buildAllChips = () => {
-  const isMarketMode = portfolioData?.contextType === "market";
+  const makeId = (suffix) =>
+    `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${suffix}`;
+
+  const buildAllChips = () => {
+    const isMarketMode = portfolioData?.contextType === "market";
+    const isStockDetailMode = portfolioData?.contextType === "stock_detail";
 
     if (isMarketMode) {
       return [
         { id: "market_pulse", label: "Explain today’s market pulse" },
         { id: "market_risk", label: "What is market risk now?" },
         { id: "spy_qqq", label: "What are SPY and QQQ showing?" },
-        {
-          id: "crypto_commodities",
-          label: "Are crypto and commodities confirming risk?",
-        },
+        { id: "crypto_commodities", label: "Crypto and commodities view" },
         { id: "market_news", label: "Summarize market news" },
-        { id: "market_movers", label: "Explain top gainers and losers" },
+        { id: "market_movers", label: "Explain top movers" },
       ];
     }
-  const isStockDetailMode = portfolioData?.contextType === "stock_detail";
-  const stockSymbol = portfolioData?.symbol || "this stock";  
-  if (isStockDetailMode) {
-    return [
-      { id: "stock_explain", label: `Explain ${stockSymbol}` },
-      { id: "decision_explain", label: `Why is ${stockSymbol} rated this way?` },
-      { id: "pattern_explain", label: `Explain ${stockSymbol} pattern` },
-      { id: "technical_explain", label: `Explain ${stockSymbol} technicals` },
-      { id: "risk_explain", label: `What is the biggest risk?` },
+
+    if (isStockDetailMode) {
+      const stockSymbol = portfolioData?.symbol || "this stock";
+      return [
+        { id: "stock_explain", label: `Explain ${stockSymbol}` },
+        { id: "decision_explain", label: `Why this rating?` },
+        { id: "pattern_explain", label: `Explain the pattern` },
+        { id: "technical_explain", label: `Explain technicals` },
+        { id: "risk_explain", label: `Biggest risk?` },
+      ];
+    }
+
+    const p = portfolioData?.positions || [];
+    const count = p.length;
+
+    const base = [
+      { id: "overview", label: "Portfolio overview" },
+      { id: "risk_exposure", label: "Risk exposure" },
+      { id: "overweight", label: "Overweight / underweight?" },
+      { id: "worst", label: "Positions needing attention" },
+      { id: "ai_suggestions", label: "Rebalancing context" },
     ];
-  }
 
-  const p = portfolioData?.positions || [];
-  const count = p.length;
+    if (count === 1) {
+      const s = p[0].symbol;
+      return [...base, { id: "explain_single", label: `Explain ${s}` }];
+    }
 
-  const base = [
-    { id: "overview", label: "Portfolio overview" },
-    { id: "risk_exposure", label: "Risk exposure" },
-    { id: "overweight", label: "Overweight / underweight?" },
-    { id: "worst", label: "Which positions need attention?" },
-    { id: "ai_suggestions", label: "Rebalancing suggestions" },
-  ];
+    if (count === 2) {
+      const a = p[0].symbol;
+      const b = p[1].symbol;
+      return [
+        ...base,
+        { id: "compare_two", label: `Compare ${a} vs ${b}` },
+        { id: "leader", label: "Which leads performance?" },
+      ];
+    }
 
-  if (count === 0) return base;
+    if (count >= 3) {
+      return [
+        ...base,
+        { id: "top3_explain", label: "Explain top holdings" },
+        { id: "compare_top3", label: "Compare top holdings" },
+        { id: "leader", label: "Main performance driver" },
+      ];
+    }
 
-  if (count === 1) {
-    const s = p[0].symbol;
-    return [
-      ...base,
-      { id: "explain_single", label: `Explain ${s}` },
-      { id: "why_moves", label: `Why does ${s} move my portfolio?` },
-    ];
-  }
+    return base;
+  };
 
-  if (count === 2) {
-    const a = p[0].symbol;
-    const b = p[1].symbol;
-    return [
-      ...base,
-      { id: "explain_two", label: `Explain ${a} and ${b}` },
-      { id: "compare_two", label: `Compare ${a} vs ${b}` },
-      { id: "leader", label: "Which stock leads performance?" },
-    ];
-  }
-
-  // 3 or more holdings
-  return [
-    ...base,
-    { id: "top3_explain", label: "Explain top 3 holdings" },
-    { id: "compare_top3", label: "Compare top 3 holdings" },
-    { id: "leader", label: "Which stock contributes most?" },
-  ];
-};
-
-// All chips dynamically
-const allChips = buildAllChips();
-
-// First-time starter chips = first 3 of dynamic list
-const starterChips = allChips.slice(0, 3);
-const starterIds = new Set(starterChips.map((c) => c.id));
-
-
+  const allChips = buildAllChips();
+  const starterChips = allChips.slice(0, 3);
+  const starterIds = new Set(starterChips.map((c) => c.id));
   const hasAsked = askedIds.length > 0;
   const askedSet = new Set(askedIds);
   const remainingChips = allChips.filter((c) => !askedSet.has(c.id));
   const moreChips = remainingChips.filter((c) => !starterIds.has(c.id));
-
 
   const scrollToEnd = () => {
     setTimeout(() => {
       scrollRef.current?.scrollToEnd({ animated: true });
     }, 30);
   };
-const makeId = (suffix) =>
-  `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${suffix}`;
-  // Reset Astra every time it is opened
+
   useEffect(() => {
     if (visible) {
       setMessages([
@@ -127,37 +113,37 @@ const makeId = (suffix) =>
           id: "welcome",
           from: "astra",
           text:
-          portfolioData?.contextType === "market"
-            ? "Ask Astra about today’s Market Pulse — SPY, QQQ, crypto, commodities, risk sentiment, movers, and market news."
-            : portfolioData?.contextType === "stock_detail"
-            ? `Ask Astra anything about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, risks, or what could change.`
-            : "Meet Astra — your AI co-pilot that monitors your holdings and explains what matters in clear, simple language. Select a quick question below or ask anything.",},
+            portfolioData?.contextType === "market"
+              ? "Ask Astra about market context, risk sentiment, movers, news, crypto, and major indexes."
+              : portfolioData?.contextType === "stock_detail"
+              ? `Ask Astra about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
+              : "Ask Astra about your portfolio, holdings, risk exposure, and performance context.",
+        },
       ]);
+
       setInput("");
       setAskedIds([]);
       setSuggestedFollowups([]);
     }
   }, [visible]);
 
-  // Core ask logic → calls /astra-chat
   const askAstra = async ({ question_id = null, question_text = null }) => {
     const isStockDetailMode = portfolioData?.contextType === "stock_detail";
-      const isMarketMode = portfolioData?.contextType === "market";
+    const isMarketMode = portfolioData?.contextType === "market";
 
-      if (
-        !isStockDetailMode &&
-        !isMarketMode &&
-        (!portfolioData ||
-          !portfolioData.positions ||
-          portfolioData.positions.length === 0)
-      ) {
+    if (
+      !isStockDetailMode &&
+      !isMarketMode &&
+      (!portfolioData ||
+        !portfolioData.positions ||
+        portfolioData.positions.length === 0)
+    ) {
       setMessages((prev) => [
         ...prev,
         {
           id: makeId("err"),
           from: "astra",
-          text:
-            "Add at least one stock to your portfolio so I can analyze performance, risk, and trends.",
+          text: "Add at least one stock to your portfolio so Astra can explain performance and risk context.",
         },
       ]);
       scrollToEnd();
@@ -181,70 +167,89 @@ const makeId = (suffix) =>
       text: label,
     };
 
-    // user bubble + immediate typing dots
     setMessages((prev) => [
       ...prev,
       userMsg,
       { id: makeId("typing"), from: "typing", text: "" },
     ]);
+
     setInput("");
     scrollToEnd();
     setLoading(true);
 
     try {
-  const chatHistory = messages
-    .filter((m) => m.from === "user" || m.from === "astra")
-    .slice(-6)
-    .map((m) => ({
-      role: m.from === "user" ? "user" : "assistant",
-      text: m.text,
-    }));
+      const chatHistory = messages
+        .filter((m) => m.from === "user" || m.from === "astra")
+        .slice(-6)
+        .map((m) => ({
+          role: m.from === "user" ? "user" : "assistant",
+          text: m.text,
+        }));
 
-  const result = await askAstraService({
-    ...portfolioData,
-    question_id,
-    question: question_text || label,
-    chat_history: chatHistory,
-  });
+      const result = await askAstraService({
+        ...portfolioData,
+        question_id,
+        question: question_text || label,
+        chat_history: chatHistory,
+      });
 
-  setMessages((prev) => [
-  ...prev.filter((m) => m.from !== "typing"),
-    {
-    id: makeId("astra"),
-    from: "astra",
-    text: result.answer,
-    cards: result.cards || [],
-  },
-]);
+      setMessages((prev) => [
+        ...prev.filter((m) => m.from !== "typing"),
+        {
+          id: makeId("astra"),
+          from: "astra",
+         text:
+          result?.answer?.trim() ||
+          "Astra could not generate a response right now. Please try again.",
+        cards: result?.cards || [],
+        },
+      ]);
 
-setSuggestedFollowups(result.suggestedFollowups || []);
+      setSuggestedFollowups(result.suggestedFollowups || []);
+      scrollToEnd();
+    } catch (err) {
+      console.warn("AstraChat error:", err);
 
-scrollToEnd();
-} catch (err) {
-  console.warn("AstraChat error:", err);
+      setMessages((prev) => [
+        ...prev.filter((m) => m.from !== "typing"),
+        {
+          id: makeId("err"),
+          from: "astra",
+          text: "Astra is temporarily unavailable. Please try again shortly.",
+        },
+      ]);
 
-  setMessages((prev) => [
-    ...prev.filter((m) => m.from !== "typing"),
-    {
-      id: makeId("err"),
-      from: "astra",
-      text: "I couldn't reach Astra right now. Please try again shortly.",
-    },
-  ]);
-
-  scrollToEnd();
-} finally {
-  setLoading(false);
-}
+      scrollToEnd();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const sendCustom = () => {
     const text = input.trim();
-    if (!text) return;
+    if (!text || loading) return;
+
     Keyboard.dismiss();
     askAstra({ question_text: text });
   };
+const resetChat = () => {
+  setMessages([
+    {
+      id: "welcome",
+      from: "astra",
+      text:
+        portfolioData?.contextType === "market"
+          ? "Ask Astra about market context, risk sentiment, movers, news, crypto, and major indexes."
+          : portfolioData?.contextType === "stock_detail"
+          ? `Ask Astra about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
+          : "Ask Astra about your portfolio, holdings, risk exposure, and performance context.",
+    },
+  ]);
 
+  setInput("");
+  setAskedIds([]);
+  setSuggestedFollowups([]);
+};
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
@@ -255,31 +260,38 @@ scrollToEnd();
           keyboardVerticalOffset={70}
         >
           <View style={styles.card}>
-            {/* Header */}
+            <View style={styles.handleBar} />
+
             <View style={styles.headerRow}>
-            <View style={styles.headerLeft}>
-              <View style={styles.avatar}>
-                <AstraAnimatedIcon size={40} />
+              <View style={styles.headerLeft}>
+                <View style={styles.avatar}>
+                  <AstraAnimatedIcon size={38} />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.astraTitle}>Astra</Text>
+                  <Text style={styles.astraTagline}>
+                    AI Market & Portfolio Assistant
+                  </Text>
+                </View>
               </View>
 
-              <View>
-                <Text style={styles.astraTitle}>Astra</Text>
-                <Text style={styles.astraTagline}>
-                  Artificial Stock Trading & Risk Analyst
-                </Text>
+              <View style={styles.headerActions}>
+                <Pressable onPress={resetChat} style={styles.clearBtn}>
+                  <Text style={styles.clearText}>Clear</Text>
+                </Pressable>
+
+                <Pressable onPress={onClose} style={styles.closeBtn}>
+                  <Ionicons name="close" size={20} color={BRAND.sub} />
+                </Pressable>
               </View>
             </View>
 
-            <Pressable onPress={onClose}>
-              <Ionicons name="close" size={22} color="#9CA3AF" />
-            </Pressable>
-          </View>
-
-            {/* Messages + starter chips */}
             <View style={styles.messagesBox}>
               <ScrollView
                 ref={scrollRef}
                 style={styles.scroll}
+                showsVerticalScrollIndicator={false}
                 onContentSizeChange={scrollToEnd}
               >
                 {messages.map((m) =>
@@ -297,132 +309,133 @@ scrollToEnd();
                     </View>
                   ) : (
                     <View key={m.id} style={styles.botBubble}>
-                    <Text style={styles.botText}>{m.text}</Text>
+                      <Text style={styles.botText}>{m.text}</Text>
 
-                    {Array.isArray(m.cards) && m.cards.length > 0 && (
-                      <View style={styles.answerCardsWrap}>
-                        {m.cards.map((card, idx) => (
-                          <View key={`${m.id}-card-${idx}`} style={styles.answerCard}>
-                            <Text style={styles.answerCardTitle}>{card.title}</Text>
-                            <Text style={styles.answerCardValue}>{card.value}</Text>
-                            {!!card.subtitle && (
-                              <Text style={styles.answerCardSubtitle}>{card.subtitle}</Text>
-                            )}
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </View>
+                      {Array.isArray(m.cards) && m.cards.length > 0 && (
+                        <View style={styles.answerCardsWrap}>
+                          {m.cards.map((card, idx) => (
+                            <View
+                              key={`${m.id}-card-${idx}`}
+                              style={styles.answerCard}
+                            >
+                              <Text style={styles.answerCardTitle}>
+                                {card.title}
+                              </Text>
+                              <Text style={styles.answerCardValue}>
+                                {card.value}
+                              </Text>
+                              {!!card.subtitle && (
+                                <Text style={styles.answerCardSubtitle}>
+                                  {card.subtitle}
+                                </Text>
+                              )}
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   )
                 )}
 
                 {!hasAsked && (
                   <View style={styles.starterBlock}>
-                    <Text style={styles.starterHeader}>Quick questions</Text>
-                    <View style={styles.starterChipColumn}>
-                      {starterChips.map((c) => (
-                        <Pressable
-                          key={c.id}
-                          style={({ pressed }) => [
-                            styles.starterChip,
-                            pressed && { opacity: 0.8 },
-                          ]}
-                          onPress={() =>
-                            askAstra({ question_id: c.id, question_text: c.label })
-                          }
-                        >
-                          <Ionicons
-                            name="sparkles-outline"
-                            size={14}
-                            color="#FBBF24"
-                            style={{ marginRight: 6 }}
-                          />
-                          <Text style={styles.starterChipText}>{c.label}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
+                    <Text style={styles.chipHeader}>Quick questions</Text>
+
+                    {starterChips.map((c) => (
+                      <Pressable
+                        key={c.id}
+                        style={({ pressed }) => [
+                          styles.chip,
+                          pressed && { opacity: 0.75 },
+                        ]}
+                        onPress={() =>
+                          askAstra({ question_id: c.id, question_text: c.label })
+                        }
+                      >
+                        <Ionicons
+                          name="sparkles-outline"
+                          size={14}
+                          color={BRAND.amber}
+                        />
+                        <Text style={styles.chipText}>{c.label}</Text>
+                      </Pressable>
+                    ))}
                   </View>
                 )}
               </ScrollView>
             </View>
 
-            {/* More insights after first question */}
             {hasAsked && suggestedFollowups.length === 0 && moreChips.length > 0 && (
-              <>
-                <Text style={styles.promptHeader}>More insights</Text>
-                <View style={styles.chipColumn}>
-                  {moreChips.map((q) => (
-                    <Pressable
-                      key={q.id}
-                      style={({ pressed }) => [
-                        styles.chip,
-                        pressed && { opacity: 0.8 },
-                      ]}
-                      onPress={() =>
-                        askAstra({ question_id: q.id, question_text: q.label })
-                      }
-                    >
-                      <Ionicons
-                        name="sparkles-outline"
-                        size={14}
-                        color="#FBBF24"
-                        style={{ marginRight: 6 }}
-                      />
-                      <Text style={styles.chipText}>{q.label}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </>
+              <View style={styles.followupArea}>
+                <Text style={styles.chipHeader}>More insights</Text>
+
+                {moreChips.slice(0, 2).map((q) => (
+                  <Pressable
+                    key={q.id}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      pressed && { opacity: 0.75 },
+                    ]}
+                    onPress={() =>
+                      askAstra({ question_id: q.id, question_text: q.label })
+                    }
+                  >
+                    <Ionicons name="sparkles-outline" size={14} color={BRAND.amber} />
+                    <Text style={styles.chipText}>{q.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
             )}
+
             {suggestedFollowups.length > 0 && (
-              <>
-                <Text style={styles.promptHeader}>Suggested follow-ups</Text>
+              <View style={styles.followupArea}>
+                <Text style={styles.chipHeader}>Suggested follow-ups</Text>
 
-                <View style={styles.chipColumn}>
-                  {suggestedFollowups.slice(0, 2).map((q, idx) => (
-                    <Pressable
-                      key={`followup-${idx}-${q}`}
-                      style={({ pressed }) => [
-                        styles.chip,
-                        pressed && { opacity: 0.8 },
-                      ]}
-                      onPress={() => askAstra({ question_text: q })}
-                    >
-                      <Ionicons
-                        name="chatbubble-ellipses-outline"
-                        size={14}
-                        color="#00E396"
-                        style={{ marginRight: 6 }}
-                      />
-
-                      <Text style={styles.chipText}>{q}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </>
+                {suggestedFollowups.slice(0, 2).map((q, idx) => (
+                  <Pressable
+                    key={`followup-${idx}-${q}`}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      pressed && { opacity: 0.75 },
+                    ]}
+                    onPress={() => askAstra({ question_text: q })}
+                  >
+                    <Ionicons
+                      name="chatbubble-ellipses-outline"
+                      size={14}
+                      color={BRAND.green}
+                    />
+                    <Text style={styles.chipText}>{q}</Text>
+                  </Pressable>
+                ))}
+              </View>
             )}
-            {/* Input */}
+
             <Text style={styles.disclaimerText}>
-              Astra provides educational AI insights only, not personal financial advice.
+              Educational AI insights only. Not financial, investment, trading, or tax advice.
             </Text>
+
             <View style={styles.inputRow}>
               <TextInput
                 style={styles.input}
                 placeholder="Ask Astra anything..."
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={BRAND.muted}
                 value={input}
                 onChangeText={setInput}
                 onSubmitEditing={sendCustom}
                 returnKeyType="send"
               />
+
               <Pressable
                 style={({ pressed }) => [
                   styles.sendBtn,
-                  pressed && { opacity: 0.7 },
+                  (!input.trim() || loading) && styles.sendDisabled,
+                  pressed && input.trim() && !loading && { opacity: 0.75 },
                 ]}
+                disabled={!input.trim() || loading}
                 onPress={sendCustom}
               >
-                <Ionicons name="send" size={16} color="#000" />
+                <Ionicons name="send" size={15} color={BRAND.bg} />
               </Pressable>
             </View>
           </View>
@@ -432,224 +445,289 @@ scrollToEnd();
   );
 }
 
-// STYLES
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "flex-end",
   },
-  bgTouch: { flex: 1 },
+
+  bgTouch: {
+    flex: 1,
+  },
 
   card: {
-    backgroundColor: "#020617",
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    backgroundColor: BRAND.card2,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     borderWidth: 1,
-    borderColor: "#1F2937",
+    borderColor: BRAND.border,
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 8,
     paddingBottom: 12,
-    height: "92%",
+    height: "90%",
+  },
+
+  handleBar: {
+    width: 42,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: BRAND.border,
+    alignSelf: "center",
+    marginBottom: 10,
   },
 
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: BRAND.softBorder,
   },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0, 227, 150, 0.08)",
+    backgroundColor: "rgba(0,227,150,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(0, 227, 150, 0.25)",
-    marginRight: 12,
+    borderColor: "rgba(0,227,150,0.24)",
+    marginRight: 10,
   },
 
   astraTitle: {
-    color: "#00E396",
-    fontSize: 21,
-    fontWeight: "700",
-    letterSpacing: 1.8,
-    fontFamily:
-      Platform.OS === "ios"
-        ? "HelveticaNeue-CondensedBlack"
-        : "RobotoCondensed-Bold",
+    color: BRAND.accent,
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: 1.2,
   },
 
   astraTagline: {
-    color: "#9CA3AF",
+    color: BRAND.muted,
     fontSize: 11.5,
-    fontWeight: "500",
-    letterSpacing: 0.8,
-    marginTop: -1,
-    fontFamily:
-      Platform.OS === "ios" ? "HelveticaNeue-Medium" : "Roboto-Medium",
+    fontWeight: "700",
+    marginTop: 1,
+  },
+
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: BRAND.card,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   messagesBox: {
     flex: 1,
-    marginTop: 6,
+    marginTop: 10,
     marginBottom: 8,
-    minHeight: 80,
   },
-  scroll: { flexGrow: 0 },
+
+  scroll: {
+    flex: 1,
+  },
 
   userBubble: {
     alignSelf: "flex-end",
-    backgroundColor: "#00E396",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 14,
+    backgroundColor: BRAND.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 16,
     marginVertical: 4,
-    maxWidth: "80%",
+    maxWidth: "82%",
   },
-  userText: { color: "#052e16", fontWeight: "600", fontSize: 12 },
+
+  userText: {
+    color: BRAND.bg,
+    fontWeight: "800",
+    fontSize: 12.5,
+    lineHeight: 17,
+  },
 
   botBubble: {
     alignSelf: "flex-start",
-    backgroundColor: "#0B1120",
+    backgroundColor: BRAND.card,
     borderWidth: 1,
-    borderColor: "#1F2937",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 14,
+    borderColor: BRAND.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
     marginVertical: 4,
-    maxWidth: "90%",
+    maxWidth: "92%",
   },
-  botText: { color: "#E5E7EB", fontSize: 12, lineHeight: 17 },
+
+  botText: {
+    color: BRAND.text,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
 
   typingBubble: {
     alignSelf: "flex-start",
-    backgroundColor: "#0B1120",
-    borderColor: "#1F2937",
+    backgroundColor: BRAND.card,
+    borderColor: BRAND.border,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 16,
     marginTop: 6,
   },
-  dotsRow: { flexDirection: "row", gap: 4 },
-  dot: { width: 5, height: 5, backgroundColor: "#9CA3AF", borderRadius: 3 },
+
+  dotsRow: {
+    flexDirection: "row",
+    columnGap: 4,
+  },
+
+  dot: {
+    width: 5,
+    height: 5,
+    backgroundColor: BRAND.sub,
+    borderRadius: 3,
+  },
 
   starterBlock: {
-    marginTop: 10,
-  },
-  starterHeader: {
-    color: "#9CA3AF",
-    fontSize: 11,
-    marginBottom: 6,
-  },
-  starterChipColumn: {
-    marginBottom: 8,
-  },
-  starterChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: "#0F172A",
-    borderWidth: 1,
-    borderColor: "#1F2937",
-    marginBottom: 6,
-  },
-  starterChipText: {
-    color: "#E5E7EB",
-    fontSize: 12,
+    marginTop: 12,
   },
 
-  promptHeader: {
-    color: "#9CA3AF",
+  followupArea: {
+    marginBottom: 8,
+  },
+
+  chipHeader: {
+    color: BRAND.muted,
     fontSize: 11,
+    fontWeight: "800",
     marginBottom: 6,
   },
-  chipColumn: {
-    marginBottom: 10,
-  },
+
   chip: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    columnGap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: "#0F172A",
+    backgroundColor: BRAND.card,
     borderWidth: 1,
-    borderColor: "#1F2937",
+    borderColor: BRAND.border,
     marginBottom: 6,
   },
-  chipText: { color: "#E5E7EB", fontSize: 11 },
+
+  chipText: {
+    color: BRAND.text,
+    fontSize: 12,
+    fontWeight: "700",
+    flexShrink: 1,
+  },
 
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: 6,
   },
+
   input: {
     flex: 1,
-    backgroundColor: "#020617",
+    backgroundColor: BRAND.card,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#1F2937",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    color: "#E5E7EB",
-    fontSize: 12,
+    borderColor: BRAND.border,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    color: BRAND.text,
+    fontSize: 12.5,
     marginRight: 8,
   },
+
   sendBtn: {
-    width: 34,
-    height: 34,
-    backgroundColor: "#00E396",
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    backgroundColor: BRAND.accent,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
   },
+
+  sendDisabled: {
+    backgroundColor: "#374151",
+  },
+
   disclaimerText: {
-  color: "#6B7280",
-  fontSize: 10.5,
-  lineHeight: 14,
-  textAlign: "center",
-  marginBottom: 4,
-},
-answerCardsWrap: {
-  marginTop: 8,
+    color: BRAND.muted,
+    fontSize: 10.5,
+    lineHeight: 14,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+
+  answerCardsWrap: {
+    marginTop: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  answerCard: {
+    width: "48%",
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    borderRadius: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+  },
+
+  answerCardTitle: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    marginBottom: 3,
+    fontWeight: "700",
+  },
+
+  answerCardValue: {
+    color: BRAND.accent,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  answerCardSubtitle: {
+    color: BRAND.sub,
+    fontSize: 10.5,
+    lineHeight: 14,
+    marginTop: 3,
+  },
+  headerActions: {
   flexDirection: "row",
-  flexWrap: "wrap",
-  gap: 8,
+  alignItems: "center",
+  columnGap: 8,
 },
 
-answerCard: {
-  width: "48%",
-  backgroundColor: "#020617",
+clearBtn: {
+  paddingHorizontal: 10,
+  height: 34,
+  borderRadius: 17,
+  backgroundColor: BRAND.card,
   borderWidth: 1,
-  borderColor: "#1F2937",
-  borderRadius: 12,
-  paddingHorizontal: 9,
-  paddingVertical: 8,
+  borderColor: BRAND.border,
+  alignItems: "center",
+  justifyContent: "center",
 },
 
-answerCardTitle: {
-  color: "#9CA3AF",
-  fontSize: 10.5,
-  marginBottom: 3,
-},
-
-answerCardValue: {
-  color: "#00E396",
-  fontSize: 13,
+clearText: {
+  color: BRAND.muted,
+  fontSize: 11,
   fontWeight: "800",
-},
-
-answerCardSubtitle: {
-  color: "#E5E7EB",
-  fontSize: 10.5,
-  lineHeight: 14,
-  marginTop: 3,
 },
 });

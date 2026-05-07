@@ -34,24 +34,14 @@ import {
   removeFromWatchlist,
 } from "../services/watchlistService";
 
-
-/* ================= BRAND ================= */
-const BRAND = {
-  bg: "#000",
-  card: "#111827",
-  border: "#1F2937",
-  text: "#FFF",
-  sub: "#9CA3AF",
-  accent: "#00E396",
-  red: "#FF4560",
-  amber: "#FEB019",
-};
-
+import { BRAND } from "../constants/theme";
 const fmt = (v) =>
   typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "--";
 
 const fmtPct = (v) =>
-  typeof v === "number" && !Number.isNaN(v) ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%` : "--";
+  typeof v === "number" && !Number.isNaN(v)
+    ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
+    : "--";
 
 const fmtDateTime = (ts) => {
   if (!ts) return "";
@@ -69,16 +59,20 @@ const fmtDateTime = (ts) => {
   }
 };
 
+const displayRating = (signal) => {
+  if (signal === "BUY") return "Bullish";
+  if (signal === "SELL") return "Bearish";
+  return "Neutral";
+};
 const signalColor = (signal) =>
   signal === "BUY" ? BRAND.accent : signal === "SELL" ? BRAND.red : BRAND.amber;
-
 
 const fmtChange = (v) =>
   typeof v === "number" && !Number.isNaN(v)
     ? `${v >= 0 ? "+" : ""}$${Math.abs(v).toFixed(2)}`
     : "--";
 
-    function getPatternColor(winRate) {
+function getPatternColor(winRate) {
   if (typeof winRate !== "number") return "#374151"; // neutral gray
   if (winRate >= 0.7) return "#16A34A"; // strong green
   if (winRate >= 0.6) return "#22C55E"; // green
@@ -93,7 +87,6 @@ function formatPatternLabel(pattern, winRate) {
   }
   return pattern;
 }
-
 
 export default function WatchlistScreen({ navigation }) {
   const user = auth.currentUser;
@@ -111,30 +104,34 @@ export default function WatchlistScreen({ navigation }) {
 
   // Pin + Notes (local UX polish)
   const [pinned, setPinned] = useState({});
-  const [noteModal, setNoteModal] = useState({ visible: false, symbol: "", text: "" });
+  const [noteModal, setNoteModal] = useState({
+    visible: false,
+    symbol: "",
+    text: "",
+  });
 
   const fadeAnim = useState(new Animated.Value(0))[0];
   const swipeRefs = useRef({});
 
   // Enable LayoutAnimation on Android
   useEffect(() => {
-    if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+    if (
+      Platform.OS === "android" &&
+      UIManager.setLayoutAnimationEnabledExperimental
+    ) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
 
+    const t = setInterval(() => {
+      loadWatchlist({ silent: true }); // snapshot-aware, TTL-safe
+    }, 30000); // align with snapshot TTL
 
-useEffect(() => {
-  if (!user) return;
-
-  const t = setInterval(() => {
-    loadWatchlist({ silent: true }); // snapshot-aware, TTL-safe
-  }, 30000); // align with snapshot TTL
-
-  return () => clearInterval(t);
-}, [user]);
-
+    return () => clearInterval(t);
+  }, [user]);
 
   /* ================= PINS STORAGE ================= */
   const pinsKey = user ? `watchlist_pins_${user.uid}` : null;
@@ -163,66 +160,63 @@ useEffect(() => {
   }, [pinsKey]);
 
   /* ================= LOAD SNAPSHOT ================= */
-const loadWatchlist = async ({ silent = false } = {}) => {
-  if (!user) return;
+  const loadWatchlist = async ({ silent = false } = {}) => {
+    if (!user) return;
 
-  try {
-    if (!silent) setRefreshing(true);
+    try {
+      if (!silent) setRefreshing(true);
 
-    const res = await getWatchlistScreen(user.uid);
-    const list = res?.items || [];
+      const res = await getWatchlistScreen(user.uid);
+      const list = res?.items || [];
 
-    setItems(list);
+      setItems(list);
+      setLastSync(new Date());
 
-// 🔥 allow render to commit before animating
-requestAnimationFrame(() => {
-  list.forEach((it) => {
-    const sym = it.symbol;
-    const price = it.price;
+      // 🔥 allow render to commit before animating
+      requestAnimationFrame(() => {
+        list.forEach((it) => {
+          const sym = it.symbol;
+          const price = it.price;
 
-    if (!priceFlash[sym]) {
-      priceFlash[sym] = new Animated.Value(0);
+          if (!priceFlash[sym]) {
+            priceFlash[sym] = new Animated.Value(0);
+          }
+
+          if (it.needs_refresh) {
+            prevPrices[sym] = price;
+            return;
+          }
+
+          if (prevPrices[sym] == null) {
+            prevPrices[sym] = price;
+            return;
+          }
+
+          // 👇 tolerance instead of strict equality
+          if (Math.abs(price - prevPrices[sym]) < 0.005) return;
+
+          priceFlash[sym].setValue(1);
+          Animated.timing(priceFlash[sym], {
+            toValue: 0,
+            duration: 900,
+            useNativeDriver: false,
+          }).start();
+
+          prevPrices[sym] = price;
+        });
+      });
+    } catch {
+      if (!silent) showToast("Failed to refresh watchlist");
+    } finally {
+      if (!silent) setRefreshing(false);
     }
-
-    if (it.needs_refresh) {
-      prevPrices[sym] = price;
-      return;
-    }
-
-    if (prevPrices[sym] == null) {
-      prevPrices[sym] = price;
-      return;
-    }
-
-    // 👇 tolerance instead of strict equality
-    if (Math.abs(price - prevPrices[sym]) < 0.005) return;
-
-    priceFlash[sym].setValue(1);
-    Animated.timing(priceFlash[sym], {
-      toValue: 0,
-      duration: 900,
-      useNativeDriver: false,
-    }).start();
-
-    prevPrices[sym] = price;
-  });
-});
-
-
-  } catch {
-    if (!silent) showToast("Failed to refresh watchlist");
-  } finally {
-    if (!silent) setRefreshing(false);
-  }
-};
-
-
+  };
 
   useFocusEffect(
     useCallback(() => {
       loadWatchlist();
       loadPins();
-    }, [user])
+    }, [user]),
   );
 
   /* ================= SEARCH ================= */
@@ -236,7 +230,9 @@ requestAnimationFrame(() => {
     }
 
     try {
-      const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(up)}`);
+      const res = await fetch(
+        `${API_BASE_URL}/search?q=${encodeURIComponent(up)}`,
+      );
       const json = await res.json();
 
       // dedupe by symbol to avoid "duplicate key" warnings
@@ -301,43 +297,43 @@ requestAnimationFrame(() => {
   };
 
   /* ================= SORT ================= */
-      const sortedItems = [...items].sort((a, b) => {
-      // pinned first
-      const ap = pinned[a.symbol] ? 1 : 0;
-      const bp = pinned[b.symbol] ? 1 : 0;
-      if (ap !== bp) return bp - ap;
+  const sortedItems = [...items].sort((a, b) => {
+    // pinned first
+    const ap = pinned[a.symbol] ? 1 : 0;
+    const bp = pinned[b.symbol] ? 1 : 0;
+    if (ap !== bp) return bp - ap;
 
-      if (sortMode === "confidence") {
-        return (b.hybridScore || 0) - (a.hybridScore || 0);
-      }
+    if (sortMode === "confidence") {
+      return (b.hybridScore || 0) - (a.hybridScore || 0);
+    }
 
-      if (sortMode === "alpha") {
-        return (a.symbol || "").localeCompare(b.symbol || "");
-      }
+    if (sortMode === "alpha") {
+      return (a.symbol || "").localeCompare(b.symbol || "");
+    }
 
-      if (sortMode === "signal") {
-        const order = { BUY: 1, HOLD: 2, SELL: 3 };
-        return (order[a.hybridSignal] || 99) - (order[b.hybridSignal] || 99);
-      }
+    if (sortMode === "signal") {
+      const order = { BUY: 1, HOLD: 2, SELL: 3 };
+      return (order[a.hybridSignal] || 99) - (order[b.hybridSignal] || 99);
+    }
 
-      return 0;
-    });
+    return 0;
+  });
 
-const pinnedItems = sortedItems.filter(i => pinned[i.symbol]);
-const normalItems = sortedItems.filter(i => !pinned[i.symbol]);
-const displayList = [
-  ...(pinnedItems.length
-    ? [{ __type: "header", title: "Pinned" }, ...pinnedItems]
-    : []),
+  const pinnedItems = sortedItems.filter((i) => pinned[i.symbol]);
+  const normalItems = sortedItems.filter((i) => !pinned[i.symbol]);
+  const displayList = [
+    ...(pinnedItems.length
+      ? [{ __type: "header", title: "Pinned" }, ...pinnedItems]
+      : []),
 
-  ...(pinnedItems.length && normalItems.length
-    ? [{ __type: "divider" }]
-    : []),
+    ...(pinnedItems.length && normalItems.length
+      ? [{ __type: "divider" }]
+      : []),
 
-  ...(normalItems.length
-    ? [{ __type: "header", title: "Watchlist" }, ...normalItems]
-    : []),
-];
+    ...(normalItems.length
+      ? [{ __type: "header", title: "Watchlist" }, ...normalItems]
+      : []),
+  ];
 
   const toggleSortModal = () => {
     const next = !sortVisible;
@@ -368,29 +364,28 @@ const displayList = [
   };
 
   const timeAgoFrom = (ts) => {
-  if (!ts) return "";
-  const diff = Date.now() - new Date(ts).getTime();
-  const sec = Math.floor(diff / 1000);
-  const min = Math.floor(sec / 60);
+    if (!ts) return "";
+    const diff = Date.now() - new Date(ts).getTime();
+    const sec = Math.floor(diff / 1000);
+    const min = Math.floor(sec / 60);
 
-  if (sec < 30) return "Live";
-  if (min < 1) return `${sec}s ago`;
-  if (min < 60) return `${min}m ago`;
-  return fmtDateTime(ts); // fallback
-};
+    if (sec < 30) return "Live";
+    if (min < 1) return `${sec}s ago`;
+    if (min < 60) return `${min}m ago`;
+    return fmtDateTime(ts); // fallback
+  };
 
   const timeAgo = () => {
-  const diffMs = Date.now() - lastSync.getTime();
-  const sec = Math.floor(diffMs / 1000);
-  const min = Math.floor(sec / 60);
-  const hr = Math.floor(min / 60);
+    const diffMs = Date.now() - lastSync.getTime();
+    const sec = Math.floor(diffMs / 1000);
+    const min = Math.floor(sec / 60);
+    const hr = Math.floor(min / 60);
 
-  if (sec < 15) return "Just now";
-  if (min < 1) return `${sec}s ago`;
-  if (min < 60) return `${min}m ago`;
-  return `${hr}h ago`;
-};
-
+    if (sec < 15) return "Just now";
+    if (min < 1) return `${sec}s ago`;
+    if (min < 60) return `${min}m ago`;
+    return `${hr}h ago`;
+  };
 
   /* ================= LONG PRESS ACTIONS ================= */
   const togglePin = async (sym) => {
@@ -440,9 +435,16 @@ const displayList = [
       const choice = actions[idx];
       if (choice === "Pin" || choice === "Unpin") togglePin(sym);
       else if (choice === "Add Alert") {
-        navigation.navigate("AddAlertScreen", { symbol: sym });
-      }
-      else if (choice === "Notes") openNotes(sym);
+        navigation.navigate("AddAlertScreen", {
+          symbol: item.symbol,
+          companyName: item.companyName || item.symbol,
+          price: item.price,
+          change: item.change,
+          changePct: item.changePct,
+          session: item.session,
+          quoteUpdatedAt: item.quote_updated_at,
+        });
+      } else if (choice === "Notes") openNotes(sym);
       else if (choice === "Remove") optimisticRemove(sym);
     };
 
@@ -454,13 +456,30 @@ const displayList = [
           destructiveButtonIndex: actions.indexOf("Remove"),
           title: sym,
         },
-        handler
+        handler,
       );
     } else {
       Alert.alert(sym, "Actions", [
         { text: pinnedNow ? "Unpin" : "Pin", onPress: () => togglePin(sym) },
+        {
+          text: "Add Alert",
+          onPress: () =>
+            navigation.navigate("AddAlertScreen", {
+              symbol: item.symbol,
+              companyName: item.companyName || item.symbol,
+              price: item.price,
+              change: item.change,
+              changePct: item.changePct,
+              session: item.session,
+              quoteUpdatedAt: item.quote_updated_at,
+            }),
+        },
         { text: "Notes", onPress: () => openNotes(sym) },
-        { text: "Remove", style: "destructive", onPress: () => optimisticRemove(sym) },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => optimisticRemove(sym),
+        },
         { text: "Cancel", style: "cancel" },
       ]);
     }
@@ -480,31 +499,31 @@ const displayList = [
 
   /* ================= RENDER ITEM ================= */
   const renderItem = ({ item, index }) => {
-    if (item.__type === "header") { 
-    return (
-      <Text
-      style={[
-        styles.sectionHeader,
-        index === 0 && { marginTop: 6 }, // 👈 reduce top gap for first header
-      ]}
-    >
-      {item.title}
-    </Text>
-    );
+    if (item.__type === "header") {
+      return (
+        <Text
+          style={[
+            styles.sectionHeader,
+            index === 0 && { marginTop: 6 }, // 👈 reduce top gap for first header
+          ]}
+        >
+          {item.title}
+        </Text>
+      );
     }
 
-  if (item.__type === "divider") {
-    return <View style={styles.sectionDivider} />;
-  }
-  // session comes from service (LIVE | LAST)
-const session = item.session;
+    if (item.__type === "divider") {
+      return <View style={styles.sectionDivider} />;
+    }
+    // session comes from service (LIVE | LAST)
+    const session = item.session;
 
-// flattened quote fields
-const price = item.price;
-const change = item.change;
-const changePct = item.changePct;
+    // flattened quote fields
+    const price = item.price;
+    const change = item.change;
+    const changePct = item.changePct;
 
-const isLive = session === "LIVE";
+    const isLive = session === "LIVE";
 
     // 🔧 normalize bullbrain fields (watchlist-safe)
     const signal = item.bullbrain?.signal || "HOLD";
@@ -527,152 +546,141 @@ const isLive = session === "LIVE";
         overshootRight={false}
       >
         <TouchableOpacity
-        activeOpacity={0.85}
-        style={styles.card}
-        onPress={() => openDetails(item)}
-        onLongPress={() => onLongPressItem(item)}
-      >
-            {/* HEADER */}
-            <View style={styles.cardHeader}>
+          activeOpacity={0.85}
+          style={styles.card}
+          onPress={() => openDetails(item)}
+          onLongPress={() => onLongPressItem(item)}
+        >
+          {/* HEADER */}
+          <View style={styles.cardHeader}>
+            {/* LEFT — Symbol + Company */}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.symbol}>{item.symbol}</Text>
+              <Text style={styles.name}>{item.companyName || item.symbol}</Text>
+            </View>
 
-              {/* LEFT — Symbol + Company */}
-              <View style={{ flex: 1 }}>
-                <Text style={styles.symbol}>{item.symbol}</Text>
-                <Text style={styles.name}>
-                  {item.companyName || item.symbol}
-                </Text>
-              </View>
+            {/* {/* RIGHT — Price + Change */}
+            <View style={styles.priceBlock}>
+              <Animated.Text
+                style={[
+                  styles.price,
+                  {
+                    color:
+                      session === "LIVE"
+                        ? changePct >= 0
+                          ? BRAND.accent
+                          : BRAND.red
+                        : BRAND.sub,
 
-              {/* {/* RIGHT — Price + Change */}
-                <View style={styles.priceBlock}>
-                 <Animated.Text
+                    backgroundColor: priceFlash[item.symbol]?.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [
+                        "transparent",
+                        changePct >= 0
+                          ? "rgba(0,227,150,0.30)"
+                          : "rgba(255,69,96,0.30)",
+                      ],
+                    }),
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 8,
+                  },
+                ]}
+              >
+                ${fmt(price)}
+              </Animated.Text>
+
+              {(() => {
+                const isLive = item.session === "LIVE";
+
+                const change =
+                  typeof item.change === "number" ? item.change : null;
+                const pct =
+                  typeof item.changePct === "number" ? item.changePct : null;
+
+                if (change == null || pct == null) {
+                  return (
+                    <Text style={[styles.changePct, { color: BRAND.sub }]}>
+                      -- {session || ""}
+                    </Text>
+                  );
+                }
+
+                const isUp = pct >= 0;
+
+                return (
+                  <Text
                     style={[
-                      styles.price,
+                      styles.changePct,
                       {
-                        color:
-                          session === "LIVE"
-                            ? changePct >= 0
-                              ? BRAND.accent
-                              : BRAND.red
-                            : BRAND.sub,
-
-                        backgroundColor: priceFlash[item.symbol]?.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [
-                            "transparent",
-                            changePct >= 0
-                              ? "rgba(0,227,150,0.30)"
-                              : "rgba(255,69,96,0.30)",
-                          ],
-                        }),
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                        borderRadius: 8,
-
+                        color: isLive
+                          ? isUp
+                            ? BRAND.accent
+                            : BRAND.red
+                          : BRAND.sub,
+                        opacity: isLive ? 1 : 0.75,
                       },
                     ]}
                   >
-                    ${fmt(price)}
-                  </Animated.Text>
+                    {isUp ? "▲" : "▼"} ${Math.abs(change).toFixed(2)} (
+                    {isUp ? "+" : "-"}
+                    {Math.abs(pct).toFixed(2)}%) {session}
+                  </Text>
+                );
+              })()}
+            </View>
+          </View>
 
-{(() => {
-  const isLive = item.session === "LIVE";
-
-const change =
-  typeof item.change === "number" ? item.change : null;
-const pct =
-  typeof item.changePct === "number" ? item.changePct : null;
-
-
-  if (change == null || pct == null) {
-    return (
-      <Text style={[styles.changePct, { color: BRAND.sub }]}>
-        -- {session || ""}
-      </Text>
-    );
-  }
-
-  const isUp = pct >= 0;
-
-  return (
-    <Text
-      style={[
-        styles.changePct,
-        {
-          color: isLive
-            ? isUp
-              ? BRAND.accent
-              : BRAND.red
-            : BRAND.sub,
-          opacity: isLive ? 1 : 0.75,
-        },
-      ]}
-    >
-      {isUp ? "▲" : "▼"} ${Math.abs(change).toFixed(2)} (
-      {isUp ? "+" : "-"}
-      {Math.abs(pct).toFixed(2)}%) {session}
-    </Text>
-  );
-})()}
-
-              
-                </View>
-
+          {/* SIGNAL ROW */}
+          <View style={styles.signalRow}>
+            <View
+              style={[
+                styles.signalBadge,
+                { backgroundColor: signalColor(item.hybridSignal) },
+              ]}
+            >
+              <Text style={styles.signalText}>
+                {displayRating(item.hybridSignal || "HOLD")}
+              </Text>
             </View>
 
+            <Text
+              style={[
+                styles.confInline,
+                { color: signalColor(item.hybridSignal) },
+              ]}
+            >
+              {Math.round(item.bullbrain?.confidence ?? 0)}% confidence
+            </Text>
+          </View>
 
+          <View style={styles.cardDivider} />
 
-  {/* SIGNAL ROW */}
-<View style={styles.signalRow}>
-  <View
-    style={[
-      styles.signalBadge,
-      { backgroundColor: signalColor(item.hybridSignal) },
-    ]}
-  >
-    <Text style={styles.signalText}>
-      {item.hybridSignal || "HOLD"}
-    </Text>
-  </View>
+          {/* SUMMARY */}
 
-  <Text style={styles.confLabel}>Confidence</Text>
-  <Text
-    style={[
-      styles.confValue,
-      { color: signalColor(item.hybridSignal) },
-    ]}
-  >
-    {Math.round(item.bullbrain?.confidence ?? 0)}%
-  </Text>
-</View>
+          {!!item.watchlistSummary && (
+            <Text style={styles.summary} numberOfLines={3}>
+              {item.watchlistSummary}
+            </Text>
+          )}
+          {/* SMART PATTERN */}
+          {!!patternName && (
+            <View style={styles.patternRow}>
+              <Text style={styles.patternLabel}>Pattern</Text>
+              <Text style={styles.patternValue}>
+                {formatPatternLabel(patternName, patternWinRate)}
+              </Text>
+            </View>
+          )}
 
-
-  {/* SUMMARY */}
-
-{!!item.watchlistSummary && (
-  <Text style={styles.summary}>
-    {item.watchlistSummary}
-  </Text>
-)}
-{/* SMART PATTERN */}
-<View
-  style={[
-    styles.patternBadge,
-    { backgroundColor: getPatternColor(patternWinRate) },
-  ]}
->
-  <Text style={styles.patternText}>
-    {formatPatternLabel(patternName, patternWinRate)}
-  </Text>
-</View>
-
-  {/* UPDATED */}
-  <Text style={styles.lastUpdated}>
-    {timeAgoFrom(item.quote_updated_at)}
-  </Text>
-</TouchableOpacity>
-
-
+          {/* UPDATED */}
+          <View style={styles.cardFooterRow}>
+            <Text style={styles.lastUpdated}>
+              {timeAgoFrom(item.quote_updated_at)}
+            </Text>
+            <Text style={styles.tapHint}>Tap for details</Text>
+          </View>
+        </TouchableOpacity>
       </Swipeable>
     );
   };
@@ -681,7 +689,7 @@ const pct =
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Your Watchlist</Text>
-        <Text style={styles.headerSubtitle}>AI-Powered Market Tracking</Text>
+        <Text style={styles.headerSubtitle}>AI-Powered Watchlist Tracking</Text>
       </View>
 
       <Text style={styles.syncText}>Last synced: {timeAgo()}</Text>
@@ -717,7 +725,11 @@ const pct =
               style={styles.suggestionRow}
               activeOpacity={0.85}
             >
-              <Ionicons name="trending-up-outline" size={16} color={BRAND.sub} />
+              <Ionicons
+                name="trending-up-outline"
+                size={16}
+                color={BRAND.sub}
+              />
               <Text style={styles.suggestionText}>
                 {s.symbol} – {s.desc}
               </Text>
@@ -732,7 +744,9 @@ const pct =
         </TouchableOpacity>
         <Text style={styles.trackedText}>{items.length} tracked</Text>
       </View>
-
+      <Text style={styles.helperText}>
+        Long press a stock for alerts, notes, pin, or remove.
+      </Text>
       <FlatList
         data={displayList}
         keyExtractor={(item, index) => `${item.symbol}-${index}`} // ✅ safe, avoids duplicate key issues
@@ -744,20 +758,38 @@ const pct =
             onRefresh={() => loadWatchlist({ silent: false })}
           />
         }
-
         contentContainerStyle={{ paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="bookmark-outline" size={56} color="#333" />
             <Text style={styles.emptyTitle}>Your watchlist is empty</Text>
-            <Text style={styles.emptyText}>Search for a stock and tap + to track it.</Text>
+            <Text style={styles.emptyText}>
+              Search for a stock and tap + to track it.
+            </Text>
+          </View>
+        }
+        ListFooterComponent={
+          <View style={styles.footerWrap}>
+            <Text style={styles.footerText}>
+              Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
+            </Text>
+
+            <Text style={styles.disclaimer}>
+              Watchlist prices, AI ratings, alerts, and market context are
+              provided for informational and educational purposes only and are
+              not financial, investment, trading, or tax advice.
+            </Text>
           </View>
         }
       />
 
       <Modal transparent visible={sortVisible} animationType="none">
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={toggleSortModal}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={toggleSortModal}
+        >
           <Animated.View
             style={[
               styles.sortBox,
@@ -775,13 +807,36 @@ const pct =
             ]}
           >
             <TouchableOpacity onPress={() => selectSort("confidence")}>
-              <Text style={styles.sortOption}>Confidence (High to Low)</Text>
+              <Text
+                style={[
+                  styles.sortOption,
+                  sortMode === "confidence" && styles.sortOptionActive,
+                ]}
+              >
+                Confidence (High to Low)
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity onPress={() => selectSort("alpha")}>
-              <Text style={styles.sortOption}>Alphabetical (A to Z)</Text>
+              <Text
+                style={[
+                  styles.sortOption,
+                  sortMode === "alpha" && styles.sortOptionActive,
+                ]}
+              >
+                Alphabetical (A to Z)
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity onPress={() => selectSort("signal")}>
-              <Text style={styles.sortOption}>Signal (BUY to SELL)</Text>
+              <Text
+                style={[
+                  styles.sortOption,
+                  sortMode === "signal" && styles.sortOptionActive,
+                ]}
+              >
+                AI Rating
+              </Text>
             </TouchableOpacity>
           </Animated.View>
         </TouchableOpacity>
@@ -802,13 +857,20 @@ const pct =
             />
             <View style={styles.noteBtns}>
               <TouchableOpacity
-                onPress={() => setNoteModal({ visible: false, symbol: "", text: "" })}
+                onPress={() =>
+                  setNoteModal({ visible: false, symbol: "", text: "" })
+                }
                 style={[styles.noteBtn, { backgroundColor: BRAND.border }]}
               >
                 <Text style={styles.noteBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={saveNotes} style={[styles.noteBtn, { backgroundColor: BRAND.accent }]}>
-                <Text style={[styles.noteBtnText, { color: "#000" }]}>Save</Text>
+              <TouchableOpacity
+                onPress={saveNotes}
+                style={[styles.noteBtn, { backgroundColor: BRAND.accent }]}
+              >
+                <Text style={[styles.noteBtnText, { color: "#000" }]}>
+                  Save
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -827,9 +889,11 @@ const pct =
 /* ================= STYLES ================= */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BRAND.bg },
+
   header: { paddingTop: 56, alignItems: "center", marginBottom: 4 },
   headerTitle: { color: BRAND.accent, fontSize: 21, fontWeight: "800" },
   headerSubtitle: { color: BRAND.sub, fontSize: 11, marginTop: 2 },
+
   syncText: { textAlign: "center", color: BRAND.sub, fontSize: 11 },
 
   addRow: {
@@ -843,7 +907,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BRAND.border,
   },
-  input: { flex: 1, color: BRAND.text, fontSize: 13, paddingVertical: 10 },
+
+  input: {
+    flex: 1,
+    color: BRAND.text,
+    fontSize: 13,
+    paddingVertical: 10,
+  },
+
   addBtn: {
     backgroundColor: BRAND.accent,
     borderRadius: 8,
@@ -862,6 +933,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     overflow: "hidden",
   },
+
   suggestionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -870,7 +942,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#0B1220",
   },
-  suggestionText: { color: "#D1D5DB", fontSize: 13, marginLeft: 8 },
+
+  suggestionText: {
+    color: "#D1D5DB",
+    fontSize: 13,
+    marginLeft: 8,
+  },
 
   sortRow: {
     flexDirection: "row",
@@ -879,83 +956,199 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     marginBottom: 4,
   },
-  trackedText: { color: BRAND.sub, fontSize: 10, marginLeft: 4 },
 
+  trackedText: {
+    color: BRAND.sub,
+    fontSize: 10,
+    marginLeft: 4,
+  },
 
+  helperText: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    textAlign: "center",
+    marginBottom: 6,
+    fontWeight: "700",
+  },
 
-  cardHead: {
+  card: {
+    backgroundColor: BRAND.card,
+    borderRadius: 16,
+    padding: 12,
+    marginHorizontal: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+  },
+
+  cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
 
- 
-  company: { marginTop: 1, fontSize: 12, color: BRAND.sub },
-
-  badge: {
-    marginLeft: 10,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  symbol: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontWeight: "700",
   },
-  badgeText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.6 },
 
-  priceRow: { marginTop: 6, flexDirection: "row", alignItems: "center" },
-  priceVal: { fontSize: 16, fontWeight: "800" },
-  priceDelta: { flexDirection: "row", alignItems: "center", marginLeft: 10 },
-  pct: { fontSize: 12, fontWeight: "700" },
-  dot: { color: BRAND.sub, marginHorizontal: 8, fontSize: 12 },
-  time: { color: BRAND.sub, fontSize: 12 },
-
-  signalLine: { marginTop: 4, fontSize: 12, fontWeight: "800" },
-
-  grokLine: {
-    marginTop: 4,
-    fontSize: 11,
+  name: {
     color: BRAND.sub,
-    fontStyle: "italic",
+    fontSize: 12,
+    marginTop: 2,
   },
 
-  confBarBg: {
-    backgroundColor: "#0B1220",
-    height: 3,
-    borderRadius: 4,
-    marginTop: 8,
-    overflow: "hidden",
-  },
-  confBarFill: { height: "100%", borderRadius: 4 },
-
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-start",
+  priceBlock: {
     alignItems: "flex-end",
-    paddingTop: 160,
-    paddingRight: 20,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    minWidth: 90,
   },
-  sortBox: {
-    backgroundColor: BRAND.card,
-    borderRadius: 10,
+
+  price: {
+    color: BRAND.text,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+
+  changePct: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  signalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+  },
+
+  signalBadge: {
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    marginRight: 8,
+  },
+
+  signalText: {
+    color: "#000",
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+
+  confInline: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  cardDivider: {
+    height: 1,
+    backgroundColor: BRAND.border,
+    marginTop: 6,
+    marginBottom: 6,
+    opacity: 0.65,
+  },
+
+  confLabel: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginRight: 4,
+  },
+
+  confValue: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  summary: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  patternRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    marginTop: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: 999,
+    backgroundColor: BRAND.card2,
     borderWidth: 1,
     borderColor: BRAND.border,
-    width: 230,
-    paddingVertical: 6,
   },
-  sortOption: {
-    color: "#E5E7EB",
-    fontSize: 13,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+  patternLabel: {
+    color: BRAND.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    marginRight: 6,
+    textTransform: "uppercase",
+  },
+  cardFooterRow: {
+    marginTop: 5,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
-  emptyState: { alignItems: "center", marginTop: 80 },
+  patternValue: {
+    color: BRAND.sub,
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
+  patternBadge: {
+    alignSelf: "flex-start",
+    marginTop: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+  },
+
+  patternText: {
+    color: "#000",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+  lastUpdated: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontWeight: "700",
+    opacity: 0.85,
+  },
+  tapHint: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontWeight: "700",
+  },
+  sectionHeader: {
+    marginHorizontal: 18,
+    marginTop: 10,
+    marginBottom: 6,
+    color: "#9CA3AF",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+
+  sectionDivider: {
+    height: 1,
+    backgroundColor: "#0B1220",
+    marginHorizontal: 18,
+    marginVertical: 10,
+  },
+
+  emptyState: {
+    alignItems: "center",
+    marginTop: 80,
+  },
+
   emptyTitle: {
     color: BRAND.text,
     fontSize: 16,
     fontWeight: "700",
     marginTop: 10,
   },
+
   emptyText: {
     color: BRAND.sub,
     fontSize: 12,
@@ -964,7 +1157,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
 
-  // Swipe delete
   swipeDelete: {
     width: 96,
     marginRight: 18,
@@ -974,9 +1166,44 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  swipeDeleteText: { color: "#fff", marginTop: 4, fontSize: 11, fontWeight: "800" },
 
-  // Notes modal
+  swipeDeleteText: {
+    color: "#fff",
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+    paddingTop: 160,
+    paddingRight: 20,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+
+  sortBox: {
+    backgroundColor: BRAND.card,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    width: 230,
+    paddingVertical: 6,
+  },
+
+  sortOption: {
+    color: "#E5E7EB",
+    fontSize: 13,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+
+  sortOptionActive: {
+    color: BRAND.accent,
+    fontWeight: "900",
+  },
+
   noteOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
@@ -984,6 +1211,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 16,
   },
+
   noteCard: {
     width: "100%",
     maxWidth: 520,
@@ -993,7 +1221,14 @@ const styles = StyleSheet.create({
     borderColor: BRAND.border,
     padding: 14,
   },
-  noteTitle: { color: "#E5E7EB", fontWeight: "900", fontSize: 14, marginBottom: 8 },
+
+  noteTitle: {
+    color: "#E5E7EB",
+    fontWeight: "900",
+    fontSize: 14,
+    marginBottom: 8,
+  },
+
   noteInput: {
     minHeight: 120,
     borderRadius: 12,
@@ -1004,172 +1239,47 @@ const styles = StyleSheet.create({
     backgroundColor: "#0B1220",
     textAlignVertical: "top",
   },
-  noteBtns: { flexDirection: "row", justifyContent: "flex-end", marginTop: 12 },
-  noteBtn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, marginLeft: 10 },
-  noteBtnText: { color: "#E5E7EB", fontWeight: "900" },
-  sectionHeader: {
-  marginHorizontal: 18,
-  marginTop: 10,
-  marginBottom: 6,
-  color: "#9CA3AF",
-  fontSize: 12,
-  fontWeight: "900",
-  letterSpacing: 1,
-  textTransform: "uppercase",
-},
 
-sectionDivider: {
-  height: 1,
-  backgroundColor: "#0B1220",
-  marginHorizontal: 18,
-  marginVertical: 10,
-},
-sessionBadge: {
-  marginLeft: 6,
-  paddingHorizontal: 6,
-  paddingVertical: 2,
-  borderRadius: 6,
-  backgroundColor: "#0B1220",
-  borderWidth: 1,
-  borderColor: BRAND.border,
-},
-sessionText: {
-  fontSize: 10,
-  fontWeight: "800",
-  color: BRAND.sub,
-},
-rowTop: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-},
+  noteBtns: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 12,
+  },
 
+  noteBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginLeft: 10,
+  },
 
-liveDotRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  marginTop: 2,
-},
+  noteBtnText: {
+    color: "#E5E7EB",
+    fontWeight: "900",
+  },
 
-liveDot: {
-  width: 6,
-  height: 6,
-  borderRadius: 3,
-  backgroundColor: "#00E396",
-  marginRight: 4,
-},
+  footerWrap: {
+    marginTop: 24,
+    marginBottom: 30,
+    paddingHorizontal: 22,
+    alignItems: "center",
+  },
 
-liveText: {
-  fontSize: 10,
-  color: "#9CA3AF",
-  fontWeight: "700",
-},
+  footerText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginBottom: 8,
+  },
 
-confText: {
-  marginLeft: 8,
-  fontSize: 12,
-  color: "#9CA3AF",
-  fontWeight: "600",
-},
-card: {
-  backgroundColor: BRAND.card,
-  borderRadius: 16,
-  padding: 12,
-  marginHorizontal: 10,
-  marginBottom: 8,
-  borderWidth: 1,
-  borderColor: BRAND.border,
-},
-cardHeader: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-},
+  footerBrand: {
+    color: BRAND.accent,
+    fontWeight: "600",
+  },
 
-symbol: {
-  color: BRAND.text,
-  fontSize: 16,
-  fontWeight: "700",
-},
-
-name: {
-  color: BRAND.sub,
-  fontSize: 12,
-  marginTop: 2,
-},
-
-price: {
-  color: BRAND.text,
-  fontSize: 15,
-  fontWeight: "600",
-},
-
-changePct: {
-  fontSize: 12,
-  fontWeight: "600",
-},
-
-signalRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  marginTop: 6,
-},
-
-signalBadge: {
-  borderRadius: 8,
-  paddingVertical: 4,
-  paddingHorizontal: 10,
-  marginRight: 10,
-},
-
-signalText: {
-  color: "#000",
-  fontSize: 12,
-  fontWeight: "700",
-},
-
-confLabel: {
-  color: BRAND.sub,
-  fontSize: 12,
-  marginRight: 4,
-},
-
-confValue: {
-  fontSize: 12,
-  fontWeight: "700",
-},
-
-summary: {
-  color: BRAND.sub,
-  fontSize: 12.5,
-  lineHeight: 18,
-  marginTop: 7,
-},
-lastUpdated: {
-  color: BRAND.sub,
-  fontSize: 11,
-  marginTop: 2,
-  fontStyle: "italic",
-  opacity: 0.7,
-},
-
-priceBlock: {
-  alignItems: "flex-end",
-  minWidth: 90, // keeps price aligned nicely
-},
-patternBadge: {
-  alignSelf: "flex-start",
-  marginTop: 6,
-  paddingVertical: 4,
-  paddingHorizontal: 10,
-  borderRadius: 999,
-},
-
-patternText: {
-  color: "#000",
-  fontSize: 11,
-  fontWeight: "700",
-  letterSpacing: 0.3,
-},
-
+  disclaimer: {
+    color: BRAND.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+  },
 });

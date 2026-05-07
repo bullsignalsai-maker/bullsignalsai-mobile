@@ -1,21 +1,28 @@
 // screens/SignupScreen.js
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   Alert,
   StyleSheet,
   Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Pressable,
+  StatusBar,
 } from "react-native";
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { setDoc, doc } from "firebase/firestore";
+import { Ionicons } from "@expo/vector-icons";
+
 import { auth, db } from "../firebaseConfig";
+import { BRAND } from "../constants/theme";
 
 export default function SignupScreen({ navigation }) {
   const [firstName, setFirstName] = useState("");
@@ -23,211 +30,289 @@ export default function SignupScreen({ navigation }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [bio, setBio] = useState("");
-  const [errors, setErrors] = useState({});
 
-  const validateInputs = () => {
-    const newErrors = {};
-    if (!firstName.trim()) newErrors.firstName = "First name is required";
-    if (!lastName.trim()) newErrors.lastName = "Last name is required";
-    if (!email.trim()) newErrors.email = "Email is required";
-    else if (!/^\S+@\S+\.\S+$/.test(email))
-      newErrors.email = "Invalid email format";
-    if (!password.trim()) newErrors.password = "Password is required";
-    else if (password.length < 6)
-      newErrors.password = "Password must be at least 6 characters";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  const [securePassword, setSecurePassword] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const lastNameRef = useRef(null);
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  const canSignup =
+    firstName.trim() &&
+    lastName.trim() &&
+    cleanEmail &&
+    password.length >= 6 &&
+    !loading;
 
   const handleSignup = async () => {
-    if (!validateInputs()) {
-      Alert.alert("Validation Error", "Please correct highlighted fields.");
+    if (!canSignup) {
+      Alert.alert("Incomplete Form", "Please fill all required fields.");
       return;
     }
 
     try {
-      // ✅ Create user in Firebase Auth
+      setLoading(true);
+      Keyboard.dismiss();
+
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        email,
+        cleanEmail,
         password
       );
+
       const user = userCredential.user;
 
-      // ✅ Store profile in Firestore
       await setDoc(doc(db, "users", user.uid), {
         firstName,
         lastName,
         bio,
-        email,
+        email: cleanEmail,
         createdAt: new Date().toISOString(),
       });
 
-      // ✅ Cache locally
       await AsyncStorage.setItem("userToken", user.email);
       await AsyncStorage.setItem(
         "profile_" + user.email,
-        JSON.stringify({ firstName, lastName, bio, email })
+        JSON.stringify({ firstName, lastName, bio, email: cleanEmail })
       );
 
-      Alert.alert("Success", "Account created successfully. Please log in.");
-      navigation.navigate("Login");
+      navigation.replace("Main");
     } catch (error) {
-      console.error("Signup Error:", error);
-      let msg = "Signup failed. Try again later.";
-      if (error.code === "auth/email-already-in-use")
-        msg = "Email already registered.";
-      else if (error.code === "auth/invalid-email")
-        msg = "Invalid email address.";
-      else if (error.code === "auth/weak-password")
-        msg = "Password too weak.";
-      Alert.alert("Error", msg);
+      console.warn("Signup failed:", error?.code);
+
+      Alert.alert(
+        "Signup Failed",
+        "Unable to create account. Please try again."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
+    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+      <KeyboardAvoidingView
+        style={styles.screen}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* LOGO + TITLE */}
-        <View style={styles.header}>
-          <Image
-            source={require("../assets/alpha-transparent.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>
-            Join Alphaclara and stay ahead with AI-powered market insights.
-          </Text>
-        </View>
+        <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
 
-        {/* INPUTS */}
-        <View style={styles.form}>
-          <TextInput
-            style={[styles.input, errors.firstName && styles.inputError]}
-            placeholder="First Name"
-            placeholderTextColor="#666"
-            value={firstName}
-            onChangeText={setFirstName}
-          />
-          {errors.firstName && (
-            <Text style={styles.errorText}>{errors.firstName}</Text>
-          )}
+        <ScrollView
+          contentContainerStyle={styles.wrapper}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* HEADER */}
+          <View style={styles.header}>
+            <Image
+              source={require("../assets/alpha-transparent.png")}
+              style={styles.logo}
+            />
+            <Text style={styles.title}>Alphaclara</Text>
+            <Text style={styles.subtitle}>Create account</Text>
+            <Text style={styles.tagline}>
+              Get started with AI-powered market intelligence.
+            </Text>
+          </View>
 
-          <TextInput
-            style={[styles.input, errors.lastName && styles.inputError]}
-            placeholder="Last Name"
-            placeholderTextColor="#666"
-            value={lastName}
-            onChangeText={setLastName}
-          />
-          {errors.lastName && (
-            <Text style={styles.errorText}>{errors.lastName}</Text>
-          )}
+          {/* FORM */}
+          <View style={styles.formCard}>
+            <TextInput
+              style={styles.input}
+              placeholder="First Name"
+              placeholderTextColor={BRAND.muted}
+              value={firstName}
+              onChangeText={setFirstName}
+              returnKeyType="next"
+              onSubmitEditing={() => lastNameRef.current?.focus()}
+            />
 
-          <TextInput
-            style={[styles.input, errors.email && styles.inputError]}
-            placeholder="Email"
-            placeholderTextColor="#666"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+            <TextInput
+              ref={lastNameRef}
+              style={styles.input}
+              placeholder="Last Name"
+              placeholderTextColor={BRAND.muted}
+              value={lastName}
+              onChangeText={setLastName}
+              returnKeyType="next"
+              onSubmitEditing={() => emailRef.current?.focus()}
+            />
 
-          <TextInput
-            style={[styles.input, errors.password && styles.inputError]}
-            placeholder="Password"
-            placeholderTextColor="#666"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-          {errors.password && (
-            <Text style={styles.errorText}>{errors.password}</Text>
-          )}
+            <TextInput
+              ref={emailRef}
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={BRAND.muted}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              textContentType="emailAddress"
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+            />
 
-          <TextInput
-            style={[styles.input, { height: 80 }]}
-            placeholder="Short Bio (Optional)"
-            placeholderTextColor="#666"
-            value={bio}
-            onChangeText={setBio}
-            multiline
-          />
-        </View>
+            <View style={styles.passwordWrap}>
+              <TextInput
+                ref={passwordRef}
+                style={styles.passwordInput}
+                placeholder="Password (min 6 chars)"
+                placeholderTextColor={BRAND.muted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={securePassword}
+                returnKeyType="done"
+              />
 
-        {/* SIGN UP BUTTON */}
-        <TouchableOpacity style={styles.button} onPress={handleSignup}>
-          <Text style={styles.buttonText}>Sign Up</Text>
-        </TouchableOpacity>
+              <Pressable onPress={() => setSecurePassword((v) => !v)}>
+                <Ionicons
+                  name={securePassword ? "eye-outline" : "eye-off-outline"}
+                  size={20}
+                  color={BRAND.sub}
+                />
+              </Pressable>
+            </View>
 
-        {/* FOOTER LINK */}
-        <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-          <Text style={styles.link}>Already have an account? Log In</Text>
-        </TouchableOpacity>
+            <TextInput
+              style={[styles.input, { height: 70 }]}
+              placeholder="Short Bio (optional)"
+              placeholderTextColor={BRAND.muted}
+              value={bio}
+              onChangeText={setBio}
+              multiline
+            />
 
-        <View style={{ height: 60 }} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <Pressable
+              style={({ pressed }) => [
+                styles.button,
+                !canSignup && styles.buttonDisabled,
+                pressed && canSignup && { opacity: 0.7 },
+              ]}
+              onPress={handleSignup}
+              disabled={!canSignup}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? "Creating…" : "Create Account"}
+              </Text>
+            </Pressable>
+
+            <Text style={styles.link} onPress={() => navigation.navigate("Login")}>
+              Already have an account?{" "}
+              <Text style={styles.linkHighlight}>Sign In</Text>
+            </Text>
+          </View>
+
+          {/* FOOTER */}
+          <View style={styles.footerWrap}>
+            <Text style={styles.footerText}>
+              By continuing, you agree to Alphaclara’s{" "}
+              <Text
+                style={styles.footerLink}
+                onPress={() => navigation.navigate("TermsOfUseScreen")}
+              >
+                Terms of Use
+              </Text>{" "}
+              and{" "}
+              <Text
+                style={styles.footerLink}
+                onPress={() => navigation.navigate("PrivacyPolicy")}
+              >
+                Privacy Policy
+              </Text>
+              .
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: "#000" },
-  container: {
+  screen: { flex: 1, backgroundColor: BRAND.bg },
+
+  wrapper: {
     flexGrow: 1,
-    backgroundColor: "#000",
-    padding: 20,
     justifyContent: "center",
+    paddingHorizontal: 22,
+    paddingTop: 50,
+    paddingBottom: 40,
   },
+
   header: { alignItems: "center", marginBottom: 20 },
-  logo: { width: 80, height: 80, marginBottom: 10 },
-  title: { color: "#00E396", fontSize: 28, fontWeight: "bold" },
-  subtitle: {
-    color: "#A3A3A3",
-    textAlign: "center",
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 4,
-  },
-  form: { marginTop: 20 },
-  input: {
-    backgroundColor: "#111",
-    color: "#FFF",
+  logo: { width: 70, height: 70 },
+  title: { color: BRAND.accent, fontSize: 26, fontWeight: "900" },
+  subtitle: { color: BRAND.text, fontSize: 20, fontWeight: "900" },
+  tagline: { color: BRAND.muted, fontSize: 12, textAlign: "center" },
+
+  formCard: {
+    backgroundColor: BRAND.card,
+    borderRadius: 20,
     padding: 16,
-    borderRadius: 12,
-    marginBottom: 10,
-    fontSize: 16,
     borderWidth: 1,
-    borderColor: "#1F2937",
+    borderColor: BRAND.border,
   },
-  inputError: { borderColor: "#EF4444" },
-  errorText: {
-    color: "#EF4444",
-    fontSize: 13,
-    marginBottom: 6,
-    marginLeft: 4,
+
+  input: {
+    backgroundColor: BRAND.card2,
+    borderRadius: 14,
+    padding: 14,
+    color: BRAND.text,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
   },
-  button: {
-    backgroundColor: "#00E396",
-    padding: 16,
-    borderRadius: 12,
+
+  passwordWrap: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 20,
+    backgroundColor: BRAND.card2,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    paddingHorizontal: 10,
+    marginBottom: 10,
   },
-  buttonText: { color: "#fff", fontWeight: "bold", fontSize: 18 },
+
+  passwordInput: {
+    flex: 1,
+    color: BRAND.text,
+    paddingVertical: 12,
+  },
+
+  button: {
+    backgroundColor: BRAND.accent,
+    padding: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    marginTop: 10,
+  },
+
+  buttonDisabled: {
+    backgroundColor: "#374151",
+  },
+
+  buttonText: {
+    color: BRAND.bg,
+    fontWeight: "900",
+  },
+
   link: {
-    color: "#00E396",
+    color: BRAND.sub,
     textAlign: "center",
-    marginTop: 20,
-    fontSize: 15,
+    marginTop: 16,
   },
+
+  linkHighlight: {
+    color: BRAND.accent,
+    fontWeight: "900",
+  },
+
+  footerWrap: { marginTop: 20, alignItems: "center" },
+  footerText: { color: BRAND.muted, fontSize: 11, textAlign: "center" },
+  footerLink: { color: BRAND.accent, fontWeight: "800" },
 });

@@ -32,7 +32,7 @@ import { registerForPushNotifications } from "./services/pushNotificationService
 import { auth } from "./firebaseConfig";
 import FullChartScreen from "./screens/FullChartScreen";
 import AddAlertScreen from "./screens/AddAlertScreen";
-
+import SupportScreen from "./screens/SupportScreen";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -52,11 +52,13 @@ function MainTabs() {
           const icons = {
             Home: "home-outline",
             Watchlist: "star-outline",
-            Portfolio: "wallet-outline",   // ⭐ NEW TAB ICON
+            Portfolio: "wallet-outline", // ⭐ NEW TAB ICON
             Market: "analytics-outline",
             Profile: "person-outline",
           };
-          return <Ionicons name={icons[route.name]} size={size} color={color} />;
+          return (
+            <Ionicons name={icons[route.name]} size={size} color={color} />
+          );
         },
       })}
     >
@@ -66,7 +68,7 @@ function MainTabs() {
       {/* ⭐ RENAMED NEWS → PORTFOLIO (placeholder for now) */}
       <Tab.Screen
         name="Portfolio"
-        component={PortfolioScreen} 
+        component={PortfolioScreen}
         options={{ title: "Portfolio" }}
       />
 
@@ -82,70 +84,68 @@ function MainTabs() {
   );
 }
 
-
 // === ROOT STACK ===
 export default function App() {
   const [initialRoute, setInitialRoute] = useState(null);
   const navigationRef = useRef(null);
-const isNavigationReady = useRef(false);
+  const isNavigationReady = useRef(false);
   const handleNotificationNavigation = (response) => {
-  const data = response?.notification?.request?.content?.data || {};
+    const data = response?.notification?.request?.content?.data || {};
 
-  const symbol = data?.symbol;
-  const type = data?.type;
+    const symbol = data?.symbol;
+    const type = data?.type;
 
-  // 1) Symbol alerts → Stock Detail
-  if (
-    symbol &&
-    (type === "watchlist_big_move" ||
-      type === "watchlist_signal_change" ||
-      type === "portfolio_position_big_move" ||
-      type === "portfolio_concentration_risk" ||
-      type === "portfolio_allocation_shift" ||
-      type === "portfolio_risk_loss_combo" ||
-      type === "watchlist_price_alert"
-  )
-  ) {
-    setTimeout(() => {
-      if (!isNavigationReady.current) return;
+    // 1) Symbol alerts → Stock Detail
+    if (
+      symbol &&
+      (type === "watchlist_big_move" ||
+        type === "watchlist_signal_change" ||
+        type === "portfolio_position_big_move" ||
+        type === "portfolio_concentration_risk" ||
+        type === "portfolio_allocation_shift" ||
+        type === "portfolio_risk_loss_combo" ||
+        type === "watchlist_price_alert")
+    ) {
+      setTimeout(() => {
+        if (!isNavigationReady.current) return;
 
-      navigationRef.current?.navigate("StockDetailScreen", {
-        symbol,
-        name: symbol,
-        source: "push_notification",
-      });
-    }, 800);
+        navigationRef.current?.navigate("StockDetailScreen", {
+          symbol,
+          name: symbol,
+          source: "push_notification",
+        });
+      }, 800);
 
-    return;
-  }
+      return;
+    }
 
-  // 2) Portfolio alerts → Portfolio tab
-  if (
-    type === "portfolio_daily_performance" ||
-    type === "portfolio_ai_rebalance"
-  ) {
-    setTimeout(() => {
-      if (!isNavigationReady.current) return;
+    // 2) Portfolio alerts → Portfolio tab
+    if (
+      type === "portfolio_daily_performance" ||
+      type === "portfolio_ai_rebalance"
+    ) {
+      setTimeout(() => {
+        if (!isNavigationReady.current) return;
 
-      navigationRef.current?.navigate("Main", {
-        screen: "Portfolio",
-      });
-    }, 800);
+        navigationRef.current?.navigate("Main", {
+          screen: "Portfolio",
+        });
+      }, 800);
 
-    return;
-  }
+      return;
+    }
 
-  // 3) Crypto alerts → Market tab
-  if (type === "crypto_market_move") {
-    setTimeout(() => {
-      if (!isNavigationReady.current) return;
+    // 3) Crypto alerts → Market tab
+    if (type === "crypto_market_move") {
+      setTimeout(() => {
+        if (!isNavigationReady.current) return;
 
-      navigationRef.current?.navigate("Main", {
-        screen: "Market",
-      });
-    }, 800);
-  }
-};
+        navigationRef.current?.navigate("Main", {
+          screen: "Market",
+        });
+      }, 800);
+    }
+  };
   // === Check login/onboarding state ===
   useEffect(() => {
     const checkUserStatus = async () => {
@@ -164,31 +164,31 @@ const isNavigationReady = useRef(false);
   }, []);
 
   useEffect(() => {
-  if (initialRoute === "Main") {
-    const userId = auth.currentUser?.uid;
+    if (initialRoute === "Main") {
+      const userId = auth.currentUser?.uid;
 
-    if (userId) {
-      registerForPushNotifications(userId);
+      if (userId) {
+        registerForPushNotifications(userId);
+      }
     }
-  }
-}, [initialRoute]);
+  }, [initialRoute]);
   useEffect(() => {
-  if (!initialRoute) return;
+    if (!initialRoute) return;
 
-  // Handles notification tap when app is already open/background
-  const sub = Notifications.addNotificationResponseReceivedListener(
-    handleNotificationNavigation
-  );
+    // Handles notification tap when app is already open/background
+    const sub = Notifications.addNotificationResponseReceivedListener(
+      handleNotificationNavigation,
+    );
 
-  // Handles notification tap when app was fully closed
-  Notifications.getLastNotificationResponseAsync().then((response) => {
-    if (response) {
-      handleNotificationNavigation(response);
-    }
-  });
+    // Handles notification tap when app was fully closed
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        handleNotificationNavigation(response);
+      }
+    });
 
-  return () => sub.remove();
-}, [initialRoute]);
+    return () => sub.remove();
+  }, [initialRoute]);
 
   if (!initialRoute) {
     return (
@@ -207,14 +207,14 @@ const isNavigationReady = useRef(false);
       </View>
     );
   }
-  
+
   return (
     <NavigationContainer
       ref={navigationRef}
       onReady={() => {
         isNavigationReady.current = true;
       }}
->
+    >
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{
@@ -232,7 +232,6 @@ const isNavigationReady = useRef(false);
           component={FullChartScreen}
           options={{ headerShown: false }}
         />
-
 
         {/* MAIN TABS */}
         <Stack.Screen name="Main" component={MainTabs} />
@@ -279,27 +278,27 @@ const isNavigationReady = useRef(false);
             ),
           }}
         />
-<Stack.Screen
-  name="AddAlertScreen"
-  component={AddAlertScreen}
-  options={{
-    headerShown: true,
-    title: "Add Alert",
-    headerStyle: { backgroundColor: "#000" },
-    headerTintColor: "#00E396",
-    headerBackTitleVisible: false,
-    headerBackTitle: false,
-    headerBackImage: () => (
-      <Ionicons
-        name="chevron-back-outline"
-        size={24}
-        color="#00E396"
-        style={{ marginLeft: 10 }}
-      />
-    ),
-  }}
-/>
-                  <Stack.Screen
+        <Stack.Screen
+          name="AddAlertScreen"
+          component={AddAlertScreen}
+          options={{
+            headerShown: true,
+            title: "Add Alert",
+            headerStyle: { backgroundColor: "#000" },
+            headerTintColor: "#00E396",
+            headerBackTitleVisible: false,
+            headerBackTitle: false,
+            headerBackImage: () => (
+              <Ionicons
+                name="chevron-back-outline"
+                size={24}
+                color="#00E396"
+                style={{ marginLeft: 10 }}
+              />
+            ),
+          }}
+        />
+        <Stack.Screen
           name="FullTechnicalDetailScreen"
           component={FullTechnicalDetailScreen}
           options={{
@@ -324,7 +323,7 @@ const isNavigationReady = useRef(false);
           component={SignalDetailScreen}
           options={{
             headerShown: true,
-            title: "Signal Details",
+            title: "Rating Details",
             headerStyle: { backgroundColor: "#000" },
             headerTintColor: "#00E396",
             headerBackTitleVisible: false,
@@ -340,9 +339,7 @@ const isNavigationReady = useRef(false);
           }}
         />
 
-
-
-      <Stack.Screen
+        <Stack.Screen
           name="MarketMoversScreen"
           component={MarketMoversScreen}
           options={{
@@ -382,13 +379,13 @@ const isNavigationReady = useRef(false);
             ),
           }}
         />
-      {/* EditPositionScreen (new) */}
+        {/* EditPositionScreen (new) */}
         <Stack.Screen
           name="EditPositionScreen"
           component={EditPositionScreen}
           options={{ headerShown: false }}
         />
-        {/* AddPositionScreen (new) */} 
+        {/* AddPositionScreen (new) */}
         <Stack.Screen
           name="AddPositionScreen"
           component={AddPositionScreen}
@@ -415,7 +412,26 @@ const isNavigationReady = useRef(false);
             headerTintColor: "#00E396",
           }}
         />
-
+        <Stack.Screen
+          name="Support"
+          component={SupportScreen}
+          options={{
+            headerShown: true,
+            title: "Support & Help",
+            headerBackTitleVisible: false,
+            headerBackTitle: false,
+            headerBackImage: () => (
+              <Ionicons
+                name="chevron-back-outline"
+                size={24}
+                color="#00E396"
+                style={{ marginLeft: 10 }}
+              />
+            ),
+            headerStyle: { backgroundColor: "#000" },
+            headerTintColor: "#00E396",
+          }}
+        />
         {/* INFO PAGES (About / Privacy / Terms) */}
         {["About", "PrivacyPolicy", "TermsOfUseScreen"].map((screen, i) => (
           <Stack.Screen
@@ -425,8 +441,8 @@ const isNavigationReady = useRef(false);
               screen === "About"
                 ? AboutScreen
                 : screen === "PrivacyPolicy"
-                ? PrivacyPolicyScreen
-                : TermsOfUseScreen
+                  ? PrivacyPolicyScreen
+                  : TermsOfUseScreen
             }
             options={{
               headerShown: true,
@@ -434,8 +450,8 @@ const isNavigationReady = useRef(false);
                 screen === "About"
                   ? "About Alphaclara"
                   : screen === "PrivacyPolicy"
-                  ? "Privacy Policy"
-                  : "Terms of Use",
+                    ? "Privacy Policy"
+                    : "Terms of Use",
               headerBackTitleVisible: false,
               headerBackTitle: false,
               headerBackImage: () => (

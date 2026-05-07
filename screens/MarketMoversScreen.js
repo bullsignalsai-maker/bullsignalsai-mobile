@@ -15,21 +15,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { getMarketMovers } from "../services/MarketPulseService";
-
-const BRAND = {
-  bg: "#000000",
-  card: "#0B1220",
-  card2: "#020617",
-  border: "#1F2937",
-  softBorder: "#111827",
-  text: "#FFFFFF",
-  sub: "#9CA3AF",
-  muted: "#6B7280",
-  green: "#00E396",
-  red: "#EF4444",
-  amber: "#FACC15",
-  blue: "#60A5FA",
-};
+import { BRAND } from "../constants/theme";
 
 /* ---------------------------------------------------------
    Utils
@@ -47,7 +33,7 @@ function formatPct(v) {
 function formatPrice(v) {
   if (v == null || Number.isNaN(Number(v))) return "—";
   const n = Number(v);
-  if (n >= 1000) return `$${n.toFixed(0)}`;
+  if (n >= 1000) return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   if (n >= 1) return `$${n.toFixed(2)}`;
   return `$${n.toFixed(4)}`;
 }
@@ -88,19 +74,23 @@ export default function MarketMoversScreen({ navigation }) {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  const [tab, setTab] = useState("all"); // all | gainers | losers
-  const [sortBy, setSortBy] = useState("move"); // move | price | symbol
+  const [errorMessage, setErrorMessage] = useState("");
+  const [tab, setTab] = useState("all");
+  const [sortBy, setSortBy] = useState("move");
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const loadMovers = useCallback(
     async (silent = false) => {
       try {
+        setErrorMessage("");
         if (!silent) setLoading(true);
 
         const data = await getMarketMovers();
-        if (!data) return;
+        if (!data) {
+          setErrorMessage("Market movers are temporarily unavailable. Pull to refresh.");
+          return;
+        }
 
         setRaw({
           gainers: data.gainers || [],
@@ -111,18 +101,19 @@ export default function MarketMoversScreen({ navigation }) {
 
         Animated.sequence([
           Animated.timing(fadeAnim, {
-            toValue: 0.65,
-            duration: 120,
+            toValue: 0.72,
+            duration: 100,
             useNativeDriver: true,
           }),
           Animated.timing(fadeAnim, {
             toValue: 1,
-            duration: 180,
+            duration: 160,
             useNativeDriver: true,
           }),
         ]).start();
       } catch (e) {
-        console.warn("MarketMoversScreen error:", e.message);
+        console.warn("MarketMoversScreen error:", e?.message || e);
+        setErrorMessage("Market movers are temporarily unavailable. Pull to refresh.");
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -168,6 +159,7 @@ export default function MarketMoversScreen({ navigation }) {
   const stats = useMemo(() => {
     const gainers = raw.gainers?.length || 0;
     const losers = raw.losers?.length || 0;
+
     return {
       gainers,
       losers,
@@ -181,18 +173,15 @@ export default function MarketMoversScreen({ navigation }) {
     const isUp = !Number.isNaN(pct) && pct >= 0;
     const { arrow, color } = arrowForChange(pct || 0);
 
-    const trendLabel = item.trendLabel || item.trend?.label || null;
-
+    const trendLabel = item.trendLabel || item.trend?.label || "Market trend";
     const patternName =
-      typeof item.pattern === "string"
-        ? item.pattern
-        : item.pattern?.name || null;
+      typeof item.pattern === "string" ? item.pattern : item.pattern?.name || null;
 
     const showPattern = isMeaningfulPattern(patternName);
 
     return (
       <TouchableOpacity
-        activeOpacity={0.86}
+        activeOpacity={0.88}
         style={styles.rowTouch}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -203,78 +192,55 @@ export default function MarketMoversScreen({ navigation }) {
           });
         }}
       >
-        <View style={styles.row}>
-          <View style={[styles.accentBar, isUp ? styles.accentUp : styles.accentDown]} />
+        <View style={styles.rowCard}>
+          <View style={styles.rowTop}>
+            <View style={styles.symbolBlock}>
+              <View style={styles.symbolLine}>
+                <Text style={styles.symbol}>{item.symbol}</Text>
 
-          <View style={styles.rowContent}>
-            <View style={styles.topLine}>
-              <View style={styles.leftBlock}>
-                <View style={styles.symbolRow}>
-                  <Text style={styles.symbol}>{item.symbol}</Text>
-
-                  <View
-                    style={[
-                      styles.directionPill,
-                      isUp ? styles.directionPillUp : styles.directionPillDown,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.directionText,
-                        { color: isUp ? BRAND.green : BRAND.red },
-                      ]}
-                    >
-                      {isUp ? "Gainer" : "Loser"}
-                    </Text>
-                  </View>
-                </View>
-
-                {!!item.company && (
-                  <Text style={styles.company} numberOfLines={1}>
-                    {item.company}
-                  </Text>
-                )}
-              </View>
-
-              <View style={styles.rightBlock}>
-                <Text style={styles.price}>{formatPrice(item.price)}</Text>
-                <Text style={[styles.change, { color }]}>
-                  {arrow} {formatChange(item.change)} ({formatPct(pct)})
-                </Text>
-              </View>
-            </View>
-
-            {!!item.oneLiner && (
-              <Text style={styles.oneLiner} numberOfLines={2}>
-                {item.oneLiner}
-              </Text>
-            )}
-
-            <View style={styles.bottomLine}>
-              <View style={styles.metaLeft}>
-                <Ionicons
-                  name="analytics-outline"
-                  size={13}
-                  color={BRAND.muted}
-                  style={{ marginRight: 5 }}
-                />
-                <Text style={styles.trendText}>
-                  {trendLabel || "Trend unavailable"}
-                </Text>
-              </View>
-
-              {showPattern ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText} numberOfLines={1}>
-                    {String(patternName)}
+                <View style={[styles.movePill, isUp ? styles.movePillUp : styles.movePillDown]}>
+                  <Text style={[styles.movePillText, { color }]}>
+                    {isUp ? "Gainer" : "Loser"}
                   </Text>
                 </View>
-              ) : (
-                <View style={styles.badgeMuted}>
-                  <Text style={styles.badgeMutedText}>No clear pattern</Text>
-                </View>
+              </View>
+
+              {!!item.company && (
+                <Text style={styles.company} numberOfLines={1}>
+                  {item.company}
+                </Text>
               )}
             </View>
+
+            <View style={styles.priceBlock}>
+              <Text style={styles.price}>{formatPrice(item.price)}</Text>
+              <Text style={[styles.change, { color }]}>
+                {arrow} {formatChange(item.change)} ({formatPct(pct)})
+              </Text>
+            </View>
+          </View>
+
+          {!!item.oneLiner && (
+            <Text style={styles.oneLiner} numberOfLines={2}>
+              {item.oneLiner}
+            </Text>
+          )}
+
+          <View style={styles.rowBottom}>
+            <View style={styles.trendWrap}>
+              <Ionicons name="pulse-outline" size={13} color={BRAND.muted} />
+              <Text style={styles.trendText} numberOfLines={1}>
+                {trendLabel}
+              </Text>
+            </View>
+
+            {showPattern ? (
+              <View style={styles.patternBadge}>
+                <Text style={styles.patternText} numberOfLines={1}>
+                  {String(patternName)}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
       </TouchableOpacity>
@@ -282,110 +248,112 @@ export default function MarketMoversScreen({ navigation }) {
   };
 
   const ListHeader = () => (
-    <View style={styles.headerWrap}>
-      <View style={styles.subHeaderOnly}>
-        <Text style={styles.headerSub}>
-          Internal tracked universe · Updated {stats.updated}
+  <View style={styles.headerWrap}>
+    <View style={styles.compactTopRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.compactTitle}>Market Movers</Text>
+
+        <Text style={styles.compactSub}>
+          <Text style={{ color: BRAND.accent, fontWeight: "700" }}>
+            Alphaclara
+          </Text>{" "}
+          tracked universe • {stats.updated}
         </Text>
       </View>
 
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{stats.total}</Text>
-          <Text style={styles.summaryLabel}>Total</Text>
-        </View>
-
-        <View style={styles.summaryDivider} />
-
-        <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: BRAND.green }]}>
-            {stats.gainers}
-          </Text>
-          <Text style={styles.summaryLabel}>Gainers</Text>
-        </View>
-
-        <View style={styles.summaryDivider} />
-
-        <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: BRAND.red }]}>
-            {stats.losers}
-          </Text>
-          <Text style={styles.summaryLabel}>Losers</Text>
-        </View>
-      </View>
-
-      <View style={styles.tabRow}>
-        {[
-          { key: "all", label: "All" },
-          { key: "gainers", label: "Gainers" },
-          { key: "losers", label: "Losers" },
-        ].map((opt) => (
-          <TouchableOpacity
-            key={opt.key}
-            onPress={() => setTab(opt.key)}
-            style={[styles.tabPill, tab === opt.key && styles.tabPillActive]}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabText, tab === opt.key && styles.tabTextActive]}>
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.sortRow}>
-        <Text style={styles.sortLabel}>Sort by</Text>
-
-        {[
-          { key: "move", label: "% Move" },
-          { key: "price", label: "Price" },
-          { key: "symbol", label: "Symbol" },
-        ].map((opt) => (
-          <TouchableOpacity
-            key={opt.key}
-            onPress={() => setSortBy(opt.key)}
-            style={[styles.sortPill, sortBy === opt.key && styles.sortPillActive]}
-            activeOpacity={0.8}
-          >
-            <Text
-              style={[styles.sortText, sortBy === opt.key && styles.sortTextActive]}
-            >
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.columnHint}>
-        <Text style={styles.columnHintText}>Symbol / Signal context</Text>
-        <Text style={styles.columnHintText}>Move</Text>
+      <View style={styles.compactStats}>
+        <Text style={styles.compactStatText}>
+          <Text style={{ color: BRAND.green }}>{stats.gainers}</Text> ↑
+        </Text>
+        <Text style={styles.compactStatText}>
+          <Text style={{ color: BRAND.red }}>{stats.losers}</Text> ↓
+        </Text>
       </View>
     </View>
-  );
+
+    <View style={styles.tabRow}>
+      {[
+        { key: "all", label: "All" },
+        { key: "gainers", label: "Gainers" },
+        { key: "losers", label: "Losers" },
+      ].map((opt) => (
+        <TouchableOpacity
+          key={opt.key}
+          onPress={() => setTab(opt.key)}
+          style={[styles.tabPill, tab === opt.key && styles.tabPillActive]}
+          activeOpacity={0.82}
+        >
+          <Text style={[styles.tabText, tab === opt.key && styles.tabTextActive]}>
+            {opt.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+
+    <View style={styles.sortCompactRow}>
+      <Text style={styles.sortLabel}>Sort</Text>
+
+      {[
+        { key: "move", label: "% Move" },
+        { key: "price", label: "Price" },
+        { key: "symbol", label: "Symbol" },
+      ].map((opt) => (
+        <TouchableOpacity
+          key={opt.key}
+          onPress={() => setSortBy(opt.key)}
+          style={[styles.sortPill, sortBy === opt.key && styles.sortPillActive]}
+          activeOpacity={0.82}
+        >
+          <Text style={[styles.sortText, sortBy === opt.key && styles.sortTextActive]}>
+            {opt.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+
+    <View style={styles.resultRow}>
+      <Text style={styles.resultCount}>{data.length} results</Text>
+      <Text style={styles.resultHint}>Tap any symbol for detail</Text>
+    </View>
+
+    {errorMessage && data.length === 0 ? (
+      <View style={styles.errorBox}>
+        <Ionicons name="alert-circle-outline" size={15} color={BRAND.amber} />
+        <Text style={styles.errorText}>{errorMessage}</Text>
+      </View>
+    ) : null}
+
+    <View style={styles.columnHint}>
+      <Text style={styles.columnHintText}>Symbol / Market context</Text>
+      <Text style={styles.columnHintText}>Move</Text>
+    </View>
+  </View>
+);
 
   if (loading) {
     return (
       <View style={styles.loading}>
-        <StatusBar barStyle="light-content" backgroundColor="#000" />
+        <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
         <ActivityIndicator size="large" color={BRAND.green} />
-        <Text style={styles.loadingText}>Loading market movers…</Text>
+        <Text style={styles.loadingText}>Loading market data…</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.wrapper}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
 
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <FlatList
           data={data}
-          keyExtractor={(item) => item.symbol}
+          keyExtractor={(item, index) => `${item.symbol}-${index}`}
           renderItem={renderRow}
           ListHeaderComponent={ListHeader}
+          stickyHeaderIndices={[0]}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <Ionicons name="pulse-outline" size={28} color={BRAND.muted} />
+              <Ionicons name="pulse-outline" size={30} color={BRAND.muted} />
               <Text style={styles.emptyTitle}>No movers available</Text>
               <Text style={styles.emptySub}>
                 Pull to refresh or check again after the next market update.
@@ -394,12 +362,17 @@ export default function MarketMoversScreen({ navigation }) {
           }
           ListFooterComponent={
             <View style={styles.footerWrap}>
-              <Text style={styles.poweredBy}>Powered by Alphaclara</Text>
+              <Text style={styles.footerText}>
+                Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
+              </Text>
+
+              <Text style={styles.footerMeta}>Last updated {stats.updated}</Text>
 
               <Text style={styles.disclaimer}>
                 Market Movers are based on Alphaclara’s internal tracked universe,
                 percentage price movement, trend context, and pattern analytics.
-                This is educational information only and not financial advice.
+                Content is provided for informational and educational purposes only
+                and is not financial, investment, trading, or tax advice.
               </Text>
             </View>
           }
@@ -441,28 +414,58 @@ const styles = StyleSheet.create({
   loadingText: {
     color: BRAND.sub,
     marginTop: 10,
+    fontSize: 13,
   },
 
-  headerWrap: {
-    paddingTop: 5,
-    paddingBottom: 15,
-    paddingHorizontal: 14,
-    backgroundColor: BRAND.bg,
+  heroCard: {
+    backgroundColor: BRAND.card,
+    borderRadius: 24,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    marginBottom: 12,
   },
-  headerSub: {
-  color: BRAND.sub,
-  fontSize: 12,
-  marginTop: 1,
-  textAlign: "center",
-},
+
+  heroIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(0,227,150,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "rgba(0,227,150,0.24)",
+  },
+
+  heroTitle: {
+    color: BRAND.text,
+    fontSize: 23,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
+
+  heroSub: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginTop: 6,
+  },
+
+  updatedText: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 10,
+    fontWeight: "700",
+  },
 
   summaryCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: BRAND.card,
+    backgroundColor: BRAND.card2,
     borderWidth: 1,
     borderColor: BRAND.border,
-    borderRadius: 18,
+    borderRadius: 20,
     paddingVertical: 14,
     marginBottom: 12,
   },
@@ -474,7 +477,7 @@ const styles = StyleSheet.create({
 
   summaryValue: {
     color: BRAND.text,
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: "900",
   },
 
@@ -482,12 +485,12 @@ const styles = StyleSheet.create({
     color: BRAND.muted,
     fontSize: 11,
     marginTop: 3,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 
   summaryDivider: {
     width: 1,
-    height: 28,
+    height: 30,
     backgroundColor: BRAND.border,
   },
 
@@ -503,7 +506,7 @@ const styles = StyleSheet.create({
 
   tabPill: {
     flex: 1,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 999,
     alignItems: "center",
   },
@@ -522,24 +525,31 @@ const styles = StyleSheet.create({
     color: BRAND.green,
   },
 
-  sortRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 2,
-    columnGap: 8,
+  sortCard: {
+    backgroundColor: "rgba(17,24,39,0.72)",
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    borderRadius: 16,
+    padding: 10,
   },
 
   sortLabel: {
     color: BRAND.muted,
-    fontSize: 11,
-    fontWeight: "800",
+    fontSize: 10,
+    fontWeight: "900",
     textTransform: "uppercase",
-    marginRight: 2,
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+
+  sortOptions: {
+    flexDirection: "row",
+    columnGap: 8,
   },
 
   sortPill: {
-    paddingHorizontal: 11,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: BRAND.border,
@@ -562,7 +572,7 @@ const styles = StyleSheet.create({
   },
 
   columnHint: {
-    marginTop: 12,
+    marginTop: 14,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: BRAND.softBorder,
@@ -582,46 +592,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
 
-  row: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    borderRadius: 16,
-    overflow: "hidden",
+  rowCard: {
+    borderRadius: 20,
     backgroundColor: BRAND.card,
     borderWidth: 1,
     borderColor: BRAND.softBorder,
+    padding: 13,
   },
 
-  accentBar: {
-    width: 4,
-  },
-
-  accentUp: {
-    backgroundColor: BRAND.green,
-  },
-
-  accentDown: {
-    backgroundColor: BRAND.red,
-  },
-
-  rowContent: {
-    flex: 1,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-  },
-
-  topLine: {
+  rowTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
 
-  leftBlock: {
-    flex: 1.3,
+  symbolBlock: {
+    flex: 1.35,
     paddingRight: 10,
   },
 
-  symbolRow: {
+  symbolLine: {
     flexDirection: "row",
     alignItems: "center",
   },
@@ -629,71 +619,74 @@ const styles = StyleSheet.create({
   symbol: {
     color: BRAND.text,
     fontWeight: "900",
-    fontSize: 16,
+    fontSize: 17,
     letterSpacing: 0.2,
     marginRight: 8,
-  },
-
-  directionPill: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-
-  directionPillUp: {
-    backgroundColor: "rgba(0,227,150,0.08)",
-    borderColor: "rgba(0,227,150,0.45)",
-  },
-
-  directionPillDown: {
-    backgroundColor: "rgba(239,68,68,0.08)",
-    borderColor: "rgba(239,68,68,0.45)",
-  },
-
-  directionText: {
-    fontSize: 9.5,
-    fontWeight: "900",
   },
 
   company: {
     color: BRAND.muted,
     fontSize: 11,
-    marginTop: 3,
+    marginTop: 4,
   },
 
-  rightBlock: {
+  movePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+
+  movePillUp: {
+    backgroundColor: "rgba(0,227,150,0.08)",
+    borderColor: "rgba(0,227,150,0.42)",
+  },
+
+  movePillDown: {
+    backgroundColor: "rgba(239,68,68,0.08)",
+    borderColor: "rgba(239,68,68,0.42)",
+  },
+
+  movePillText: {
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
+
+  priceBlock: {
     flex: 1,
     alignItems: "flex-end",
   },
 
   price: {
     color: BRAND.text,
-    fontSize: 13,
-    fontWeight: "800",
+    fontSize: 14,
+    fontWeight: "900",
   },
 
   change: {
-    marginTop: 3,
+    marginTop: 4,
     fontSize: 13,
     fontWeight: "900",
   },
 
   oneLiner: {
     color: BRAND.sub,
-    fontSize: 11.5,
-    lineHeight: 16,
-    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 10,
   },
 
-  bottomLine: {
-    marginTop: 9,
+  rowBottom: {
+    marginTop: 11,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: BRAND.softBorder,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
 
-  metaLeft: {
+  trendWrap: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
@@ -704,25 +697,27 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     fontSize: 11,
     fontWeight: "800",
+    marginLeft: 5,
+    flexShrink: 1,
   },
 
-  badge: {
-    maxWidth: "58%",
+  patternBadge: {
+    maxWidth: "52%",
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: "rgba(250,204,21,0.10)",
     borderWidth: 1,
-    borderColor: "rgba(250,204,21,0.65)",
+    borderColor: "rgba(250,204,21,0.50)",
   },
 
-  badgeText: {
+  patternText: {
     color: BRAND.amber,
     fontSize: 10,
     fontWeight: "900",
   },
 
-  badgeMuted: {
+  patternBadgeMuted: {
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 999,
@@ -731,7 +726,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(107,114,128,0.18)",
   },
 
-  badgeMutedText: {
+  patternMutedText: {
     color: BRAND.muted,
     fontSize: 10,
     fontWeight: "800",
@@ -743,9 +738,9 @@ const styles = StyleSheet.create({
 
   emptyBox: {
     marginHorizontal: 16,
-    marginTop: 28,
+    marginTop: 26,
     padding: 24,
-    borderRadius: 18,
+    borderRadius: 22,
     backgroundColor: BRAND.card,
     borderWidth: 1,
     borderColor: BRAND.border,
@@ -755,7 +750,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     color: BRAND.text,
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: "900",
     marginTop: 10,
   },
 
@@ -767,21 +762,41 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 
-  footerWrap: {
-    marginTop: 28,
-    paddingTop: 18,
-    paddingBottom: 30,
-    paddingHorizontal: 18,
-    borderTopWidth: 1,
-    borderTopColor: BRAND.softBorder,
+  errorBox: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 14,
+    backgroundColor: "rgba(250,204,21,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(250,204,21,0.32)",
+    flexDirection: "row",
     alignItems: "center",
   },
 
-  poweredBy: {
-    color: BRAND.green,
+  errorText: {
+    color: BRAND.amber,
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "700",
+    marginLeft: 6,
+    flex: 1,
+  },
+
+  footerWrap: {
+    marginTop: 28,
+    marginBottom: 30,
+    paddingHorizontal: 18,
+    alignItems: "center",
+  },
+
+  footerText: {
+    color: BRAND.sub,
+    fontSize: 12,
     marginBottom: 8,
+  },
+
+  footerBrand: {
+    color: BRAND.accent,
+    fontWeight: "600",
   },
 
   disclaimer: {
@@ -790,9 +805,161 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: "center",
   },
-  subHeaderOnly: {
-  paddingBottom: 5,
+  headerWrap: {
+  paddingTop: 8,
+  paddingBottom: 8,
+  paddingHorizontal: 14,
+  backgroundColor: BRAND.bg,
+},
+
+compactTopRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
   alignItems: "center",
-  paddingTop: 5,
+  marginBottom: 10,
+},
+
+compactTitle: {
+  color: BRAND.text,
+  fontSize: 22,
+  fontWeight: "900",
+},
+
+compactSub: {
+  color: BRAND.muted,
+  fontSize: 11,
+  marginTop: 2,
+  fontWeight: "700",
+},
+
+compactStats: {
+  flexDirection: "row",
+  columnGap: 8,
+  backgroundColor: BRAND.card2,
+  borderWidth: 1,
+  borderColor: BRAND.border,
+  borderRadius: 999,
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+},
+
+compactStatText: {
+  color: BRAND.sub,
+  fontSize: 12,
+  fontWeight: "900",
+},
+
+sortCompactRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  columnGap: 8,
+  marginTop: 8,
+},
+headerWrap: {
+  paddingTop: 8,
+  paddingBottom: 8,
+  paddingHorizontal: 14,
+  backgroundColor: BRAND.bg,
+  borderBottomWidth: 1,
+  borderBottomColor: BRAND.softBorder,
+},
+
+compactTopRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 10,
+},
+
+compactTitle: {
+  color: BRAND.text,
+  fontSize: 22,
+  fontWeight: "900",
+},
+
+compactSub: {
+  color: BRAND.muted,
+  fontSize: 11,
+  marginTop: 2,
+  fontWeight: "700",
+},
+
+compactStats: {
+  flexDirection: "row",
+  columnGap: 8,
+  backgroundColor: BRAND.card2,
+  borderWidth: 1,
+  borderColor: BRAND.border,
+  borderRadius: 999,
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+},
+
+compactStatText: {
+  color: BRAND.sub,
+  fontSize: 12,
+  fontWeight: "900",
+},
+
+sortCompactRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  columnGap: 8,
+  marginTop: 8,
+},
+
+resultRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginTop: 10,
+},
+
+resultCount: {
+  color: BRAND.sub,
+  fontSize: 11,
+  fontWeight: "800",
+},
+
+resultHint: {
+  color: BRAND.muted,
+  fontSize: 11,
+  fontWeight: "700",
+},
+
+rowCard: {
+  borderRadius: 18,
+  backgroundColor: BRAND.card,
+  borderWidth: 1,
+  borderColor: BRAND.softBorder,
+  padding: 11,
+},
+
+oneLiner: {
+  color: BRAND.sub,
+  fontSize: 11.5,
+  lineHeight: 16,
+  marginTop: 8,
+},
+
+rowBottom: {
+  marginTop: 9,
+  paddingTop: 8,
+  borderTopWidth: 1,
+  borderTopColor: BRAND.softBorder,
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+},
+  
+separator: {
+  height: 8,
+},
+
+footerMeta: {
+  color: BRAND.muted,
+  fontSize: 10.5,
+  marginBottom: 8,
+  fontWeight: "700",
 },
 });

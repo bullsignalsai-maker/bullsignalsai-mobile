@@ -9,18 +9,21 @@ import {
   TouchableOpacity,
   Alert,
   Animated,
+  Pressable,
+  StatusBar,
 } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
-import { getBatchPrices } from "../services/marketData";
 import { Swipeable } from "react-native-gesture-handler";
-import { auth, getPortfolio, deletePosition } from "../firebaseConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Pressable } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+
+import { getBatchPrices } from "../services/marketData";
+import { auth, getPortfolio, deletePosition } from "../firebaseConfig";
 import { API_BASE_URL } from "../config/apiKeys";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import AstraChat from "../components/AstraChat";
+import { BRAND } from "../constants/theme";
 
 export default function PortfolioScreen({ navigation }) {
   const [portfolio, setPortfolio] = useState([]);
@@ -28,33 +31,37 @@ export default function PortfolioScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // SORT
   const [menuVisible, setMenuVisible] = useState(false);
-  const [sortMode, setSortMode] = useState("gain"); // default: highest gain
+  const [sortMode, setSortMode] = useState("gain");
 
-  // User profile for header name
   const [userProfile, setUserProfile] = useState({
     firstName: "",
     lastName: "",
   });
 
-  // Per-symbol AI insight
-  // aiState[symbol] = { expanded, loading, error, ai: {...}, text: "" }
   const [aiState, setAiState] = useState({});
-
-  // ✅ Astra visibility only (logic is now inside AstraChat component)
   const [astraVisible, setAstraVisible] = useState(false);
 
   const swipeRefs = useRef({});
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim();
   const headerName = fullName.length ? fullName : "Your";
-  const [pulseAnim] = useState(new Animated.Value(1));
 
+  const fmt = (n) => {
+    if (n == null || Number.isNaN(Number(n))) return "--";
+    return Number(n).toFixed(2);
+  };
 
-  // ----------------------------------------------------
-  // DELETE POSITION
-  // ----------------------------------------------------
+  const money = (n) => `$${fmt(n)}`;
+
+  const signedMoney = (n) => {
+    const value = Number(n || 0);
+    return `${value >= 0 ? "+$" : "-$"}${fmt(Math.abs(value))}`;
+  };
+
+  const getGainColor = (n) => (Number(n || 0) >= 0 ? BRAND.green : BRAND.red);
+
   const handleDelete = async (symbol) => {
     const userId = auth.currentUser?.uid;
     if (!userId) return;
@@ -76,16 +83,11 @@ export default function PortfolioScreen({ navigation }) {
             delete copy[symbol];
             return copy;
           });
-
-    
         },
       },
     ]);
   };
 
-  // ----------------------------------------------------
-  // LOAD USER PROFILE
-  // ----------------------------------------------------
   const loadUserProfile = async () => {
     try {
       const email = await AsyncStorage.getItem("userToken");
@@ -98,16 +100,11 @@ export default function PortfolioScreen({ navigation }) {
         firstName: profile.firstName || "",
         lastName: profile.lastName || "",
       });
-
-     
     } catch (err) {
       console.warn("Profile load error:", err);
     }
   };
 
-  // ----------------------------------------------------
-  // LOAD PORTFOLIO FROM FIREBASE
-  // ----------------------------------------------------
   const loadPortfolio = useCallback(async () => {
     try {
       const userId = auth.currentUser?.uid;
@@ -134,9 +131,8 @@ export default function PortfolioScreen({ navigation }) {
   useEffect(() => {
     loadPortfolio();
     loadUserProfile();
-  }, []);
+  }, [loadPortfolio]);
 
-  // AUTO REFRESH PRICES
   useEffect(() => {
     if (!portfolio.length) return;
 
@@ -153,7 +149,6 @@ export default function PortfolioScreen({ navigation }) {
     return () => clearInterval(interval);
   }, [portfolio]);
 
-  // Close swipe rows when returning to screen
   useFocusEffect(
     useCallback(() => {
       Object.values(swipeRefs.current).forEach((ref) => ref?.close());
@@ -165,10 +160,6 @@ export default function PortfolioScreen({ navigation }) {
     loadPortfolio();
   };
 
-  
-  // ----------------------------------------------------
-  // CALCULATIONS
-  // ----------------------------------------------------
   let totalValue = 0;
   let totalCost = 0;
   let todayGain = 0;
@@ -197,21 +188,14 @@ export default function PortfolioScreen({ navigation }) {
       gain,
       gainPct,
       today,
+      allocationPct: 0,
     };
   });
 
-  // Allocation %
-  if (totalValue > 0) {
-    enriched.forEach((p) => {
-      p.allocationPct = (p.currValue / totalValue) * 100;
-    });
-  } else {
-    enriched.forEach((p) => (p.allocationPct = 0));
-  }
+  enriched.forEach((p) => {
+    p.allocationPct = totalValue > 0 ? (p.currValue / totalValue) * 100 : 0;
+  });
 
-  // ----------------------------------------------------
-  // SORTING
-  // ----------------------------------------------------
   const applySorting = (list) => {
     switch (sortMode) {
       case "gain":
@@ -229,21 +213,24 @@ export default function PortfolioScreen({ navigation }) {
 
   const enrichedSorted = applySorting(enriched);
 
-  const fmt = (n) => (isNaN(n) ? "--" : Number(n).toFixed(2));
+  const totalGain = totalValue - totalCost;
+  const totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
 
-  if (loading) {
-    return (
-      <View style={styles.loading}>
-        <Text style={{ color: "#9CA3AF" }}>Loading portfolio...</Text>
-      </View>
-    );
-  }
+  const topHolding = [...enrichedSorted].sort(
+    (a, b) => b.allocationPct - a.allocationPct
+  )[0];
 
-  // ----------------------------------------------------
-  // PER-SYMBOL AI INSIGHT TOGGLER
-  // ----------------------------------------------------
+  const topPerformer = [...enrichedSorted].sort((a, b) => b.gain - a.gain)[0];
+  const worstPerformer = [...enrichedSorted].sort((a, b) => a.gain - b.gain)[0];
+
+  const riskExposure = (() => {
+    const pct = topHolding?.allocationPct ?? 0;
+    if (pct > 40) return { label: "High", color: BRAND.red };
+    if (pct > 20) return { label: "Moderate", color: BRAND.amber };
+    return { label: "Balanced", color: BRAND.green };
+  })();
+
   const handleToggleAIInsight = async (symbol, p, totalValueLocal) => {
-    // Toggle UI immediately
     setAiState((prev) => {
       const current = prev[symbol] || {};
       return {
@@ -259,12 +246,9 @@ export default function PortfolioScreen({ navigation }) {
     const alreadyLoaded = current && current.ai;
     const alreadyLoading = current && current.loading;
 
-    if (alreadyLoaded || alreadyLoading) {
-      return;
-    }
+    if (alreadyLoaded || alreadyLoading) return;
 
     try {
-      // Set loading
       setAiState((prev) => ({
         ...prev,
         [symbol]: {
@@ -282,7 +266,6 @@ export default function PortfolioScreen({ navigation }) {
         `&portfolio_total_value=${totalValueLocal}`;
 
       const res = await fetch(url);
-
       if (!res.ok) throw new Error("AI insight unavailable");
 
       const json = await res.json();
@@ -316,16 +299,15 @@ export default function PortfolioScreen({ navigation }) {
         [symbol]: {
           ...(prev[symbol] || {}),
           loading: false,
-          error: "AI insight failed. Pull to refresh and try again.",
+          error: "AI insight is temporarily unavailable. Try again later.",
         },
       }));
     }
   };
 
-  // ✅ Build payload for AstraChat (same structure backend expects)
   const portfolioData = {
     total_value: totalValue,
-    total_gain: totalValue - totalCost,
+    total_gain: totalGain,
     today_gain: todayGain,
     positions: enrichedSorted.map((p) => ({
       symbol: p.symbol,
@@ -339,413 +321,351 @@ export default function PortfolioScreen({ navigation }) {
     })),
   };
 
-  // ----------------------------------------------------
-  // RENDER
-  // ----------------------------------------------------
+  if (loading) {
+    return (
+      <View style={styles.loading}>
+        <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
+        <Text style={styles.loadingText}>Loading portfolio…</Text>
+      </View>
+    );
+  }
+
+  const renderPosition = (p) => {
+    const insight = aiState[p.symbol] || {};
+
+    const renderRightActions = () => (
+      <Pressable
+        style={({ pressed }) => [styles.editBtn, { opacity: pressed ? 0.6 : 1 }]}
+        onPress={() =>
+          navigation.navigate("EditPositionScreen", {
+            symbol: p.symbol,
+            shares: p.shares,
+            avgCost: p.avgCost,
+          })
+        }
+      >
+        <Text style={styles.actionText}>Edit</Text>
+      </Pressable>
+    );
+
+    const renderLeftActions = () => (
+      <Pressable
+        style={({ pressed }) => [
+          styles.deleteBtn,
+          { opacity: pressed ? 0.6 : 1 },
+        ]}
+        onPress={() => handleDelete(p.symbol)}
+      >
+        <Text style={styles.actionText}>Delete</Text>
+      </Pressable>
+    );
+
+    return (
+      <Swipeable
+        ref={(ref) => (swipeRefs.current[p.symbol] = ref)}
+        key={`${p.symbol}-${p.avgCost}-${p.shares}`}
+        renderRightActions={renderRightActions}
+        renderLeftActions={renderLeftActions}
+      >
+        <TouchableOpacity
+          style={styles.positionCard}
+          activeOpacity={0.88}
+          onPress={() =>
+            navigation.navigate("StockDetailScreen", {
+              symbol: p.symbol,
+            })
+          }
+        >
+          <View style={styles.positionTopRow}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.symbolLine}>
+                <Text style={styles.symbol}>{p.symbol}</Text>
+                <Text style={styles.allocationPill}>
+                  {fmt(p.allocationPct)}%
+                </Text>
+              </View>
+
+              <Text style={styles.companyMeta}>
+                {p.shares} shares · Avg {money(p.avgCost)}
+              </Text>
+            </View>
+
+            <View style={styles.positionRight}>
+              <Text style={styles.currentValue}>{money(p.currValue)}</Text>
+              <Text style={[styles.todayText, { color: getGainColor(p.today) }]}>
+                Today {signedMoney(p.today)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.positionMiddle}>
+            <Text style={[styles.plValue, { color: getGainColor(p.gain) }]}>
+              Total Gain {signedMoney(p.gain)} ({fmt(p.gainPct)}%)
+            </Text>
+
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                handleToggleAIInsight(p.symbol, p, totalValue);
+              }}
+              style={({ pressed }) => [
+                styles.aiIconBtn,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <Ionicons name="sparkles-outline" size={16} color={BRAND.amber} />
+              <Text style={styles.aiBtnText}>AI View</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.priceRow}>
+            <Text style={styles.priceMeta}>Current {money(p.price)}</Text>
+            <Text style={styles.priceMeta}>Avg {money(p.avgCost)}</Text>
+          </View>
+
+          {insight.expanded && (
+            <View style={styles.aiBox}>
+              <Text style={styles.aiTitle}>AI Portfolio View</Text>
+
+              {insight.loading ? (
+                <Text style={styles.aiLoading}>Fetching AI insight…</Text>
+              ) : insight.error ? (
+                <Text style={styles.aiError}>{insight.error}</Text>
+              ) : insight.ai ? (
+                <>
+                  <View style={styles.aiGrid}>
+                    <View style={styles.aiMiniCard}>
+                      <Text style={styles.aiLabel}>Trend</Text>
+                      <Text style={styles.aiValue}>{insight.ai.trend || "—"}</Text>
+                    </View>
+
+                    <View style={styles.aiMiniCard}>
+                      <Text style={styles.aiLabel}>Risk</Text>
+                      <Text style={styles.aiValue}>{insight.ai.risk || "—"}</Text>
+                    </View>
+
+                    <View style={styles.aiMiniCard}>
+                      <Text style={styles.aiLabel}>Move</Text>
+                      <Text style={styles.aiValue}>
+                        {insight.ai.expected_move || "—"}
+                      </Text>
+                    </View>
+
+                    <View style={styles.aiMiniCard}>
+                      <Text style={styles.aiLabel}>Confidence</Text>
+                      <Text style={styles.aiValue}>
+                        {insight.ai.confidence || "—"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {!!insight.ai.pattern && (
+                    <Text style={styles.aiParagraph}>
+                      Pattern: {insight.ai.pattern}
+                    </Text>
+                  )}
+
+                  {!!insight.ai.five_day_prob && (
+                    <Text style={styles.aiParagraph}>
+                      5-Day Outlook: {insight.ai.five_day_prob}
+                    </Text>
+                  )}
+
+                  {!!insight.ai.rebalancing && (
+                    <>
+                      <Text style={styles.aiRebalancingTitle}>
+                        Rebalancing Context
+                      </Text>
+                      <Text style={styles.aiRebalancingText}>
+                        {insight.ai.rebalancing}
+                      </Text>
+                    </>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.aiLoading}>
+                  AI view is not available right now.
+                </Text>
+              )}
+            </View>
+          )}
+        </TouchableOpacity>
+      </Swipeable>
+    );
+  };
+
   return (
     <View style={styles.wrapper}>
+      <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
+
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#00E396"
+            tintColor={BRAND.green}
           />
         }
       >
-        {/* HEADER */}
-        <View style={styles.headerBox}>
-          <Text style={styles.headerLabel}>{headerName}’s Portfolio</Text>
+        <View style={styles.heroCard}>
+          <Text style={styles.headerTitle}>Portfolio</Text>
+          <Text style={styles.headerSub}>AI-Powered Portfolio Tracking</Text>
+          <Text style={styles.headerMeta}>Live portfolio value</Text>
+          <Text style={styles.totalValue}>{money(totalValue)}</Text>
 
-          <Text style={styles.totalValue}>${fmt(totalValue)}</Text>
-
-          <Text
-            style={[
-              styles.totalGain,
-              { color: totalValue >= totalCost ? "#00E396" : "#EF4444" },
-            ]}
-          >
-            {totalValue - totalCost >= 0 ? "+$" : "-$"}
-            {fmt(Math.abs(totalValue - totalCost))}{" "}
-            ({fmt(((totalValue - totalCost) / (totalCost || 1)) * 100)}%)
+          <Text style={[styles.totalGain, { color: getGainColor(totalGain) }]}>
+            {signedMoney(totalGain)} ({fmt(totalGainPct)}%)
           </Text>
 
-          <Text
-            style={[
-              styles.todayGain,
-              { color: todayGain >= 0 ? "#00E396" : "#EF4444" },
-            ]}
-          >
-            Today: {todayGain >= 0 ? "+$" : "-$"}
-            {fmt(Math.abs(todayGain))}
-          </Text>
+          <View style={styles.heroStatsRow}>
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatLabel}>Today P&L</Text>
+              <Text style={[styles.heroStatValue, { color: getGainColor(todayGain) }]}>
+                {signedMoney(todayGain)}
+              </Text>
+            </View>
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatLabel}>Holdings</Text>
+              <Text style={styles.heroStatValue}>{portfolio.length}</Text>
+            </View>
+          </View>
         </View>
 
-        {/* PORTFOLIO ANALYTICS */}
-        <View style={styles.analyticsBox}>
-          <Text style={styles.analyticsTitle}>Portfolio Insights</Text>
+        <View style={styles.insightsCard}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.sectionTitle}>Portfolio Insights</Text>
+            <Text style={styles.cardHint}>Snapshot</Text>
+          </View>
 
-          {/* Largest holding */}
-          <View style={styles.analyticsRow}>
-            <Text style={styles.analyticsLabel}>Largest Holding</Text>
-            <Text style={styles.analyticsValue}>
-              {enrichedSorted[0]?.symbol} (
-              {fmt(enrichedSorted[0]?.allocationPct)}%)
+          <View style={styles.insightRow}>
+            <Text style={styles.insightLabel}>Largest Holding</Text>
+            <Text style={styles.insightValue}>
+              {topHolding?.symbol || "--"}{" "}
+              {topHolding ? `(${fmt(topHolding.allocationPct)}%)` : ""}
             </Text>
           </View>
 
-          {/* Top & worst performer */}
-          {(() => {
-            const sortedDesc = [...enrichedSorted].sort(
-              (a, b) => b.gain - a.gain
-            );
-            const sortedAsc = [...enrichedSorted].sort(
-              (a, b) => a.gain - b.gain
-            );
-
-            const top = sortedDesc[0];
-            const worst = sortedAsc[0];
-
-            return (
-              <>
-                <View style={styles.analyticsRow}>
-                  <Text style={styles.analyticsLabel}>Top Performer</Text>
-                  <Text
-                    style={[styles.analyticsValue, { color: "#00E396" }]}
-                  >
-                    {top?.symbol || "--"} (
-                    {top?.gain >= 0 ? "+$" : "-$"}
-                    {fmt(Math.abs(top?.gain || 0))})
-                  </Text>
-                </View>
-
-                <View style={styles.analyticsRow}>
-                  <Text style={styles.analyticsLabel}>Worst Performer</Text>
-                  <Text
-                    style={[styles.analyticsValue, { color: "#EF4444" }]}
-                  >
-                    {worst?.symbol || "--"} (
-                    {worst?.gain >= 0 ? "+$" : "-$"}
-                    {fmt(Math.abs(worst?.gain || 0))})
-                  </Text>
-                </View>
-              </>
-            );
-          })()}
-
-          {/* Entry performance */}
-          <View style={styles.analyticsRow}>
-            <Text style={styles.analyticsLabel}>Entry Performance (%)</Text>
-            <Text style={styles.analyticsValue}>
-              {fmt(
-                enriched.length
-                  ? enriched.reduce(
-                      (sum, p) =>
-                        sum + ((p.price - p.avgCost) / p.avgCost) * 100,
-                      0
-                    ) / enriched.length
-                  : 0
-              )}
-              %
+          <View style={styles.insightRow}>
+            <Text style={styles.insightLabel}>Top Performer</Text>
+            <Text style={[styles.insightValue, { color: BRAND.green }]}>
+              {topPerformer?.symbol || "--"}{" "}
+              {topPerformer ? signedMoney(topPerformer.gain) : ""}
             </Text>
           </View>
 
-          {/* Risk exposure */}
-          <View style={styles.analyticsRow}>
-            <Text style={styles.analyticsLabel}>Risk Exposure</Text>
-            <Text
-              style={[
-                styles.analyticsValue,
-                {
-                  color:
-                    (enrichedSorted[0]?.allocationPct ?? 0) > 40
-                      ? "#EF4444"
-                      : (enrichedSorted[0]?.allocationPct ?? 0) > 20
-                      ? "#FBBF24"
-                      : "#00E396",
-                },
-              ]}
-            >
-              {(() => {
-                const pct = enrichedSorted[0]?.allocationPct ?? 0;
-                if (pct > 40) return "High";
-                if (pct > 20) return "Moderate";
-                return "Balanced";
-              })()}
+          <View style={styles.insightRow}>
+            <Text style={styles.insightLabel}>Weakest Performer</Text>
+            <Text style={[styles.insightValue, { color: BRAND.red }]}>
+              {worstPerformer?.symbol || "--"}{" "}
+              {worstPerformer ? signedMoney(worstPerformer.gain) : ""}
+            </Text>
+          </View>
+
+          <View style={styles.insightRow}>
+            <Text style={styles.insightLabel}>Risk Exposure</Text>
+            <Text style={[styles.insightValue, { color: riskExposure.color }]}>
+              {riskExposure.label}
             </Text>
           </View>
         </View>
 
-        {/* HOLDINGS */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Your Holdings</Text>
-
-          <View style={styles.sortRow}>
-            <TouchableOpacity onPress={() => setMenuVisible(!menuVisible)}>
-              <Ionicons name="filter-outline" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-
-            <Text style={styles.holdingsCountText}>
-              {portfolio.length} holdings
+          <View>
+            <Text style={styles.sectionTitle}>Your Holdings</Text>
+            <Text style={styles.sectionSub}>
+              {portfolio.length} holdings · Sorted by{" "}
+              {sortMode === "gain"
+                ? "gain"
+                : sortMode === "shares"
+                ? "shares"
+                : sortMode === "allocation"
+                ? "allocation"
+                : "A-Z"}
             </Text>
           </View>
+
+          <TouchableOpacity
+            style={styles.filterBtn}
+            onPress={() => setMenuVisible(!menuVisible)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="filter-outline" size={18} color={BRAND.sub} />
+          </TouchableOpacity>
         </View>
 
         {enrichedSorted.length === 0 ? (
-          <Text style={{ color: "#6B7280", marginTop: 20 }}>
-            No positions yet — tap + to add your first stock.
-          </Text>
+          <View style={styles.emptyBox}>
+            <Ionicons name="briefcase-outline" size={30} color={BRAND.muted} />
+            <Text style={styles.emptyTitle}>Start your portfolio</Text>
+            <Text style={styles.emptySub}>
+              Add stocks to track performance and AI insights in one place.
+            </Text>
+          </View>
         ) : (
-          enrichedSorted.map((p) => {
-            const insight = aiState[p.symbol] || {};
-
-            const renderRightActions = () => (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.editBtn,
-                  { opacity: pressed ? 0.6 : 1 },
-                ]}
-                onPress={() =>
-                  navigation.navigate("EditPositionScreen", {
-                    symbol: p.symbol,
-                    shares: p.shares,
-                    avgCost: p.avgCost,
-                  })
-                }
-              >
-                <Text style={styles.editText}>Edit</Text>
-              </Pressable>
-            );
-
-            const renderLeftActions = () => (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.deleteBtn,
-                  { opacity: pressed ? 0.6 : 1 },
-                ]}
-                onPress={() => handleDelete(p.symbol)}
-              >
-                <Text style={styles.deleteText}>Delete</Text>
-              </Pressable>
-            );
-
-            return (
-              <Swipeable
-                ref={(ref) => (swipeRefs.current[p.symbol] = ref)}
-                key={p.symbol}
-                renderRightActions={renderRightActions}
-                renderLeftActions={renderLeftActions}
-              >
-                <TouchableOpacity
-                  style={styles.positionCard}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    navigation.navigate("StockDetailScreen", {
-                      symbol: p.symbol,
-                    })
-                  }
-                >
-                  {/* SYMBOL + ALLOCATION + SHARES + AI ICON */}
-                  <View style={styles.rowTop}>
-                    <View>
-                      <Text style={styles.symbol}>{p.symbol}</Text>
-                      <Text style={styles.allocationText}>
-                        {fmt(p.allocationPct)}% of portfolio
-                      </Text>
-                    </View>
-
-                    <View style={styles.rowTopRight}>
-                      <Text style={styles.shares}>{p.shares} shares</Text>
-
-                      <Pressable
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          handleToggleAIInsight(p.symbol, p, totalValue);
-                        }}
-                        style={({ pressed }) => [
-                          styles.aiIconBtn,
-                          pressed && { opacity: 0.7 },
-                        ]}
-                      >
-                        <Ionicons
-                          name="sparkles-outline"
-                          size={18}
-                          color="#FBBF24"
-                        />
-                      </Pressable>
-                    </View>
-                  </View>
-
-                  {/* PROFIT / LOSS */}
-                  <View style={styles.rowMiddle}>
-                    <Text
-                      style={[
-                        styles.plValue,
-                        { color: p.gain >= 0 ? "#00E396" : "#EF4444" },
-                      ]}
-                    >
-                      {p.gain >= 0 ? "Profit: +" : "Loss: -"}
-                      ${fmt(Math.abs(p.gain))} ({fmt(p.gainPct)}%)
-                    </Text>
-                  </View>
-
-                  {/* COST → PRICE + TODAY */}
-                  <View style={styles.rowBottom}>
-                    <Text style={styles.costText}>
-                      Avg: ${fmt(p.avgCost)} → Current: ${fmt(p.price)}
-                    </Text>
-
-                    <Text
-                      style={[
-                        styles.todayText,
-                        { color: p.today >= 0 ? "#00E396" : "#EF4444" },
-                      ]}
-                    >
-                      Today: {p.today >= 0 ? "+$" : "-$"}
-                      {fmt(Math.abs(p.today))}
-                    </Text>
-                  </View>
-
-                  {/* AI INSIGHT COLLAPSIBLE */}
-                  {insight.expanded && (
-                    <View style={styles.aiBox}>
-                      <Text style={styles.aiTitle}>AI View (BullBrain v2)</Text>
-
-                      {insight.loading ? (
-                        <Text style={styles.aiLoading}>
-                          Fetching AI insight…
-                        </Text>
-                      ) : insight.error ? (
-                        <Text style={styles.aiError}>{insight.error}</Text>
-                      ) : insight.ai ? (
-                        <>
-                          <View style={styles.aiRow}>
-                            <Text style={styles.aiLabel}>Trend:</Text>
-                            <Text style={styles.aiValue}>
-                              {insight.ai.trend}
-                            </Text>
-                          </View>
-
-                          <View style={styles.aiRow}>
-                            <Text style={styles.aiLabel}>Move:</Text>
-                            <Text style={styles.aiValue}>
-                              {insight.ai.expected_move}
-                            </Text>
-                          </View>
-
-                          <View style={styles.aiRow}>
-                            <Text style={styles.aiLabel}>Risk:</Text>
-                            <Text style={styles.aiValue}>
-                              {insight.ai.risk}
-                            </Text>
-                          </View>
-
-                          <View style={styles.aiRow}>
-                            <Text style={styles.aiLabel}>Confidence:</Text>
-                            <Text style={styles.aiValue}>
-                              {insight.ai.confidence}
-                            </Text>
-                          </View>
-
-                          <View style={styles.aiRow}>
-                            <Text style={styles.aiLabel}>Pattern:</Text>
-                            <Text style={styles.aiValue}>
-                              {insight.ai.pattern}
-                            </Text>
-                          </View>
-
-                          <View style={styles.aiRow}>
-                            <Text style={styles.aiLabel}>5-Day Outlook:</Text>
-                            <Text style={styles.aiValue}>
-                              {insight.ai.five_day_prob}
-                            </Text>
-                          </View>
-
-                          <Text style={styles.aiRebalancingTitle}>
-                            AI Rebalancing Suggestion
-                          </Text>
-                          <Text style={styles.aiRebalancingText}>
-                            {insight.ai.rebalancing}
-                          </Text>
-                        </>
-                      ) : (
-                        <Text style={styles.aiText}>
-                          AI view is not available right now. Try again later.
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </Swipeable>
-            );
-          })
+          enrichedSorted.map(renderPosition)
         )}
+
+        <View style={styles.footerWrap}>
+          <Text style={styles.footerText}>
+            Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
+          </Text>
+          <Text style={styles.footerMeta}>
+            Data updates periodically and may be delayed.
+          </Text>
+          <Text style={styles.disclaimer}>
+            Portfolio values, AI insights, and market data are provided for
+            informational and educational purposes only and are not financial,
+            investment, trading, or tax advice.
+          </Text>
+        </View>
       </ScrollView>
 
-              {/* Premium Add Button */}
-        <Pressable style={styles.fab} onPress={() => navigation.navigate("AddPositionScreen")}>
-          <Ionicons name="add" size={40} color="#00E396" />
-        </Pressable>
+      <Pressable
+        style={styles.fab}
+        onPress={() => navigation.navigate("AddPositionScreen")}
+      >
+        <Ionicons name="add" size={36} color={BRAND.green} />
+      </Pressable>
 
-        {/* Premium Astra Button */}
-        {portfolio.length > 0 && (
-          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-            <Pressable style={styles.astraFab} onPress={() => setAstraVisible(true)}>
-              <AstraAnimatedIcon size={40} />
-            </Pressable>
-          </Animated.View>
-        )}
+      {portfolio.length > 0 && (
+        <Animated.View style={[styles.astraWrap, { transform: [{ scale: pulseAnim }] }]}>
+          <Pressable style={styles.astraFab} onPress={() => setAstraVisible(true)}>
+            <AstraAnimatedIcon size={40} />
+          </Pressable>
+        </Animated.View>
+      )}
 
-
-
-      {/* SORTING MENU */}
       {menuVisible && (
         <View style={styles.sortMenu}>
-          <TouchableOpacity
-            style={styles.sortItem}
-            onPress={() => {
-              setSortMode("gain");
-              setMenuVisible(false);
-            }}
-          >
-            <Text style={styles.sortItemText}>Highest Gain</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.sortItem}
-            onPress={() => {
-              setSortMode("shares");
-              setMenuVisible(false);
-            }}
-          >
-            <Text style={styles.sortItemText}>Most Shares</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.sortItem}
-            onPress={() => {
-              setSortMode("allocation");
-              setMenuVisible(false);
-            }}
-          >
-            <Text style={styles.sortItemText}>Highest Allocation</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.sortItem}
-            onPress={() => {
-              setSortMode("az");
-              setMenuVisible(false);
-            }}
-          >
-            <Text style={styles.sortItemText}>Alphabetical (A → Z)</Text>
-          </TouchableOpacity>
+          {[
+            { key: "gain", label: "Highest Gain" },
+            { key: "shares", label: "Most Shares" },
+            { key: "allocation", label: "Highest Allocation" },
+            { key: "az", label: "Alphabetical (A → Z)" },
+          ].map((item) => (
+            <TouchableOpacity
+              key={item.key}
+              style={styles.sortItem}
+              onPress={() => {
+                setSortMode(item.key);
+                setMenuVisible(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.sortItemText,
+                  sortMode === item.key && styles.sortItemTextActive,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
 
-      {/* ✅ AstraChat full-screen mini-popup */}
       <AstraChat
         visible={astraVisible}
         onClose={() => setAstraVisible(false)}
@@ -755,277 +675,509 @@ export default function PortfolioScreen({ navigation }) {
   );
 }
 
-// ================= STYLES =================
 const styles = StyleSheet.create({
-  wrapper: { flex: 1, backgroundColor: "#000" },
-  container: { flex: 1, paddingHorizontal: 18 },
+  wrapper: {
+    flex: 1,
+    backgroundColor: BRAND.bg,
+  },
+
+  container: {
+    flex: 1,
+    paddingHorizontal: 14,
+  },
+
+  scrollContent: {
+    paddingTop: 70,
+    paddingBottom: 130,
+  },
 
   loading: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#000",
+    backgroundColor: BRAND.bg,
   },
 
-  headerBox: {
-    marginTop: 75,
-    backgroundColor: "#111827",
-    padding: 20,
-    borderRadius: 16,
-    borderColor: "#1F2937",
-    borderWidth: 1,
-    alignItems: "center",
-    marginBottom: -5,
-  },
-  headerLabel: { color: "#9CA3AF", fontSize: 14 },
-  totalValue: { color: "#FFF", fontSize: 25, fontWeight: "800" },
-  totalGain: { fontSize: 15, marginTop: 6, fontWeight: "600" },
-  todayGain: { fontSize: 13, marginTop: 4 },
-
-  sectionHeader: {
-    marginTop: 1,
-    marginBottom: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  sectionTitle: { color: "#00E396", fontSize: 16, fontWeight: "600" },
-
-  positionCard: {
-    backgroundColor: "#111827",
-    padding: 18,
-    borderRadius: 14,
-    borderColor: "#1F2937",
-    borderWidth: 1,
-    marginBottom: 10,
-  },
-
-  rowTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  rowTopRight: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  symbol: { color: "#FFF", fontSize: 18, fontWeight: "700" },
-  shares: { color: "#9CA3AF", fontSize: 13 },
-
-  rowMiddle: { marginVertical: 6 },
-  plValue: { fontSize: 15, fontWeight: "700" },
-
-  rowBottom: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  costText: { color: "#9CA3AF", fontSize: 13 },
-  todayText: { fontSize: 13 },
-
-  editBtn: {
-    backgroundColor: "#2563EB",
-    width: 80,
-    justifyContent: "center",
-    alignItems: "center",
-    marginVertical: 6,
-    borderRadius: 12,
-  },
-  editText: { color: "#FFF", fontWeight: "700" },
-
-  deleteBtn: {
-    backgroundColor: "#EF4444",
-    width: 80,
-    justifyContent: "center",
-    alignItems: "center",
-    marginVertical: 6,
-    borderRadius: 12,
-  },
-  deleteText: { color: "#FFF", fontWeight: "700" },
-
-  allocationText: {
-    color: "#9CA3AF",
-    fontSize: 12,
-    marginTop: 2,
-  },
-
-  sortRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-
-  holdingsCountText: {
-    color: "#9CA3AF",
+  loadingText: {
+    color: BRAND.sub,
     fontSize: 13,
   },
 
-  // SORT MENU
-  sortMenu: {
-    position: "absolute",
-    top: 165,
-    right: 20,
-    backgroundColor: "#111827",
-    paddingVertical: 8,
-    width: 220,
-    borderRadius: 12,
-    borderColor: "#1F2937",
+  heroCard: {
+    backgroundColor: BRAND.card,
+    borderRadius: 24,
     borderWidth: 1,
-    zIndex: 9999,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
+    borderColor: BRAND.border,
+    padding: 18,
+    marginBottom: 14,
+    alignItems: "stretch",
   },
 
-  sortItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
-
-  sortItemText: {
-    color: "#E5E7EB",
-    fontSize: 15,
-  },
-
-  // ANALYTICS
-  analyticsBox: {
-    backgroundColor: "#111827",
-    padding: 16,
-    borderRadius: 14,
-    borderColor: "#1F2937",
-    borderWidth: 1,
-    marginTop: 20,
-    marginBottom: 10,
-  },
-
-  analyticsTitle: {
-    color: "#E5E7EB",
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 10,
-  },
-
-  analyticsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  eyebrow: {
+    color: BRAND.muted,
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
     marginBottom: 8,
   },
 
-  analyticsItem: {
+  totalValue: {
+    color: BRAND.text,
+    fontSize: 32,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
+
+  totalGain: {
+    fontSize: 15,
+    marginTop: 5,
+    fontWeight: "800",
+  },
+
+  heroStatsRow: {
+    flexDirection: "row",
+    columnGap: 10,
+    marginTop: 16,
+  },
+
+  heroStat: {
+    flex: 1,
+    backgroundColor: BRAND.card2,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    padding: 11,
+  },
+
+  heroStatLabel: {
+    color: BRAND.muted,
+    fontSize: 11,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+
+  heroStatValue: {
+    color: BRAND.text,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
+  insightsCard: {
+    backgroundColor: BRAND.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    padding: 15,
+    marginBottom: 14,
+  },
+
+  cardHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  cardHint: {
+    color: BRAND.muted,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  insightRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: BRAND.softBorder,
+  },
+
+  insightLabel: {
+    color: BRAND.sub,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  insightValue: {
+    color: BRAND.text,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  sectionHeader: {
+    marginTop: 2,
+    marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  sectionTitle: {
+    color: BRAND.green,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+
+  sectionSub: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 3,
+    fontWeight: "700",
+  },
+
+  filterBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  positionCard: {
+    backgroundColor: BRAND.card,
+    padding: 14,
+    borderRadius: 18,
+    borderColor: BRAND.softBorder,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+
+  positionTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+
+  symbolLine: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  symbol: {
+    color: BRAND.text,
+    fontSize: 18,
+    fontWeight: "900",
+    marginRight: 8,
+  },
+
+  allocationPill: {
+    color: BRAND.green,
+    fontSize: 10.5,
+    fontWeight: "900",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,227,150,0.10)",
+    overflow: "hidden",
+  },
+
+  companyMeta: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 4,
+    fontWeight: "700",
+  },
+
+  positionRight: {
+    alignItems: "flex-end",
+  },
+
+  currentValue: {
+    color: BRAND.text,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
+  todayText: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+
+  positionMiddle: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: BRAND.softBorder,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  plValue: {
+    fontSize: 14,
+    fontWeight: "900",
     flex: 1,
   },
 
-  analyticsLabel: {
-    color: "#9CA3AF",
-    fontSize: 12,
-    marginBottom: 2,
+  aiIconBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    columnGap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(250,204,21,0.35)",
+    backgroundColor: "rgba(250,204,21,0.08)",
   },
 
-  analyticsValue: {
-    color: "#FFF",
-    fontSize: 14,
+  aiBtnText: {
+    color: BRAND.amber,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  priceRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
+  priceMeta: {
+    color: BRAND.sub,
+    fontSize: 11.5,
     fontWeight: "700",
   },
 
-  analyticsPie: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#1F2937",
+  editBtn: {
+    backgroundColor: BRAND.blue,
+    width: 78,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#0F172A",
+    marginVertical: 6,
+    borderRadius: 14,
   },
 
-  // AI INSIGHTS CARD
-  aiIconBtn: {
-    marginLeft: 8,
-    padding: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#374151",
-    backgroundColor: "#020617",
+  deleteBtn: {
+    backgroundColor: BRAND.red,
+    width: 78,
+    justifyContent: "center",
+    alignItems: "center",
+    marginVertical: 6,
+    borderRadius: 14,
+  },
+
+  actionText: {
+    color: BRAND.text,
+    fontWeight: "900",
   },
 
   aiBox: {
-    marginTop: 10,
+    marginTop: 12,
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#1F2937",
-    backgroundColor: "rgba(15, 23, 42, 0.8)",
+    borderColor: BRAND.softBorder,
+    backgroundColor: BRAND.card2,
   },
 
   aiTitle: {
-    color: "#FBBF24",
+    color: BRAND.amber,
     fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 8,
-    letterSpacing: 0.3,
+    fontWeight: "900",
+    marginBottom: 10,
   },
 
-  aiRow: {
+  aiGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
-    marginBottom: 6,
+    rowGap: 8,
+  },
+
+  aiMiniCard: {
+    width: "48%",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    padding: 9,
+    backgroundColor: "rgba(15,23,42,0.75)",
   },
 
   aiLabel: {
-    color: "#9CA3AF",
-    fontSize: 12,
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontWeight: "800",
+    marginBottom: 3,
   },
 
   aiValue: {
-    color: "#FFF",
-    fontSize: 12,
-    fontWeight: "700",
+    color: BRAND.text,
+    fontSize: 11.5,
+    fontWeight: "900",
   },
 
-  aiText: {
-    color: "#9CA3AF",
-    fontSize: 13,
+  aiParagraph: {
+    color: BRAND.sub,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 9,
   },
 
   aiLoading: {
-    color: "#9CA3AF",
+    color: BRAND.sub,
     fontSize: 12,
   },
 
   aiError: {
-    color: "#F97316",
+    color: BRAND.amber,
     fontSize: 12,
   },
 
   aiRebalancingTitle: {
-    color: "#FBBF24",
+    color: BRAND.amber,
     fontSize: 12,
-    fontWeight: "700",
-    marginTop: 10,
+    fontWeight: "900",
+    marginTop: 12,
     marginBottom: 4,
   },
 
   aiRebalancingText: {
-    color: "#E5E7EB",
+    color: BRAND.sub,
     fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 17,
   },
-  astraFab: {
-  position: "absolute",
-  left: 20,
-  bottom: 32,
-  width: 42,
-  height: 42,
-  borderRadius: 20,
-},
-  fab: {
-  position: "absolute",
-  right: 20,
-  bottom: 32,
 
-  width: 42,
-  height: 42,
-  borderRadius: 29,
+  emptyBox: {
+    backgroundColor: BRAND.card,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    marginTop: 14,
+  },
+
+  emptyTitle: {
+    color: BRAND.text,
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 10,
+  },
+
+  emptySub: {
+    color: BRAND.sub,
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 6,
+    lineHeight: 17,
+  },
+
+  sortMenu: {
+    position: "absolute",
+    top: 185,
+    right: 18,
+    backgroundColor: BRAND.card,
+    paddingVertical: 8,
+    width: 230,
+    borderRadius: 16,
+    borderColor: BRAND.border,
+    borderWidth: 1,
+    zIndex: 9999,
+    elevation: 10,
+  },
+
+  sortItem: {
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+
+  sortItemText: {
+    color: BRAND.text,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+sortItemTextActive: {
+  color: BRAND.accent,
+  fontWeight: "900",
+},
+  footerWrap: {
+    marginTop: 28,
+    marginBottom: 30,
+    paddingHorizontal: 18,
+    alignItems: "center",
+  },
+
+  footerText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginBottom: 8,
+  },
+
+  footerBrand: {
+    color: BRAND.accent,
+    fontWeight: "600",
+  },
+
+  disclaimer: {
+    color: BRAND.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+  },
+
+  fab: {
+    position: "absolute",
+    right: 20,
+    bottom: 32,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 10,
+  },
+
+  astraWrap: {
+    position: "absolute",
+    left: 20,
+    bottom: 32,
+  },
+
+  astraFab: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 10,
+  },
+    headerTitle: {
+    color: BRAND.accent,
+    fontSize: 23,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+    marginBottom: 2,
+    textAlign: "center", 
+  },
+
+headerSub: {
+  color: BRAND.muted,
+  fontSize: 11.5,
+  fontWeight: "700",
+  marginBottom: 12,
+},
+headerMeta: {
+  color: BRAND.muted,
+  fontSize: 10.5,
+  fontWeight: "700",
+  marginBottom: 8,
+},
+footerMeta: {
+  color: BRAND.muted,
+  fontSize: 10.5,
+  marginBottom: 8,
+  fontWeight: "700",
 },
 });
