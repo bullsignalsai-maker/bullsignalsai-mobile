@@ -462,7 +462,7 @@ export default function MarketScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.moversSubTitle}>Top Gainers</Text>
+        <Text style={styles.moversSubTitle}>Raising Fast</Text>
 
         {movers.gainers.length === 0 ? (
           <Text style={styles.mutedNote}>Loading movers…</Text>
@@ -473,7 +473,7 @@ export default function MarketScreen({ navigation }) {
         )}
 
         <Text style={[styles.moversSubTitle, { marginTop: 14 }]}>
-          Top Losers
+          Dropping Fast
         </Text>
 
         {movers.losers.length === 0 ? (

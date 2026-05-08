@@ -153,9 +153,7 @@ export default function App() {
         const onboarded = await AsyncStorage.getItem("onboarded");
         const userToken = await AsyncStorage.getItem("userToken");
 
-        if (userToken) setInitialRoute("Main");
-        else if (onboarded) setInitialRoute("Login");
-        else setInitialRoute("Onboarding");
+        setInitialRoute("Onboarding"); // TEMP: force onboarding for testing
       } catch {
         setInitialRoute("Onboarding");
       }

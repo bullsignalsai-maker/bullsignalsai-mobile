@@ -27,6 +27,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { auth, db } from "../firebaseConfig";
 import { BRAND } from "../constants/theme";
+import { SafeAreaView } from "react-native-safe-area-context"; // ← Added for SafeAreaView fix
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -41,7 +42,10 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     if (!cleanEmail || !password) {
-      Alert.alert("Missing Information", "Please enter your email and password.");
+      Alert.alert(
+        "Missing Information",
+        "Please enter your email and password.",
+      );
       return;
     }
 
@@ -52,7 +56,7 @@ export default function LoginScreen({ navigation }) {
       const userCredential = await signInWithEmailAndPassword(
         auth,
         cleanEmail,
-        password
+        password,
       );
 
       const user = userCredential.user;
@@ -63,7 +67,7 @@ export default function LoginScreen({ navigation }) {
       if (docSnap.exists()) {
         await AsyncStorage.setItem(
           "profile_" + user.email,
-          JSON.stringify(docSnap.data())
+          JSON.stringify(docSnap.data()),
         );
       }
 
@@ -71,10 +75,9 @@ export default function LoginScreen({ navigation }) {
       navigation.replace("Main");
     } catch (error) {
       console.warn("Login failed:", error?.code);
-
       Alert.alert(
         "Login Failed",
-        "Please check your email and password, then try again."
+        "Please check your email and password, then try again.",
       );
     } finally {
       setLoading(false);
@@ -89,162 +92,169 @@ export default function LoginScreen({ navigation }) {
 
     try {
       await sendPasswordResetEmail(auth, cleanEmail);
-
       Alert.alert(
         "Password Reset Sent",
-        "If an account exists for this email, a reset link will be sent shortly."
+        "If an account exists for this email, a reset link will be sent shortly.",
       );
     } catch (error) {
       console.warn("Password reset failed:", error?.code);
-
       Alert.alert(
         "Password Reset",
-        "If an account exists for this email, a reset link will be sent shortly."
+        "If an account exists for this email, a reset link will be sent shortly.",
       );
     }
   };
 
   return (
-    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-      <KeyboardAvoidingView
-        style={styles.screen}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
-
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.wrapper}
-          showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.safeArea}>
+      <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+        <KeyboardAvoidingView
+          style={styles.screen}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View style={styles.header}>
-            <Image
-              source={require("../assets/alpha-transparent.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+          <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
 
-            <Text style={styles.title}>Alphaclara</Text>
-            <Text style={styles.subtitle}>Welcome back</Text>
-            <Text style={styles.tagline}>
-              Access your AI-powered market intelligence.
-            </Text>
-          </View>
-
-          <View style={styles.formCard}>
-            <View style={styles.fieldBlock}>
-              <Text style={styles.label}>Email</Text>
-
-              <TextInput
-                style={styles.input}
-                placeholder="you@example.com"
-                placeholderTextColor={BRAND.muted}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                textContentType="emailAddress"
-                importantForAutofill="yes"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordRef.current?.focus()}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.wrapper}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.header}>
+              <Image
+                source={require("../assets/alpha-transparent.png")}
+                style={styles.logo}
+                resizeMode="contain"
               />
+
+              <Text style={styles.title}>Alphaclara</Text>
+              <Text style={styles.subtitle}>Welcome back</Text>
+              <Text style={styles.tagline}>
+                Access your AI-powered market intelligence.
+              </Text>
             </View>
 
-            <View style={styles.fieldBlock}>
-              <Text style={styles.label}>Password</Text>
-
-              <View style={styles.passwordWrap}>
+            <View style={styles.formCard}>
+              <View style={styles.fieldBlock}>
+                <Text style={styles.label}>Email</Text>
                 <TextInput
-                  ref={passwordRef}
-                  style={styles.passwordInput}
-                  placeholder="Enter your password"
+                  style={styles.input}
+                  placeholder="you@example.com"
                   placeholderTextColor={BRAND.muted}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={securePassword}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  autoComplete="password"
-                  textContentType="password"
+                  autoComplete="email"
+                  textContentType="emailAddress"
                   importantForAutofill="yes"
-                  returnKeyType="done"
-                  onSubmitEditing={handleLogin}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
                 />
-
-                <Pressable
-                  onPress={() => setSecurePassword((v) => !v)}
-                  style={styles.eyeBtn}
-                >
-                  <Ionicons
-                    name={securePassword ? "eye-outline" : "eye-off-outline"}
-                    size={19}
-                    color={BRAND.sub}
-                  />
-                </Pressable>
               </View>
+
+              <View style={styles.fieldBlock}>
+                <Text style={styles.label}>Password</Text>
+                <View style={styles.passwordWrap}>
+                  <TextInput
+                    ref={passwordRef}
+                    style={styles.passwordInput}
+                    placeholder="Enter your password"
+                    placeholderTextColor={BRAND.muted}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={securePassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="password"
+                    textContentType="password"
+                    importantForAutofill="yes"
+                    returnKeyType="done"
+                    onSubmitEditing={handleLogin}
+                  />
+
+                  <Pressable
+                    onPress={() => setSecurePassword((v) => !v)}
+                    style={styles.eyeBtn}
+                  >
+                    <Ionicons
+                      name={securePassword ? "eye-outline" : "eye-off-outline"}
+                      size={19}
+                      color={BRAND.sub}
+                    />
+                  </Pressable>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={handleForgotPassword}
+                style={styles.forgotContainer}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.forgotText}>Forgot password?</Text>
+              </TouchableOpacity>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.button,
+                  !canLogin && styles.buttonDisabled,
+                  pressed && canLogin && { opacity: 0.72 },
+                ]}
+                onPress={handleLogin}
+                disabled={!canLogin || loading}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? "Signing in…" : "Sign In"}
+                </Text>
+              </Pressable>
+
+              <TouchableOpacity
+                onPress={() => navigation.navigate("Signup")}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.link}>
+                  Don’t have an account?{" "}
+                  <Text style={styles.linkHighlight}>Sign Up</Text>
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              onPress={handleForgotPassword}
-              style={styles.forgotContainer}
-              activeOpacity={0.75}
-            >
-              <Text style={styles.forgotText}>Forgot password?</Text>
-            </TouchableOpacity>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.button,
-                !canLogin && styles.buttonDisabled,
-                pressed && canLogin && { opacity: 0.72 },
-              ]}
-              onPress={handleLogin}
-              disabled={!canLogin || loading}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? "Signing in…" : "Sign In"}
+            <View style={styles.footerWrap}>
+              <Text style={styles.footerText}>
+                By continuing, you agree to Alphaclara’s{" "}
+                <Text
+                  style={styles.footerLink}
+                  onPress={() => navigation.navigate("TermsOfUseScreen")}
+                >
+                  Terms of Use
+                </Text>{" "}
+                and{" "}
+                <Text
+                  style={styles.footerLink}
+                  onPress={() => navigation.navigate("PrivacyPolicy")}
+                >
+                  Privacy Policy
+                </Text>
+                .
               </Text>
-            </Pressable>
-
-            <TouchableOpacity
-              onPress={() => navigation.navigate("Signup")}
-              activeOpacity={0.75}
-            >
-              <Text style={styles.link}>
-                Don’t have an account?{" "}
-                <Text style={styles.linkHighlight}>Sign Up</Text>
+              <Text style={styles.disclaimer}>
+                Alphaclara provides market insights for educational and
+                informational purposes only. Not financial advice.
               </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.footerWrap}>
-            <Text style={styles.footerText}>
-              By continuing, you agree to Alphaclara’s{" "}
-              <Text
-                style={styles.footerLink}
-                onPress={() => navigation.navigate("TermsOfUseScreen")}
-              >
-                Terms of Use
-              </Text>{" "}
-              and{" "}
-              <Text
-                style={styles.footerLink}
-                onPress={() => navigation.navigate("PrivacyPolicy")}
-              >
-                Privacy Policy
-              </Text>
-              .
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </TouchableWithoutFeedback>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: BRAND.bg,
+  },
+
   screen: {
     flex: 1,
     backgroundColor: BRAND.bg,
@@ -408,5 +418,13 @@ const styles = StyleSheet.create({
   footerLink: {
     color: BRAND.accent,
     fontWeight: "800",
+  },
+
+  disclaimer: {
+    color: BRAND.muted,
+    fontSize: 11,
+    textAlign: "center",
+    marginTop: 12,
+    opacity: 0.8,
   },
 });

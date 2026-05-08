@@ -18,7 +18,7 @@ import { Swipeable } from "react-native-gesture-handler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 
-import { getBatchPrices } from "../services/marketData";
+import { getBatchPrices } from "../services/priceService";
 import { auth, getPortfolio, deletePosition } from "../firebaseConfig";
 import { API_BASE_URL } from "../config/apiKeys";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
@@ -75,7 +75,7 @@ export default function PortfolioScreen({ navigation }) {
           await deletePosition(userId, symbol);
 
           setPortfolio((prev) =>
-            prev.filter((p) => p.symbol.toUpperCase() !== symbol.toUpperCase())
+            prev.filter((p) => p.symbol.toUpperCase() !== symbol.toUpperCase()),
           );
 
           setPrices((prev) => {
@@ -152,7 +152,7 @@ export default function PortfolioScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       Object.values(swipeRefs.current).forEach((ref) => ref?.close());
-    }, [])
+    }, []),
   );
 
   const onRefresh = () => {
@@ -217,7 +217,7 @@ export default function PortfolioScreen({ navigation }) {
   const totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
 
   const topHolding = [...enrichedSorted].sort(
-    (a, b) => b.allocationPct - a.allocationPct
+    (a, b) => b.allocationPct - a.allocationPct,
   )[0];
 
   const topPerformer = [...enrichedSorted].sort((a, b) => b.gain - a.gain)[0];
@@ -335,7 +335,10 @@ export default function PortfolioScreen({ navigation }) {
 
     const renderRightActions = () => (
       <Pressable
-        style={({ pressed }) => [styles.editBtn, { opacity: pressed ? 0.6 : 1 }]}
+        style={({ pressed }) => [
+          styles.editBtn,
+          { opacity: pressed ? 0.6 : 1 },
+        ]}
         onPress={() =>
           navigation.navigate("EditPositionScreen", {
             symbol: p.symbol,
@@ -392,7 +395,9 @@ export default function PortfolioScreen({ navigation }) {
 
             <View style={styles.positionRight}>
               <Text style={styles.currentValue}>{money(p.currValue)}</Text>
-              <Text style={[styles.todayText, { color: getGainColor(p.today) }]}>
+              <Text
+                style={[styles.todayText, { color: getGainColor(p.today) }]}
+              >
                 Today {signedMoney(p.today)}
               </Text>
             </View>
@@ -436,12 +441,16 @@ export default function PortfolioScreen({ navigation }) {
                   <View style={styles.aiGrid}>
                     <View style={styles.aiMiniCard}>
                       <Text style={styles.aiLabel}>Trend</Text>
-                      <Text style={styles.aiValue}>{insight.ai.trend || "—"}</Text>
+                      <Text style={styles.aiValue}>
+                        {insight.ai.trend || "—"}
+                      </Text>
                     </View>
 
                     <View style={styles.aiMiniCard}>
                       <Text style={styles.aiLabel}>Risk</Text>
-                      <Text style={styles.aiValue}>{insight.ai.risk || "—"}</Text>
+                      <Text style={styles.aiValue}>
+                        {insight.ai.risk || "—"}
+                      </Text>
                     </View>
 
                     <View style={styles.aiMiniCard}>
@@ -522,7 +531,12 @@ export default function PortfolioScreen({ navigation }) {
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStat}>
               <Text style={styles.heroStatLabel}>Today P&L</Text>
-              <Text style={[styles.heroStatValue, { color: getGainColor(todayGain) }]}>
+              <Text
+                style={[
+                  styles.heroStatValue,
+                  { color: getGainColor(todayGain) },
+                ]}
+              >
                 {signedMoney(todayGain)}
               </Text>
             </View>
@@ -579,10 +593,10 @@ export default function PortfolioScreen({ navigation }) {
               {sortMode === "gain"
                 ? "gain"
                 : sortMode === "shares"
-                ? "shares"
-                : sortMode === "allocation"
-                ? "allocation"
-                : "A-Z"}
+                  ? "shares"
+                  : sortMode === "allocation"
+                    ? "allocation"
+                    : "A-Z"}
             </Text>
           </View>
 
@@ -630,8 +644,13 @@ export default function PortfolioScreen({ navigation }) {
       </Pressable>
 
       {portfolio.length > 0 && (
-        <Animated.View style={[styles.astraWrap, { transform: [{ scale: pulseAnim }] }]}>
-          <Pressable style={styles.astraFab} onPress={() => setAstraVisible(true)}>
+        <Animated.View
+          style={[styles.astraWrap, { transform: [{ scale: pulseAnim }] }]}
+        >
+          <Pressable
+            style={styles.astraFab}
+            onPress={() => setAstraVisible(true)}
+          >
             <AstraAnimatedIcon size={40} />
           </Pressable>
         </Animated.View>
@@ -1092,10 +1111,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
-sortItemTextActive: {
-  color: BRAND.accent,
-  fontWeight: "900",
-},
+  sortItemTextActive: {
+    color: BRAND.accent,
+    fontWeight: "900",
+  },
   footerWrap: {
     marginTop: 28,
     marginBottom: 30,
@@ -1153,31 +1172,31 @@ sortItemTextActive: {
     justifyContent: "center",
     elevation: 10,
   },
-    headerTitle: {
+  headerTitle: {
     color: BRAND.accent,
     fontSize: 23,
     fontWeight: "900",
     letterSpacing: 0.4,
     marginBottom: 2,
-    textAlign: "center", 
+    textAlign: "center",
   },
 
-headerSub: {
-  color: BRAND.muted,
-  fontSize: 11.5,
-  fontWeight: "700",
-  marginBottom: 12,
-},
-headerMeta: {
-  color: BRAND.muted,
-  fontSize: 10.5,
-  fontWeight: "700",
-  marginBottom: 8,
-},
-footerMeta: {
-  color: BRAND.muted,
-  fontSize: 10.5,
-  marginBottom: 8,
-  fontWeight: "700",
-},
+  headerSub: {
+    color: BRAND.muted,
+    fontSize: 11.5,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
+  headerMeta: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  footerMeta: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    marginBottom: 8,
+    fontWeight: "700",
+  },
 });

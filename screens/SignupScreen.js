@@ -14,6 +14,7 @@ import {
   Keyboard,
   Pressable,
   StatusBar,
+  TouchableOpacity, // Added
 } from "react-native";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -23,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { auth, db } from "../firebaseConfig";
 import { BRAND } from "../constants/theme";
+import { SafeAreaView } from "react-native-safe-area-context"; // Added
 
 export default function SignupScreen({ navigation }) {
   const [firstName, setFirstName] = useState("");
@@ -60,7 +62,7 @@ export default function SignupScreen({ navigation }) {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         cleanEmail,
-        password
+        password,
       );
 
       const user = userCredential.user;
@@ -76,16 +78,15 @@ export default function SignupScreen({ navigation }) {
       await AsyncStorage.setItem("userToken", user.email);
       await AsyncStorage.setItem(
         "profile_" + user.email,
-        JSON.stringify({ firstName, lastName, bio, email: cleanEmail })
+        JSON.stringify({ firstName, lastName, bio, email: cleanEmail }),
       );
 
       navigation.replace("Main");
     } catch (error) {
       console.warn("Signup failed:", error?.code);
-
       Alert.alert(
         "Signup Failed",
-        "Unable to create account. Please try again."
+        "Unable to create account. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -93,146 +94,153 @@ export default function SignupScreen({ navigation }) {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-      <KeyboardAvoidingView
-        style={styles.screen}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
-
-        <ScrollView
-          contentContainerStyle={styles.wrapper}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.safeArea}>
+      <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+        <KeyboardAvoidingView
+          style={styles.screen}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          {/* HEADER */}
-          <View style={styles.header}>
-            <Image
-              source={require("../assets/alpha-transparent.png")}
-              style={styles.logo}
-            />
-            <Text style={styles.title}>Alphaclara</Text>
-            <Text style={styles.subtitle}>Create account</Text>
-            <Text style={styles.tagline}>
-              Get started with AI-powered market intelligence.
-            </Text>
-          </View>
+          <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
 
-          {/* FORM */}
-          <View style={styles.formCard}>
-            <TextInput
-              style={styles.input}
-              placeholder="First Name"
-              placeholderTextColor={BRAND.muted}
-              value={firstName}
-              onChangeText={setFirstName}
-              returnKeyType="next"
-              onSubmitEditing={() => lastNameRef.current?.focus()}
-            />
-
-            <TextInput
-              ref={lastNameRef}
-              style={styles.input}
-              placeholder="Last Name"
-              placeholderTextColor={BRAND.muted}
-              value={lastName}
-              onChangeText={setLastName}
-              returnKeyType="next"
-              onSubmitEditing={() => emailRef.current?.focus()}
-            />
-
-            <TextInput
-              ref={emailRef}
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor={BRAND.muted}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              textContentType="emailAddress"
-              returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-            />
-
-            <View style={styles.passwordWrap}>
-              <TextInput
-                ref={passwordRef}
-                style={styles.passwordInput}
-                placeholder="Password (min 6 chars)"
-                placeholderTextColor={BRAND.muted}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={securePassword}
-                returnKeyType="done"
+          <ScrollView
+            contentContainerStyle={styles.wrapper}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* HEADER */}
+            <View style={styles.header}>
+              <Image
+                source={require("../assets/alpha-transparent.png")}
+                style={styles.logo}
               />
-
-              <Pressable onPress={() => setSecurePassword((v) => !v)}>
-                <Ionicons
-                  name={securePassword ? "eye-outline" : "eye-off-outline"}
-                  size={20}
-                  color={BRAND.sub}
-                />
-              </Pressable>
+              <Text style={styles.title}>Alphaclara</Text>
+              <Text style={styles.subtitle}>Create account</Text>
+              <Text style={styles.tagline}>
+                Get started with AI-powered market intelligence.
+              </Text>
             </View>
 
-            <TextInput
-              style={[styles.input, { height: 70 }]}
-              placeholder="Short Bio (optional)"
-              placeholderTextColor={BRAND.muted}
-              value={bio}
-              onChangeText={setBio}
-              multiline
-            />
+            {/* FORM */}
+            <View style={styles.formCard}>
+              <TextInput
+                style={styles.input}
+                placeholder="First Name"
+                placeholderTextColor={BRAND.muted}
+                value={firstName}
+                onChangeText={setFirstName}
+                returnKeyType="next"
+                onSubmitEditing={() => lastNameRef.current?.focus()}
+              />
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.button,
-                !canSignup && styles.buttonDisabled,
-                pressed && canSignup && { opacity: 0.7 },
-              ]}
-              onPress={handleSignup}
-              disabled={!canSignup}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? "Creating…" : "Create Account"}
-              </Text>
-            </Pressable>
+              <TextInput
+                ref={lastNameRef}
+                style={styles.input}
+                placeholder="Last Name"
+                placeholderTextColor={BRAND.muted}
+                value={lastName}
+                onChangeText={setLastName}
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+              />
 
-            <Text style={styles.link} onPress={() => navigation.navigate("Login")}>
-              Already have an account?{" "}
-              <Text style={styles.linkHighlight}>Sign In</Text>
-            </Text>
-          </View>
+              <TextInput
+                ref={emailRef}
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor={BRAND.muted}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+              />
 
-          {/* FOOTER */}
-          <View style={styles.footerWrap}>
-            <Text style={styles.footerText}>
-              By continuing, you agree to Alphaclara’s{" "}
-              <Text
-                style={styles.footerLink}
-                onPress={() => navigation.navigate("TermsOfUseScreen")}
+              <View style={styles.passwordWrap}>
+                <TextInput
+                  ref={passwordRef}
+                  style={styles.passwordInput}
+                  placeholder="Password (min 6 chars)"
+                  placeholderTextColor={BRAND.muted}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={securePassword}
+                  returnKeyType="done"
+                />
+
+                <Pressable onPress={() => setSecurePassword((v) => !v)}>
+                  <Ionicons
+                    name={securePassword ? "eye-outline" : "eye-off-outline"}
+                    size={20}
+                    color={BRAND.sub}
+                  />
+                </Pressable>
+              </View>
+
+              <TextInput
+                style={[styles.input, { height: 70 }]}
+                placeholder="Short Bio (optional)"
+                placeholderTextColor={BRAND.muted}
+                value={bio}
+                onChangeText={setBio}
+                multiline
+              />
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.button,
+                  !canSignup && styles.buttonDisabled,
+                  pressed && canSignup && { opacity: 0.7 },
+                ]}
+                onPress={handleSignup}
+                disabled={!canSignup}
               >
-                Terms of Use
-              </Text>{" "}
-              and{" "}
-              <Text
-                style={styles.footerLink}
-                onPress={() => navigation.navigate("PrivacyPolicy")}
-              >
-                Privacy Policy
+                <Text style={styles.buttonText}>
+                  {loading ? "Creating…" : "Create Account"}
+                </Text>
+              </Pressable>
+
+              {/* Fixed Link */}
+              <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+                <Text style={styles.link}>
+                  Already have an account?{" "}
+                  <Text style={styles.linkHighlight}>Sign In</Text>
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* FOOTER */}
+            <View style={styles.footerWrap}>
+              <Text style={styles.footerText}>
+                By continuing, you agree to Alphaclara’s{" "}
+                <Text
+                  style={styles.footerLink}
+                  onPress={() => navigation.navigate("TermsOfUseScreen")}
+                >
+                  Terms of Use
+                </Text>{" "}
+                and{" "}
+                <Text
+                  style={styles.footerLink}
+                  onPress={() => navigation.navigate("PrivacyPolicy")}
+                >
+                  Privacy Policy
+                </Text>
+                .
               </Text>
-              .
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </TouchableWithoutFeedback>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: BRAND.bg },
+
   screen: { flex: 1, backgroundColor: BRAND.bg },
 
   wrapper: {
@@ -305,6 +313,7 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     textAlign: "center",
     marginTop: 16,
+    fontSize: 14,
   },
 
   linkHighlight: {

@@ -1,10 +1,15 @@
 // firebaseConfig.js
 import { initializeApp } from "firebase/app";
+import { initializeAuth, getReactNativePersistence } from "firebase/auth";
 import {
-  initializeAuth,
-  getReactNativePersistence,
-} from "firebase/auth";
-import { getFirestore, doc, getDoc, setDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  getDocs,
+  collection,
+  deleteDoc,
+} from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
@@ -43,12 +48,15 @@ export async function saveCachedSummary(symbol, summary) {
     const user = auth.currentUser;
     if (!user) return;
     const ref = doc(db, "users", user.uid, "summaries", symbol);
-    await setDoc(ref, { summary, updatedAt: new Date().toISOString() }, { merge: true });
+    await setDoc(
+      ref,
+      { summary, updatedAt: new Date().toISOString() },
+      { merge: true },
+    );
   } catch (err) {
     console.warn("saveCachedSummary error:", err);
   }
 }
-
 
 // -------------------------------------------------------------
 // PORTFOLIO CRUD (Firestore) — Lot-Based, FIFO
@@ -156,7 +164,7 @@ export async function buyShares(userId, symbol, shares, price) {
         avgCost,
         updatedAt: new Date().toISOString(),
       },
-      { merge: true }
+      { merge: true },
     );
 
     console.log("💹 BUY applied for", sym, "lots:", lots.length);
@@ -211,7 +219,7 @@ export async function sellShares(userId, symbol, sharesToSell) {
         avgCost,
         updatedAt: new Date().toISOString(),
       },
-      { merge: true }
+      { merge: true },
     );
 
     console.log("💹 SELL applied for", sym, "lots now:", lots.length);
@@ -236,7 +244,7 @@ export async function updatePosition(userId, symbol, updates) {
         ...updates,
         updatedAt: Date.now(),
       },
-      { merge: true }
+      { merge: true },
     );
   } catch (err) {
     console.warn("updatePosition error:", err.message);
@@ -281,50 +289,6 @@ export async function getPortfolio(userId) {
   }
 }
 
-
-// === Existing Background ===
-import * as BackgroundFetch from "expo-background-fetch";
-import * as TaskManager from "expo-task-manager";
-import { getTickerSummary } from "./services/marketData.js";
-
-const REVALIDATE_TASK = "nightly-summary-refresh";
-
-TaskManager.defineTask(REVALIDATE_TASK, async () => {
-  try {
-    const user = auth.currentUser;
-    if (!user) return BackgroundFetch.Result.NoData;
-
-    const col = collection(db, "users", user.uid, "summaries");
-    const snaps = await getDocs(col);
-
-    for (const docSnap of snaps.docs) {
-      const { summary, updatedAt } = docSnap.data();
-      const ageHours = (Date.now() - new Date(updatedAt).getTime()) / 3600000;
-      if (ageHours > 24) {
-        const symbol = docSnap.id;
-        console.log("Revalidating summary for", symbol);
-        await getTickerSummary({ symbol });
-      }
-    }
-    return BackgroundFetch.Result.NewData;
-  } catch (err) {
-    console.warn("Background revalidation error:", err);
-    return BackgroundFetch.Result.Failed;
-  }
-});
-
-export async function registerNightlySummaryJob() {
-  try {
-    await BackgroundFetch.registerTaskAsync(REVALIDATE_TASK, {
-      minimumInterval: 24 * 60 * 60,
-      stopOnTerminate: false,
-      startOnBoot: true,
-    });
-    console.log("Nightly task registered.");
-  } catch (err) {
-    console.warn("registerNightlySummaryJob error:", err);
-  }
-}
 // === NEW: AI Pulse Cache for InsightsScreen ===
 
 /**
@@ -357,8 +321,7 @@ export async function getFromFirestoreCache(docId, maxAgeHours = 3) {
     const { data, updated_at } = snap.data();
     if (!updated_at) return data;
 
-    const ageHours =
-      (Date.now() - new Date(updated_at).getTime()) / 3600000;
+    const ageHours = (Date.now() - new Date(updated_at).getTime()) / 3600000;
 
     if (ageHours > maxAgeHours) {
       console.log(`⏰ AI Pulse cache expired (${ageHours.toFixed(1)}h)`);
@@ -373,7 +336,6 @@ export async function getFromFirestoreCache(docId, maxAgeHours = 3) {
   }
 }
 
-
 // === HOTLIST CACHE (BullBrain v2, GLOBAL) ===
 // Backend writes docs with shape:
 // { count, hotlist, updated_at }
@@ -386,7 +348,7 @@ export async function saveHotlistCache(data) {
         ...data, // expect { count, hotlist }
         updated_at: new Date().toISOString(),
       },
-      { merge: true }
+      { merge: true },
     );
     console.log("🔥 Hotlist cached (client write)");
   } catch (err) {
@@ -406,8 +368,7 @@ export async function getHotlistCache(maxAgeMinutes = 5) {
 
     if (!updated_at) return data;
 
-    const ageMinutes =
-      (Date.now() - new Date(updated_at).getTime()) / 60000;
+    const ageMinutes = (Date.now() - new Date(updated_at).getTime()) / 60000;
 
     if (ageMinutes > maxAgeMinutes) {
       console.log("⏰ Hotlist cache expired");
@@ -422,7 +383,6 @@ export async function getHotlistCache(maxAgeMinutes = 5) {
   }
 }
 
-
 // === BEARWATCH CACHE (BullBrain v2, GLOBAL) ===
 // Backend writes docs with shape:
 // { count, bearwatch, updated_at }
@@ -435,7 +395,7 @@ export async function saveBearwatchCache(data) {
         ...data, // expect { count, bearwatch }
         updated_at: new Date().toISOString(),
       },
-      { merge: true }
+      { merge: true },
     );
     console.log("🔥 BearWatch cached (client write)");
   } catch (err) {
@@ -455,8 +415,7 @@ export async function getBearwatchCache(maxAgeMinutes = 5) {
 
     if (!updated_at) return data;
 
-    const ageMinutes =
-      (Date.now() - new Date(updated_at).getTime()) / 60000;
+    const ageMinutes = (Date.now() - new Date(updated_at).getTime()) / 60000;
 
     if (ageMinutes > maxAgeMinutes) {
       console.log("⏰ BearWatch cache expired");
