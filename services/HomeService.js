@@ -1,4 +1,3 @@
-
 // services/HomeService.js
 import { API_BASE_URL } from "../config/apiKeys";
 
@@ -27,9 +26,7 @@ export async function getHomeScreen() {
     const [mag7Res, carouselRes, quotesRes] = await Promise.all([
       fetch(`${API_BASE_URL}/homescreen-mag7`), // intelligence (cron)
       fetch(`${API_BASE_URL}/homescreen-carousel`),
-      fetch(
-        `${API_BASE_URL}/quotes-bulk?scope=home&symbols=${symbolsParam}`
-      ), // 🔥 LIVE quotes
+      fetch(`${API_BASE_URL}/quotes-bulk?scope=home&symbols=${symbolsParam}`), // 🔥 LIVE quotes
     ]);
 
     if (!mag7Res.ok || !carouselRes.ok) return null;
@@ -46,10 +43,7 @@ export async function getHomeScreen() {
     return {
       header: buildHeader(carouselJson),
       carousel: buildCarousel(carouselJson.carousel || []),
-      signals: buildMag7Signals(
-        mag7Json.mag7 || [],
-        quotesJson
-      ),
+      signals: buildMag7Signals(mag7Json.mag7 || [], quotesJson),
       meta: {
         version: `mag7:${mag7Json.version} | carousel:${carouselJson.version}`,
         refreshed_at: new Date().toISOString(),
@@ -79,11 +73,10 @@ function buildHeader(carouselJson) {
 }
 
 function deriveMarketStatus(usMarket) {
-  if (!usMarket || !usMarket.items?.length)
-    return "Market Status Unknown";
+  if (!usMarket || !usMarket.items?.length) return "Market Status Unknown";
 
   const spy = usMarket.items.find((i) =>
-    i.label?.toLowerCase().includes("s&p")
+    i.label?.toLowerCase().includes("s&p"),
   );
 
   if (!spy || !spy.value) return "Market Open";
@@ -175,29 +168,16 @@ function buildMag7Signals(stocks = [], quotes = {}) {
     const needsRefresh = q?.needs_refresh === true;
 
     // ✅ ALWAYS show price if available
-    const price =
-      q?.price ??
-      s.quote?.price ??
-      null;
+    const price = q?.price ?? s.quote?.price ?? null;
 
-    const change =
-      q?.change ??
-      s.quote?.change ??
-      null;
+    const change = q?.change ?? s.quote?.change ?? null;
 
-    const changePct =
-      q?.changePct ??
-      s.quote?.changePct ??
-      null;
+    const changePct = q?.changePct ?? s.quote?.changePct ?? null;
 
     // ✅ Timestamp logic: trust live only if not stale
-    const lastUpdated =
-      !needsRefresh
-        ? q?.updated_at
-        : s.quote?.updated_at ??
-          q?.updated_at ??
-          s.updated_at ??
-          null;
+    const lastUpdated = !needsRefresh
+      ? q?.updated_at
+      : (s.quote?.updated_at ?? q?.updated_at ?? s.updated_at ?? null);
 
     return {
       symbol: sym,
@@ -213,7 +193,9 @@ function buildMag7Signals(stocks = [], quotes = {}) {
       confidence: Number(s.bullbrain?.confidence ?? 0),
 
       summary:
-        s.insight || "Market signal based on trend and momentum.",
+        s.marketAwareness?.summary ||
+        s.insight ||
+        "Market signal based on trend and momentum.",
 
       pattern: s.pattern?.name || null,
       patternWinRate: s.pattern?.winRate_5d ?? null,
@@ -230,7 +212,6 @@ function buildMag7Signals(stocks = [], quotes = {}) {
     };
   });
 }
-
 
 /* =========================================================
    ICON MAP

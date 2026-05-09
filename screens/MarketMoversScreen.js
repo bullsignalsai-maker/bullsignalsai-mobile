@@ -1,5 +1,11 @@
 // screens/MarketMoversScreen.js
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   View,
   Text,
@@ -10,13 +16,15 @@ import {
   StatusBar,
   Animated,
   RefreshControl,
+  Image,
 } from "react-native";
-
+import ViewShot from "react-native-view-shot";
+import * as Sharing from "expo-sharing";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { getMarketMovers } from "../services/MarketPulseService";
 import { BRAND } from "../constants/theme";
-
+const ALPHACLARA_LOGO = require("../assets/alpha-transparent.png");
 /* ---------------------------------------------------------
    Utils
 --------------------------------------------------------- */
@@ -33,7 +41,8 @@ function formatPct(v) {
 function formatPrice(v) {
   if (v == null || Number.isNaN(Number(v))) return "—";
   const n = Number(v);
-  if (n >= 1000) return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  if (n >= 1000)
+    return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   if (n >= 1) return `$${n.toFixed(2)}`;
   return `$${n.toFixed(4)}`;
 }
@@ -79,7 +88,7 @@ export default function MarketMoversScreen({ navigation }) {
   const [sortBy, setSortBy] = useState("move");
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
-
+  const shareCardRef = useRef(null);
   const loadMovers = useCallback(
     async (silent = false) => {
       try {
@@ -88,7 +97,9 @@ export default function MarketMoversScreen({ navigation }) {
 
         const data = await getMarketMovers();
         if (!data) {
-          setErrorMessage("Market movers are temporarily unavailable. Pull to refresh.");
+          setErrorMessage(
+            "Market movers are temporarily unavailable. Pull to refresh.",
+          );
           return;
         }
 
@@ -113,13 +124,15 @@ export default function MarketMoversScreen({ navigation }) {
         ]).start();
       } catch (e) {
         console.warn("MarketMoversScreen error:", e?.message || e);
-        setErrorMessage("Market movers are temporarily unavailable. Pull to refresh.");
+        setErrorMessage(
+          "Market movers are temporarily unavailable. Pull to refresh.",
+        );
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [fadeAnim]
+    [fadeAnim],
   );
 
   useEffect(() => {
@@ -148,8 +161,13 @@ export default function MarketMoversScreen({ navigation }) {
       .filter((m) => !!m.symbol);
 
     cleaned.sort((a, b) => {
+      if (sortBy === "dollar")
+        return Math.abs(b.change || 0) - Math.abs(a.change || 0);
+      if (sortBy === "pct")
+        return Math.abs(b.changePct || 0) - Math.abs(a.changePct || 0);
       if (sortBy === "price") return (b.price || 0) - (a.price || 0);
-      if (sortBy === "symbol") return String(a.symbol).localeCompare(String(b.symbol));
+      if (sortBy === "symbol")
+        return String(a.symbol).localeCompare(String(b.symbol));
       return Math.abs(b.changePct || 0) - Math.abs(a.changePct || 0);
     });
 
@@ -167,7 +185,55 @@ export default function MarketMoversScreen({ navigation }) {
       updated: timeAgoFromUtc(raw.updated_at || raw.as_of),
     };
   }, [raw]);
+  const shareMovers = async () => {
+    try {
+      const uri = await shareCardRef.current?.capture?.();
 
+      if (!uri) {
+        console.warn("Share card capture failed: no URI");
+        return;
+      }
+
+      const available = await Sharing.isAvailableAsync();
+
+      if (!available) {
+        console.warn("Sharing is not available on this device");
+        return;
+      }
+
+      await Sharing.shareAsync(uri, {
+        mimeType: "image/png",
+        dialogTitle: "Share Alphaclara Market Movers",
+      });
+    } catch (e) {
+      console.warn("Share movers card error:", e?.message || e);
+    }
+  };
+  const shareRising = useMemo(() => {
+    if (tab === "losers") return [];
+
+    return [...(raw.gainers || [])]
+      .map((m) => ({
+        ...m,
+        changePct: Number(m.changePct || 0),
+        change: Number(m.change || 0),
+        price: Number(m.price || 0),
+      }))
+      .sort((a, b) => Math.abs(b.changePct || 0) - Math.abs(a.changePct || 0));
+  }, [raw.gainers, tab]);
+
+  const sharePullingBack = useMemo(() => {
+    if (tab === "gainers") return [];
+
+    return [...(raw.losers || [])]
+      .map((m) => ({
+        ...m,
+        changePct: Number(m.changePct || 0),
+        change: Number(m.change || 0),
+        price: Number(m.price || 0),
+      }))
+      .sort((a, b) => Math.abs(b.changePct || 0) - Math.abs(a.changePct || 0));
+  }, [raw.losers, tab]);
   const renderRow = ({ item }) => {
     const pct = Number(item.changePct);
     const isUp = !Number.isNaN(pct) && pct >= 0;
@@ -175,7 +241,9 @@ export default function MarketMoversScreen({ navigation }) {
 
     const trendLabel = item.trendLabel || item.trend?.label || "Market trend";
     const patternName =
-      typeof item.pattern === "string" ? item.pattern : item.pattern?.name || null;
+      typeof item.pattern === "string"
+        ? item.pattern
+        : item.pattern?.name || null;
 
     const showPattern = isMeaningfulPattern(patternName);
 
@@ -198,9 +266,14 @@ export default function MarketMoversScreen({ navigation }) {
               <View style={styles.symbolLine}>
                 <Text style={styles.symbol}>{item.symbol}</Text>
 
-                <View style={[styles.movePill, isUp ? styles.movePillUp : styles.movePillDown]}>
+                <View
+                  style={[
+                    styles.movePill,
+                    isUp ? styles.movePillUp : styles.movePillDown,
+                  ]}
+                >
                   <Text style={[styles.movePillText, { color }]}>
-                    {isUp ? "Gainer" : "Loser"}
+                    {isUp ? "Rising" : "Pullback"}
                   </Text>
                 </View>
               </View>
@@ -248,87 +321,111 @@ export default function MarketMoversScreen({ navigation }) {
   };
 
   const ListHeader = () => (
-  <View style={styles.headerWrap}>
-    <View style={styles.compactTopRow}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.compactTitle}>Market Movers</Text>
+    <View style={styles.headerWrap}>
+      <View style={styles.compactTopRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.compactTitle}>Market Movers</Text>
 
-        <Text style={styles.compactSub}>
-          <Text style={{ color: BRAND.accent, fontWeight: "700" }}>
-            Alphaclara
-          </Text>{" "}
-          tracked universe • {stats.updated}
-        </Text>
-      </View>
-
-      <View style={styles.compactStats}>
-        <Text style={styles.compactStatText}>
-          <Text style={{ color: BRAND.green }}>{stats.gainers}</Text> ↑
-        </Text>
-        <Text style={styles.compactStatText}>
-          <Text style={{ color: BRAND.red }}>{stats.losers}</Text> ↓
-        </Text>
-      </View>
-    </View>
-
-    <View style={styles.tabRow}>
-      {[
-        { key: "all", label: "All" },
-        { key: "gainers", label: "Gainers" },
-        { key: "losers", label: "Losers" },
-      ].map((opt) => (
-        <TouchableOpacity
-          key={opt.key}
-          onPress={() => setTab(opt.key)}
-          style={[styles.tabPill, tab === opt.key && styles.tabPillActive]}
-          activeOpacity={0.82}
-        >
-          <Text style={[styles.tabText, tab === opt.key && styles.tabTextActive]}>
-            {opt.label}
+          <Text style={styles.compactSub}>
+            <Text style={{ color: BRAND.accent, fontWeight: "700" }}>
+              Alphaclara
+            </Text>{" "}
+            mover universe • updated {stats.updated}
           </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
+        </View>
 
-    <View style={styles.sortCompactRow}>
-      <Text style={styles.sortLabel}>Sort</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.shareButton}
+            activeOpacity={0.82}
+            onPress={shareMovers}
+          >
+            <Ionicons name="share-outline" size={15} color={BRAND.accent} />
+            <Text style={styles.shareText}>Share</Text>
+          </TouchableOpacity>
 
-      {[
-        { key: "move", label: "% Move" },
-        { key: "price", label: "Price" },
-        { key: "symbol", label: "Symbol" },
-      ].map((opt) => (
-        <TouchableOpacity
-          key={opt.key}
-          onPress={() => setSortBy(opt.key)}
-          style={[styles.sortPill, sortBy === opt.key && styles.sortPillActive]}
-          activeOpacity={0.82}
-        >
-          <Text style={[styles.sortText, sortBy === opt.key && styles.sortTextActive]}>
-            {opt.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
+          <View style={styles.compactStats}>
+            <Text style={styles.compactStatText}>
+              <Text style={{ color: BRAND.green }}>{stats.gainers}</Text> ↑
+            </Text>
 
-    <View style={styles.resultRow}>
-      <Text style={styles.resultCount}>{data.length} results</Text>
-      <Text style={styles.resultHint}>Tap any symbol for detail</Text>
-    </View>
-
-    {errorMessage && data.length === 0 ? (
-      <View style={styles.errorBox}>
-        <Ionicons name="alert-circle-outline" size={15} color={BRAND.amber} />
-        <Text style={styles.errorText}>{errorMessage}</Text>
+            <Text style={styles.compactStatText}>
+              <Text style={{ color: BRAND.red }}>{stats.losers}</Text> ↓
+            </Text>
+          </View>
+        </View>
       </View>
-    ) : null}
 
-    <View style={styles.columnHint}>
-      <Text style={styles.columnHintText}>Symbol / Market context</Text>
-      <Text style={styles.columnHintText}>Move</Text>
+      <View style={styles.tabRow}>
+        {[
+          { key: "all", label: "All" },
+          { key: "gainers", label: "Rising" },
+          { key: "losers", label: "Pulling Back" },
+        ].map((opt) => (
+          <TouchableOpacity
+            key={opt.key}
+            onPress={() => setTab(opt.key)}
+            style={[styles.tabPill, tab === opt.key && styles.tabPillActive]}
+            activeOpacity={0.82}
+          >
+            <Text
+              style={[styles.tabText, tab === opt.key && styles.tabTextActive]}
+            >
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.sortCompactRow}>
+        <Text style={styles.sortLabel}>Sort</Text>
+
+        {[
+          { key: "move", label: "% Move" },
+          { key: "dollar", label: "$ Chg" },
+          { key: "pct", label: "% Chg" },
+          { key: "price", label: "Price" },
+          { key: "symbol", label: "Symbol" },
+        ].map((opt) => (
+          <TouchableOpacity
+            key={opt.key}
+            onPress={() => setSortBy(opt.key)}
+            style={[
+              styles.sortPill,
+              sortBy === opt.key && styles.sortPillActive,
+            ]}
+            activeOpacity={0.82}
+          >
+            <Text
+              style={[
+                styles.sortText,
+                sortBy === opt.key && styles.sortTextActive,
+              ]}
+            >
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.resultRow}>
+        <Text style={styles.resultCount}>{data.length} results</Text>
+        <Text style={styles.resultHint}>Tap any symbol for detail</Text>
+      </View>
+
+      {errorMessage && data.length === 0 ? (
+        <View style={styles.errorBox}>
+          <Ionicons name="alert-circle-outline" size={15} color={BRAND.amber} />
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.columnHint}>
+        <Text style={styles.columnHintText}>Symbol / Market context</Text>
+        <Text style={styles.columnHintText}>Move</Text>
+      </View>
     </View>
-  </View>
-);
+  );
 
   if (loading) {
     return (
@@ -343,7 +440,103 @@ export default function MarketMoversScreen({ navigation }) {
   return (
     <View style={styles.wrapper}>
       <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
+      <View style={styles.hiddenShareCardWrap} pointerEvents="none">
+        <ViewShot ref={shareCardRef} options={{ format: "png", quality: 1 }}>
+          <View style={styles.shareCard}>
+            <View style={styles.shareBrandRow}>
+              <Image source={ALPHACLARA_LOGO} style={styles.shareLogo} />
+              <View>
+                <Text style={styles.shareCardTitle}>Alphaclara</Text>
+                <Text style={styles.shareCardSubTitle}>Market Movers</Text>
+              </View>
+            </View>
 
+            <Text style={styles.shareCardMeta}>
+              Updated {stats.updated} • Informational only
+            </Text>
+
+            {shareRising.length > 0 && (
+              <View style={styles.shareSection}>
+                <Text
+                  style={[styles.shareSectionTitle, { color: BRAND.green }]}
+                >
+                  Rising
+                </Text>
+
+                <View style={styles.shareTableHeader}>
+                  <Text style={styles.shareHeaderSymbol}>Symbol</Text>
+                  <Text style={styles.shareHeaderPrice}>Price</Text>
+                  <Text style={styles.shareHeaderDollar}>$ Chg</Text>
+                  <Text style={styles.shareHeaderMove}>% Chg</Text>
+                </View>
+
+                {shareRising.map((m, index) => (
+                  <View
+                    key={`rise-${m.symbol}-${index}`}
+                    style={styles.shareTableRow}
+                  >
+                    <Text style={styles.shareColSymbol}>{m.symbol}</Text>
+
+                    <Text style={styles.shareColPrice}>
+                      {formatPrice(m.price)}
+                    </Text>
+
+                    <Text
+                      style={[styles.shareColDollar, { color: BRAND.green }]}
+                    >
+                      +${Math.abs(Number(m.change || 0)).toFixed(2)}
+                    </Text>
+
+                    <Text style={[styles.shareColMove, { color: BRAND.green }]}>
+                      ▲ {Math.abs(Number(m.changePct || 0)).toFixed(2)}%
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {sharePullingBack.length > 0 && (
+              <View style={styles.shareSection}>
+                <Text style={[styles.shareSectionTitle, { color: BRAND.red }]}>
+                  Pulling Back
+                </Text>
+
+                <View style={styles.shareTableHeader}>
+                  <Text style={styles.shareHeaderSymbol}>Symbol</Text>
+                  <Text style={styles.shareHeaderPrice}>Price</Text>
+                  <Text style={styles.shareHeaderDollar}>$ Chg</Text>
+                  <Text style={styles.shareHeaderMove}>% Chg</Text>
+                </View>
+
+                {sharePullingBack.map((m, index) => (
+                  <View
+                    key={`pull-${m.symbol}-${index}`}
+                    style={styles.shareTableRow}
+                  >
+                    <Text style={styles.shareColSymbol}>{m.symbol}</Text>
+
+                    <Text style={styles.shareColPrice}>
+                      {formatPrice(m.price)}
+                    </Text>
+
+                    <Text style={[styles.shareColDollar, { color: BRAND.red }]}>
+                      -${Math.abs(Number(m.change || 0)).toFixed(2)}
+                    </Text>
+
+                    <Text style={[styles.shareColMove, { color: BRAND.red }]}>
+                      ▼ {Math.abs(Number(m.changePct || 0)).toFixed(2)}%
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <Text style={styles.shareFooter}>
+              Powered by Alphaclara • Not financial advice
+            </Text>
+          </View>
+        </ViewShot>
+      </View>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <FlatList
           data={data}
@@ -366,13 +559,16 @@ export default function MarketMoversScreen({ navigation }) {
                 Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
               </Text>
 
-              <Text style={styles.footerMeta}>Last updated {stats.updated}</Text>
+              <Text style={styles.footerMeta}>
+                Last updated {stats.updated}
+              </Text>
 
               <Text style={styles.disclaimer}>
-                Market Movers are based on Alphaclara’s internal tracked universe,
-                percentage price movement, trend context, and pattern analytics.
-                Content is provided for informational and educational purposes only
-                and is not financial, investment, trading, or tax advice.
+                Market Movers are based on Alphaclara’s internal tracked
+                universe, percentage price movement, trend context, and pattern
+                analytics. Content is provided for informational and educational
+                purposes only and is not financial, investment, trading, or tax
+                advice.
               </Text>
             </View>
           }
@@ -548,8 +744,8 @@ const styles = StyleSheet.create({
   },
 
   sortPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: BRAND.border,
@@ -563,7 +759,7 @@ const styles = StyleSheet.create({
 
   sortText: {
     color: BRAND.sub,
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: "800",
   },
 
@@ -805,161 +1001,263 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: "center",
   },
+
   headerWrap: {
-  paddingTop: 8,
-  paddingBottom: 8,
-  paddingHorizontal: 14,
-  backgroundColor: BRAND.bg,
-},
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingHorizontal: 14,
+    backgroundColor: BRAND.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: BRAND.softBorder,
+  },
 
-compactTopRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: 10,
-},
+  compactTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
 
-compactTitle: {
-  color: BRAND.text,
-  fontSize: 22,
-  fontWeight: "900",
-},
+  compactTitle: {
+    color: BRAND.text,
+    fontSize: 22,
+    fontWeight: "900",
+  },
 
-compactSub: {
-  color: BRAND.muted,
-  fontSize: 11,
-  marginTop: 2,
-  fontWeight: "700",
-},
+  compactSub: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: "700",
+  },
 
-compactStats: {
-  flexDirection: "row",
-  columnGap: 8,
-  backgroundColor: BRAND.card2,
-  borderWidth: 1,
-  borderColor: BRAND.border,
-  borderRadius: 999,
-  paddingHorizontal: 10,
-  paddingVertical: 6,
-},
+  compactStats: {
+    flexDirection: "row",
+    columnGap: 8,
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
 
-compactStatText: {
-  color: BRAND.sub,
-  fontSize: 12,
-  fontWeight: "900",
-},
+  compactStatText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    fontWeight: "900",
+  },
 
-sortCompactRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  columnGap: 8,
-  marginTop: 8,
-},
-headerWrap: {
-  paddingTop: 8,
-  paddingBottom: 8,
-  paddingHorizontal: 14,
-  backgroundColor: BRAND.bg,
-  borderBottomWidth: 1,
-  borderBottomColor: BRAND.softBorder,
-},
+  sortCompactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    columnGap: 6,
+    rowGap: 6,
+    marginTop: 8,
+  },
 
-compactTopRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: 10,
-},
+  resultRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+  },
 
-compactTitle: {
-  color: BRAND.text,
-  fontSize: 22,
-  fontWeight: "900",
-},
+  resultCount: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontWeight: "800",
+  },
 
-compactSub: {
-  color: BRAND.muted,
-  fontSize: 11,
-  marginTop: 2,
-  fontWeight: "700",
-},
+  resultHint: {
+    color: BRAND.muted,
+    fontSize: 11,
+    fontWeight: "700",
+  },
 
-compactStats: {
-  flexDirection: "row",
-  columnGap: 8,
-  backgroundColor: BRAND.card2,
-  borderWidth: 1,
-  borderColor: BRAND.border,
-  borderRadius: 999,
-  paddingHorizontal: 10,
-  paddingVertical: 6,
-},
+  footerMeta: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    marginBottom: 8,
+    fontWeight: "700",
+  },
+  headerActions: {
+    alignItems: "flex-end",
+    rowGap: 6,
+  },
 
-compactStatText: {
-  color: BRAND.sub,
-  fontSize: 12,
-  fontWeight: "900",
-},
+  shareButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    columnGap: 4,
+    backgroundColor: "rgba(0,227,150,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(0,227,150,0.25)",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
 
-sortCompactRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  columnGap: 8,
-  marginTop: 8,
-},
+  shareText: {
+    color: BRAND.accent,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  hiddenShareCardWrap: {
+    position: "absolute",
+    left: -10000,
+    top: 0,
+  },
 
-resultRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginTop: 10,
-},
+  shareCard: {
+    width: 900,
+    backgroundColor: BRAND.bg,
+    padding: 30,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+  },
 
-resultCount: {
-  color: BRAND.sub,
-  fontSize: 11,
-  fontWeight: "800",
-},
+  shareBrandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
 
-resultHint: {
-  color: BRAND.muted,
-  fontSize: 11,
-  fontWeight: "700",
-},
+  shareLogo: {
+    width: 54,
+    height: 54,
+    borderRadius: 14,
+    marginRight: 12,
+  },
 
-rowCard: {
-  borderRadius: 18,
-  backgroundColor: BRAND.card,
-  borderWidth: 1,
-  borderColor: BRAND.softBorder,
-  padding: 11,
-},
+  shareCardTitle: {
+    color: BRAND.text,
+    fontSize: 34,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
 
-oneLiner: {
-  color: BRAND.sub,
-  fontSize: 11.5,
-  lineHeight: 16,
-  marginTop: 8,
-},
+  shareCardSubTitle: {
+    color: BRAND.accent,
+    fontSize: 18,
+    fontWeight: "800",
+    marginTop: -2,
+  },
 
-rowBottom: {
-  marginTop: 9,
-  paddingTop: 8,
-  borderTopWidth: 1,
-  borderTopColor: BRAND.softBorder,
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-},
-  
-separator: {
-  height: 8,
-},
+  shareCardMeta: {
+    color: BRAND.sub,
+    textAlign: "center",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 22,
+  },
 
-footerMeta: {
-  color: BRAND.muted,
-  fontSize: 10.5,
-  marginBottom: 8,
-  fontWeight: "700",
-},
+  shareSection: {
+    marginTop: 14,
+    backgroundColor: BRAND.card,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    borderRadius: 20,
+    padding: 16,
+  },
+
+  shareSectionTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: 10,
+  },
+
+  shareTableHeader: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: BRAND.softBorder,
+    paddingBottom: 8,
+    marginBottom: 4,
+  },
+
+  shareTableRow: {
+    flexDirection: "row",
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.04)",
+  },
+
+  shareColSymbol: {
+    flex: 1,
+    color: BRAND.text,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  shareColPrice: {
+    flex: 1,
+    color: BRAND.sub,
+    fontSize: 15,
+    fontWeight: "800",
+    textAlign: "right",
+  },
+
+  shareColMove: {
+    flex: 1,
+    color: BRAND.text,
+    fontSize: 15,
+    fontWeight: "900",
+    textAlign: "right",
+  },
+
+  shareFooter: {
+    color: BRAND.muted,
+    textAlign: "center",
+    marginTop: 22,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  shareHeaderSymbol: {
+    flex: 1,
+    color: BRAND.muted,
+    fontSize: 13,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  shareHeaderPrice: {
+    flex: 1,
+    color: BRAND.muted,
+    fontSize: 13,
+    fontWeight: "900",
+    textAlign: "right",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  shareHeaderMove: {
+    flex: 1,
+    color: BRAND.muted,
+    fontSize: 13,
+    fontWeight: "900",
+    textAlign: "right",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  shareHeaderDollar: {
+    flex: 1,
+    color: BRAND.muted,
+    fontSize: 13,
+    fontWeight: "900",
+    textAlign: "right",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  shareColDollar: {
+    flex: 1,
+    color: BRAND.text,
+    fontSize: 15,
+    fontWeight: "900",
+    textAlign: "right",
+  },
 });
