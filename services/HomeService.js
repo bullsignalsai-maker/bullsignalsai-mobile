@@ -156,7 +156,30 @@ function formatCarouselItems(items, cardId) {
 
   return formatted.join(" · ");
 }
+function getHomeInsight(s) {
+  const awareness = s.marketAwareness || {};
 
+  // Best for Home card: short, direct, readable
+  if (typeof awareness.oneLiner === "string" && awareness.oneLiner.trim()) {
+    return awareness.oneLiner.trim();
+  }
+
+  // Fallback: catalyst driver if available
+  if (
+    Array.isArray(awareness.drivers) &&
+    typeof awareness.drivers[0] === "string" &&
+    awareness.drivers[0].trim()
+  ) {
+    return awareness.drivers[0].replace(/^Catalyst:\s*/i, "").trim();
+  }
+
+  // Existing backend insight fallback
+  if (typeof s.insight === "string" && s.insight.trim()) {
+    return s.insight.trim();
+  }
+
+  return "Market signal based on trend, price action, and momentum.";
+}
 /* =========================================================
    MAG7 SIGNALS (LIVE QUOTES MERGE + needs_refresh)
 ========================================================= */
@@ -192,10 +215,10 @@ function buildMag7Signals(stocks = [], quotes = {}) {
       signal: s.bullbrain?.signal || "HOLD",
       confidence: Number(s.bullbrain?.confidence ?? 0),
 
-      summary:
-        s.marketAwareness?.summary ||
-        s.insight ||
-        "Market signal based on trend and momentum.",
+      summary: getHomeInsight(s),
+      marketAwareness: s.marketAwareness || null,
+      todayTone: s.marketAwareness?.todayTone || null,
+      catalyst: s.marketAwareness?.catalyst || null,
 
       pattern: s.pattern?.name || null,
       patternWinRate: s.pattern?.winRate_5d ?? null,

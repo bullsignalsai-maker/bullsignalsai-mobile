@@ -23,6 +23,7 @@ import {
 
 import AstraChat from "../components/AstraChat";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
+import MoveLabel from "../components/MoveLabel";
 import { BRAND } from "../constants/theme";
 
 /* ---------------------------------------------------------
@@ -323,7 +324,10 @@ export default function MarketScreen({ navigation }) {
           {isUp ? "▲" : "▼"} {formatSignedChange(m.change)} (
           {Math.abs(Number(m.changePct || 0)).toFixed(2)}%)
         </Text>
-
+        <MoveLabel
+          changePct={Number(m.changePct)}
+          style={styles.moverMoveLabel}
+        />
         {!!m.trendLabel && (
           <Text style={styles.trendBadge} numberOfLines={1}>
             {m.trendLabel}
@@ -462,7 +466,7 @@ export default function MarketScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.moversSubTitle}>Raising Fast</Text>
+        <Text style={styles.moversSubTitle}>Rising Fast</Text>
 
         {movers.gainers.length === 0 ? (
           <Text style={styles.mutedNote}>Loading movers…</Text>
@@ -1006,5 +1010,10 @@ const styles = StyleSheet.create({
 
   livePillTextClosed: {
     color: BRAND.muted,
+  },
+  moverMoveLabel: {
+    fontSize: 11.5,
+    fontWeight: "900",
+    marginTop: 5,
   },
 });

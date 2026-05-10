@@ -24,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { getMarketMovers } from "../services/MarketPulseService";
 import { BRAND } from "../constants/theme";
+import MoveLabel from "../components/MoveLabel";
 const ALPHACLARA_LOGO = require("../assets/alpha-transparent.png");
 /* ---------------------------------------------------------
    Utils
@@ -266,16 +267,7 @@ export default function MarketMoversScreen({ navigation }) {
               <View style={styles.symbolLine}>
                 <Text style={styles.symbol}>{item.symbol}</Text>
 
-                <View
-                  style={[
-                    styles.movePill,
-                    isUp ? styles.movePillUp : styles.movePillDown,
-                  ]}
-                >
-                  <Text style={[styles.movePillText, { color }]}>
-                    {isUp ? "Rising" : "Pullback"}
-                  </Text>
-                </View>
+                <MoveLabel changePct={pct} style={styles.marketMoverLabel} />
               </View>
 
               {!!item.company && (
@@ -825,29 +817,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 4,
   },
-
-  movePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-
-  movePillUp: {
-    backgroundColor: "rgba(0,227,150,0.08)",
-    borderColor: "rgba(0,227,150,0.42)",
-  },
-
-  movePillDown: {
-    backgroundColor: "rgba(239,68,68,0.08)",
-    borderColor: "rgba(239,68,68,0.42)",
-  },
-
-  movePillText: {
-    fontSize: 9.5,
-    fontWeight: "900",
-  },
-
   priceBlock: {
     flex: 1,
     alignItems: "flex-end",
@@ -1259,5 +1228,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "900",
     textAlign: "right",
+  },
+  marketMoverLabel: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    fontStyle: "italic",
+    letterSpacing: -0.15,
+    marginLeft: 4,
+    marginTop: 0,
   },
 });

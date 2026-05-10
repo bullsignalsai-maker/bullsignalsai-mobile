@@ -27,7 +27,7 @@ import { Swipeable } from "react-native-gesture-handler";
 import { auth } from "../firebaseConfig";
 import { API_BASE_URL } from "../config/apiKeys";
 import ToastMessage from "../components/ToastMessage";
-
+import MoveLabel from "../components/MoveLabel";
 import {
   getWatchlistScreen,
   addToWatchlist,
@@ -557,6 +557,8 @@ export default function WatchlistScreen({ navigation }) {
             <View style={{ flex: 1 }}>
               <Text style={styles.symbol}>{item.symbol}</Text>
               <Text style={styles.name}>{item.companyName || item.symbol}</Text>
+
+              <MoveLabel changePct={item.changePct} style={styles.moveLabel} />
             </View>
 
             {/* {/* RIGHT — Price + Change */}
@@ -1281,5 +1283,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     textAlign: "center",
+  },
+  moveLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 3,
   },
 });

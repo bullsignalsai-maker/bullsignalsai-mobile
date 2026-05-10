@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { getHomeScreen } from "../services/HomeService";
 import { BRAND } from "../constants/theme";
-
+import MoveLabel from "../components/MoveLabel";
 const LOGO = require("../assets/alpha-transparent.png");
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const CAROUSEL_CARD_WIDTH = SCREEN_WIDTH - 40;
@@ -358,6 +358,11 @@ export default function HomeScreen({ navigation }) {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.symbol}>{item.symbol}</Text>
                   <Text style={styles.name}>{item.companyName}</Text>
+
+                  <MoveLabel
+                    changePct={item.changePct}
+                    style={styles.moveLabel}
+                  />
                 </View>
 
                 {/* RIGHT */}
@@ -750,5 +755,10 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     fontSize: 10.5,
     fontWeight: "800",
+  },
+  moveLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 3,
   },
 });
