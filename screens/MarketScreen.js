@@ -25,6 +25,7 @@ import AstraChat from "../components/AstraChat";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import MoveLabel from "../components/MoveLabel";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 /* ---------------------------------------------------------
    Utils
@@ -326,6 +327,7 @@ export default function MarketScreen({ navigation }) {
         </Text>
         <MoveLabel
           changePct={Number(m.changePct)}
+          price={Number(m.price)}
           style={styles.moverMoveLabel}
         />
         {!!m.trendLabel && (
@@ -626,15 +628,17 @@ const styles = StyleSheet.create({
   },
 
   headerTitle: {
-    color: BRAND.green,
-    fontSize: 22,
-    fontWeight: "800",
+    color: BRAND.text,
+    fontSize: 26,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
   },
 
   updatedTime: {
     color: BRAND.sub,
     fontSize: 12,
-    marginTop: 1,
+    marginTop: 2,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   loadingContainer: {
@@ -670,7 +674,7 @@ const styles = StyleSheet.create({
   cardEyebrow: {
     color: BRAND.muted,
     fontSize: 11,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 4,
@@ -679,16 +683,13 @@ const styles = StyleSheet.create({
   marketStatusText: {
     color: BRAND.text,
     fontSize: 15,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
   },
 
-  livePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,227,150,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(0,227,150,0.28)",
+  livePillText: {
+    color: BRAND.green,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   livePillText: {
@@ -719,7 +720,7 @@ const styles = StyleSheet.create({
     width: "33%",
     color: BRAND.text,
     fontSize: 12.5,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   colPrice: {
@@ -727,7 +728,8 @@ const styles = StyleSheet.create({
     textAlign: "right",
     color: BRAND.text,
     fontSize: 12.5,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.semibold,
+    fontVariant: ["tabular-nums"],
   },
 
   colChange: {
@@ -735,7 +737,8 @@ const styles = StyleSheet.create({
     textAlign: "right",
     color: BRAND.text,
     fontSize: 12.5,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
   },
 
   colPct: {
@@ -743,7 +746,8 @@ const styles = StyleSheet.create({
     textAlign: "right",
     color: BRAND.text,
     fontSize: 12.5,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
   },
 
   sectionSubtle: {
@@ -792,22 +796,25 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    color: BRAND.green,
-    fontSize: 16,
-    fontWeight: "800",
+    color: BRAND.text,
+    fontSize: 17,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.2,
   },
 
   viewAll: {
-    color: BRAND.blue,
+    color: BRAND.text,
     fontSize: 13,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   moversSubTitle: {
-    color: BRAND.text,
-    fontSize: 13,
-    fontWeight: "800",
+    color: BRAND.sub,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.bold,
     marginBottom: 7,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
 
   mutedNote: {
@@ -856,19 +863,21 @@ const styles = StyleSheet.create({
 
   moverSymbol: {
     color: BRAND.text,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
     fontSize: 14,
   },
 
   moverPrice: {
     color: BRAND.sub,
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.semibold,
+    fontVariant: ["tabular-nums"],
   },
 
   moverChange: {
     fontSize: 13,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
   },
 
   trendBadge: {
@@ -935,7 +944,7 @@ const styles = StyleSheet.create({
 
   newsTitle: {
     color: BRAND.text,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -945,15 +954,15 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontSize: 12,
     lineHeight: 17,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   newsMeta: {
     color: BRAND.muted,
     fontSize: 11,
     marginTop: 5,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.semibold,
   },
-
   footerWrap: {
     marginTop: 28,
     marginBottom: 30,
@@ -1012,8 +1021,10 @@ const styles = StyleSheet.create({
     color: BRAND.muted,
   },
   moverMoveLabel: {
-    fontSize: 11.5,
-    fontWeight: "900",
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.semibold,
+    fontStyle: "italic",
+    letterSpacing: -0.15,
     marginTop: 5,
   },
 });
