@@ -24,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { getMarketMovers } from "../services/MarketPulseService";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 import MoveLabel from "../components/MoveLabel";
 const ALPHACLARA_LOGO = require("../assets/alpha-transparent.png");
 /* ---------------------------------------------------------
@@ -267,7 +268,11 @@ export default function MarketMoversScreen({ navigation }) {
               <View style={styles.symbolLine}>
                 <Text style={styles.symbol}>{item.symbol}</Text>
 
-                <MoveLabel changePct={pct} style={styles.marketMoverLabel} />
+                <MoveLabel
+                  changePct={pct}
+                  price={Number(item.price)}
+                  style={styles.marketMoverLabel}
+                />
               </View>
 
               {!!item.company && (
@@ -332,7 +337,7 @@ export default function MarketMoversScreen({ navigation }) {
             activeOpacity={0.82}
             onPress={shareMovers}
           >
-            <Ionicons name="share-outline" size={15} color={BRAND.accent} />
+            <Ionicons name="share-outline" size={15} color={BRAND.text} />
             <Text style={styles.shareText}>Share</Text>
           </TouchableOpacity>
 
@@ -352,7 +357,7 @@ export default function MarketMoversScreen({ navigation }) {
         {[
           { key: "all", label: "All" },
           { key: "gainers", label: "Rising" },
-          { key: "losers", label: "Pulling Back" },
+          { key: "losers", label: "Dropping" },
         ].map((opt) => (
           <TouchableOpacity
             key={opt.key}
@@ -806,16 +811,17 @@ const styles = StyleSheet.create({
 
   symbol: {
     color: BRAND.text,
-    fontWeight: "900",
     fontSize: 17,
+    fontFamily: TYPO.fontFamily.bold,
     letterSpacing: 0.2,
     marginRight: 8,
   },
 
   company: {
     color: BRAND.muted,
-    fontSize: 11,
-    marginTop: 4,
+    fontSize: 12,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.medium,
   },
   priceBlock: {
     flex: 1,
@@ -824,21 +830,23 @@ const styles = StyleSheet.create({
 
   price: {
     color: BRAND.text,
-    fontSize: 14,
-    fontWeight: "900",
+    fontSize: 15,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
   },
 
   change: {
     marginTop: 4,
-    fontSize: 13,
-    fontWeight: "900",
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
   },
-
   oneLiner: {
     color: BRAND.sub,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 12.5,
+    lineHeight: 18,
     marginTop: 10,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   rowBottom: {
@@ -989,15 +997,15 @@ const styles = StyleSheet.create({
 
   compactTitle: {
     color: BRAND.text,
-    fontSize: 22,
-    fontWeight: "900",
+    fontSize: 24,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
   },
-
   compactSub: {
     color: BRAND.muted,
-    fontSize: 11,
-    marginTop: 2,
-    fontWeight: "700",
+    fontSize: 11.5,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   compactStats: {
@@ -1060,18 +1068,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     columnGap: 4,
-    backgroundColor: "rgba(0,227,150,0.08)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(0,227,150,0.25)",
+    borderColor: "rgba(255,255,255,0.12)",
     borderRadius: 999,
     paddingHorizontal: 9,
     paddingVertical: 5,
   },
-
   shareText: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontSize: 11,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
   },
   hiddenShareCardWrap: {
     position: "absolute",
@@ -1231,7 +1238,7 @@ const styles = StyleSheet.create({
   },
   marketMoverLabel: {
     fontSize: 10.5,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.semibold,
     fontStyle: "italic",
     letterSpacing: -0.15,
     marginLeft: 4,

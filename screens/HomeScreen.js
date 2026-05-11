@@ -341,6 +341,7 @@ export default function HomeScreen({ navigation }) {
 
                     <MoveLabel
                       changePct={item.changePct}
+                      price={item.price}
                       style={styles.moveLabelInline}
                     />
                   </View>
