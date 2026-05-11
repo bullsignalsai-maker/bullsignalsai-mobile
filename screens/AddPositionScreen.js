@@ -20,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { auth, addPosition } from "../firebaseConfig";
 import { API_BASE_URL } from "../config/apiKeys";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 export default function AddPositionScreen({ navigation }) {
   const [symbol, setSymbol] = useState("");
@@ -89,7 +90,10 @@ export default function AddPositionScreen({ navigation }) {
     }
 
     if (!avgCost || Number.isNaN(avgCostNumber) || avgCostNumber <= 0) {
-      Alert.alert("Average Cost Required", "Enter your average purchase price.");
+      Alert.alert(
+        "Average Cost Required",
+        "Enter your average purchase price.",
+      );
       return;
     }
 
@@ -112,15 +116,12 @@ export default function AddPositionScreen({ navigation }) {
       setLoading(false);
     }
   };
-    const isValid =
-      symbol.trim() &&
-      Number(shares) > 0 &&
-      Number(avgCost) > 0;
+  const isValid = symbol.trim() && Number(shares) > 0 && Number(avgCost) > 0;
 
-    const estimatedValue =
-      Number(shares) > 0 && Number(avgCost) > 0
-        ? Number(shares) * Number(avgCost)
-        : null;
+  const estimatedValue =
+    Number(shares) > 0 && Number(avgCost) > 0
+      ? Number(shares) * Number(avgCost)
+      : null;
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <KeyboardAvoidingView
@@ -169,8 +170,8 @@ export default function AddPositionScreen({ navigation }) {
               {suggestions.length > 0 && (
                 <View style={styles.dropdown}>
                   {suggestions.map((item, index) => (
-                  <Pressable
-                    key={`${item.symbol}-${index}`}
+                    <Pressable
+                      key={`${item.symbol}-${index}`}
                       style={({ pressed }) => [
                         styles.dropdownRow,
                         pressed && { backgroundColor: BRAND.softBorder },
@@ -209,7 +210,7 @@ export default function AddPositionScreen({ navigation }) {
               <TextInput
                 ref={costRef}
                 style={styles.input}
-                placeholder="Example: 150.00"
+                placeholder="Example: $150.00"
                 placeholderTextColor={BRAND.muted}
                 keyboardType="decimal-pad"
                 value={avgCost}
@@ -290,51 +291,64 @@ const styles = StyleSheet.create({
   },
 
   headerTitle: {
-    color: BRAND.accent,
-    fontSize: 24,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-    marginBottom: 4,
+    color: BRAND.text,
+    fontSize: 28,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
+    marginBottom: 5,
   },
 
   headerSub: {
     color: BRAND.muted,
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 17,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.medium,
+    lineHeight: 18,
     textAlign: "center",
     paddingHorizontal: 12,
   },
 
   formCard: {
-    backgroundColor: BRAND.card,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    borderRadius: 22,
-    padding: 16,
-  },
+    backgroundColor: "rgba(17,24,39,0.82)",
 
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+
+    borderRadius: 26,
+
+    padding: 18,
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+  },
   block: {
     marginBottom: 16,
   },
 
   label: {
     color: BRAND.sub,
-    marginBottom: 7,
+    marginBottom: 8,
     fontSize: 12,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
+    letterSpacing: 0.15,
   },
 
   input: {
     backgroundColor: BRAND.card2,
+
     borderWidth: 1,
-    borderColor: BRAND.softBorder,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    borderColor: "rgba(255,255,255,0.08)",
+
+    borderRadius: 16,
+
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+
     color: BRAND.text,
+
     fontSize: 15,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   dropdown: {
@@ -354,32 +368,40 @@ const styles = StyleSheet.create({
   },
 
   dropSymbol: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontSize: 15,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
   },
 
   dropDesc: {
     color: BRAND.sub,
     fontSize: 12,
     marginTop: 2,
-    fontWeight: "600",
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   saveBtn: {
-    marginTop: 10,
-    backgroundColor: BRAND.accent,
+    marginTop: 12,
+
+    backgroundColor: "#FFFFFF",
+
     paddingVertical: 15,
-    borderRadius: 16,
+
+    borderRadius: 18,
+
     alignItems: "center",
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
   },
 
   saveText: {
-    color: BRAND.bg,
+    color: "#0A0A0A",
     fontSize: 15,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
   },
-
   footerWrap: {
     marginTop: 28,
     alignItems: "center",
@@ -393,8 +415,8 @@ const styles = StyleSheet.create({
   },
 
   footerBrand: {
-    color: BRAND.accent,
-    fontWeight: "600",
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   disclaimer: {
@@ -404,13 +426,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   estimateText: {
-  color: BRAND.muted,
-  fontSize: 11.5,
-  marginTop: 7,
-  fontWeight: "700",
-},
+    color: BRAND.muted,
+    fontSize: 11.5,
+    marginTop: 8,
+    fontFamily: TYPO.fontFamily.medium,
+  },
 
-saveDisabled: {
-  backgroundColor: "#374151",
-},
+  saveDisabled: {
+    backgroundColor: "#374151",
+  },
 });

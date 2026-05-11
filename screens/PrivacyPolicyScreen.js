@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, ScrollView, StyleSheet } from "react-native";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 export default function PrivacyPolicyScreen() {
   return (
@@ -113,61 +114,56 @@ const styles = StyleSheet.create({
     paddingBottom: 90,
   },
 
-  title: {
-    color: BRAND.accent,
-    fontSize: 25,
-    fontWeight: "900",
-    textAlign: "center",
-    marginBottom: 6,
-  },
-
   updated: {
     color: BRAND.muted,
     fontSize: 12,
     textAlign: "center",
     marginBottom: 18,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   card: {
-    backgroundColor: BRAND.card,
+    backgroundColor: "rgba(17,24,39,0.82)",
     borderWidth: 1,
-    borderColor: BRAND.border,
-    borderRadius: 16,
-    padding: 14,
+    borderColor: "rgba(255,255,255,0.06)",
+    borderRadius: 20,
+    padding: 16,
     marginBottom: 12,
   },
 
   subTitle: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontSize: 15,
-    fontWeight: "900",
-    marginBottom: 6,
+    fontFamily: TYPO.fontFamily.extrabold,
+    marginBottom: 8,
   },
 
   text: {
     color: BRAND.sub,
     fontSize: 14,
     lineHeight: 21,
-  },
-
-  footerWrap: {
-    alignItems: "center",
-    marginTop: 20,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   powered: {
     color: BRAND.sub,
     fontSize: 12,
     marginBottom: 6,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   brand: {
-    color: BRAND.accent,
-    fontWeight: "700",
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   footer: {
     color: BRAND.muted,
     fontSize: 11,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+  footerWrap: {
+    alignItems: "center",
+    marginTop: 20,
   },
 });

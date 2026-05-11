@@ -41,6 +41,8 @@ import { auth } from "./firebaseConfig";
 import FullChartScreen from "./screens/FullChartScreen";
 import AddAlertScreen from "./screens/AddAlertScreen";
 import SupportScreen from "./screens/SupportScreen";
+import { BRAND } from "./constants/theme";
+import { TYPO } from "./constants/typography";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -54,7 +56,7 @@ function MainTabs() {
           backgroundColor: "#0A0A0A",
           borderTopColor: "#1F2937",
         },
-        tabBarActiveTintColor: "#00E396",
+        tabBarActiveTintColor: BRAND.text,
         tabBarInactiveTintColor: "#6B7280",
         tabBarIcon: ({ color, size }) => {
           const icons = {
@@ -170,7 +172,9 @@ export default function App() {
         const onboarded = await AsyncStorage.getItem("onboarded");
         const userToken = await AsyncStorage.getItem("userToken");
 
-        setInitialRoute("Onboarding"); // TEMP: force onboarding for testing
+        if (userToken) setInitialRoute("Main");
+        else if (onboarded) setInitialRoute("Login");
+        else setInitialRoute("Onboarding");
       } catch {
         setInitialRoute("Onboarding");
       }
@@ -215,7 +219,7 @@ export default function App() {
           alignItems: "center",
         }}
       >
-        <ActivityIndicator size="large" color="#00E396" />
+        <ActivityIndicator size="large" color={BRAND.text} />
         <Text style={{ color: "#A3A3A3", marginTop: 12, fontSize: 14 }}>
           Initializing Alphaclara...
         </Text>
@@ -234,8 +238,20 @@ export default function App() {
         initialRouteName={initialRoute}
         screenOptions={{
           headerShown: false,
-          headerStyle: { backgroundColor: "#000" },
-          headerTintColor: "#00E396",
+
+          headerStyle: {
+            backgroundColor: BRAND.bg,
+            shadowColor: "transparent",
+            elevation: 0,
+          },
+
+          headerTintColor: BRAND.text,
+
+          headerTitleStyle: {
+            color: BRAND.text,
+            fontFamily: TYPO.fontFamily.bold,
+            fontSize: 18,
+          },
         }}
       >
         {/* AUTH FLOW */}
@@ -258,15 +274,19 @@ export default function App() {
           options={{
             headerShown: true,
             title: "Stock Details",
-            headerStyle: { backgroundColor: "#000" },
-            headerTintColor: "#00E396",
+            headerStyle: {
+              backgroundColor: BRAND.bg,
+              shadowColor: "transparent",
+              elevation: 0,
+            },
+            headerTintColor: BRAND.text,
             headerBackTitleVisible: false,
             headerBackTitle: false,
             headerBackImage: () => (
               <Ionicons
                 name="chevron-back-outline"
                 size={24}
-                color="#00E396"
+                color={BRAND.text}
                 style={{ marginLeft: 10 }}
               />
             ),
@@ -279,15 +299,19 @@ export default function App() {
           options={{
             headerShown: true,
             title: "Pattern Details",
-            headerStyle: { backgroundColor: "#000" },
-            headerTintColor: "#00E396",
+            headerStyle: {
+              backgroundColor: BRAND.bg,
+              shadowColor: "transparent",
+              elevation: 0,
+            },
+            headerTintColor: BRAND.text,
             headerBackTitleVisible: false,
             headerBackTitle: false,
             headerBackImage: () => (
               <Ionicons
                 name="chevron-back-outline"
                 size={24}
-                color="#00E396"
+                color={BRAND.text}
                 style={{ marginLeft: 10 }}
               />
             ),
@@ -299,15 +323,19 @@ export default function App() {
           options={{
             headerShown: true,
             title: "Add Alert",
-            headerStyle: { backgroundColor: "#000" },
-            headerTintColor: "#00E396",
+            headerStyle: {
+              backgroundColor: BRAND.bg,
+              shadowColor: "transparent",
+              elevation: 0,
+            },
+            headerTintColor: BRAND.text,
             headerBackTitleVisible: false,
             headerBackTitle: false,
             headerBackImage: () => (
               <Ionicons
                 name="chevron-back-outline"
                 size={24}
-                color="#00E396"
+                color={BRAND.text}
                 style={{ marginLeft: 10 }}
               />
             ),
@@ -319,15 +347,19 @@ export default function App() {
           options={{
             headerShown: true,
             title: "Technical Details",
-            headerStyle: { backgroundColor: "#000" },
-            headerTintColor: "#00E396",
+            headerStyle: {
+              backgroundColor: BRAND.bg,
+              shadowColor: "transparent",
+              elevation: 0,
+            },
+            headerTintColor: BRAND.text,
             headerBackTitleVisible: false,
             headerBackTitle: false,
             headerBackImage: () => (
               <Ionicons
                 name="chevron-back-outline"
                 size={24}
-                color="#00E396"
+                color={BRAND.text}
                 style={{ marginLeft: 10 }}
               />
             ),
@@ -339,15 +371,19 @@ export default function App() {
           options={{
             headerShown: true,
             title: "Rating Details",
-            headerStyle: { backgroundColor: "#000" },
-            headerTintColor: "#00E396",
+            headerStyle: {
+              backgroundColor: BRAND.bg,
+              shadowColor: "transparent",
+              elevation: 0,
+            },
+            headerTintColor: BRAND.text,
             headerBackTitleVisible: false,
             headerBackTitle: false,
             headerBackImage: () => (
               <Ionicons
                 name="chevron-back-outline"
                 size={24}
-                color="#00E396"
+                color={BRAND.text}
                 style={{ marginLeft: 10 }}
               />
             ),
@@ -360,15 +396,19 @@ export default function App() {
           options={{
             headerShown: true,
             title: "Market Movers",
-            headerStyle: { backgroundColor: "#000" },
-            headerTintColor: "#00E396",
+            headerStyle: {
+              backgroundColor: BRAND.bg,
+              shadowColor: "transparent",
+              elevation: 0,
+            },
+            headerTintColor: BRAND.text,
             headerBackTitleVisible: false,
             headerBackTitle: false,
             headerBackImage: () => (
               <Ionicons
                 name="chevron-back-outline"
                 size={24}
-                color="#00E396"
+                color={BRAND.text}
                 style={{ marginLeft: 10 }}
               />
             ),
@@ -381,14 +421,18 @@ export default function App() {
           options={{
             headerShown: false,
             title: "Alerts",
-            headerStyle: { backgroundColor: "#000" },
-            headerTintColor: "#00E396",
+            headerStyle: {
+              backgroundColor: BRAND.bg,
+              shadowColor: "transparent",
+              elevation: 0,
+            },
+            headerTintColor: BRAND.text,
             headerBackTitleVisible: false,
             headerBackImage: () => (
               <Ionicons
                 name="chevron-back-outline"
                 size={24}
-                color="#00E396"
+                color={BRAND.text}
                 style={{ marginLeft: 10 }}
               />
             ),
@@ -419,12 +463,16 @@ export default function App() {
               <Ionicons
                 name="chevron-back-outline"
                 size={24}
-                color="#00E396"
+                color={BRAND.text}
                 style={{ marginLeft: 10 }}
               />
             ),
-            headerStyle: { backgroundColor: "#000" },
-            headerTintColor: "#00E396",
+            headerStyle: {
+              backgroundColor: BRAND.bg,
+              shadowColor: "transparent",
+              elevation: 0,
+            },
+            headerTintColor: BRAND.text,
           }}
         />
         <Stack.Screen
@@ -439,12 +487,16 @@ export default function App() {
               <Ionicons
                 name="chevron-back-outline"
                 size={24}
-                color="#00E396"
+                color={BRAND.text}
                 style={{ marginLeft: 10 }}
               />
             ),
-            headerStyle: { backgroundColor: "#000" },
-            headerTintColor: "#00E396",
+            headerStyle: {
+              backgroundColor: BRAND.bg,
+              shadowColor: "transparent",
+              elevation: 0,
+            },
+            headerTintColor: BRAND.text,
           }}
         />
         {/* INFO PAGES (About / Privacy / Terms) */}
@@ -473,12 +525,16 @@ export default function App() {
                 <Ionicons
                   name="chevron-back-outline"
                   size={24}
-                  color="#00E396"
+                  color={BRAND.text}
                   style={{ marginLeft: 10 }}
                 />
               ),
-              headerStyle: { backgroundColor: "#000" },
-              headerTintColor: "#00E396",
+              headerStyle: {
+                backgroundColor: BRAND.bg,
+                shadowColor: "transparent",
+                elevation: 0,
+              },
+              headerTintColor: BRAND.text,
             }}
           />
         ))}

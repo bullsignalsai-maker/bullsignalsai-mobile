@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
   },
 
   footerBrand: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontFamily: TYPO.semibold,
   },
   disclaimer: {

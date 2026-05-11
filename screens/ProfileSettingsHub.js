@@ -18,19 +18,9 @@ import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { registerForPushNotifications } from "../services/pushNotificationService";
-import { auth, db } from "../firebaseConfig";
 import { SafeAreaView } from "react-native-safe-area-context";
-const BRAND = {
-  bg: "#000000",
-  card: "#0B1220",
-  card2: "#111827",
-  border: "#1F2937",
-  text: "#FFFFFF",
-  sub: "#9CA3AF",
-  muted: "#6B7280",
-  accent: "#00E396",
-  red: "#EF4444",
-};
+import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 export default function ProfileSettingsHub({ navigation }) {
   const [user, setUser] = useState({
@@ -102,8 +92,6 @@ export default function ProfileSettingsHub({ navigation }) {
   };
 
   const handleAvatarChange = async () => {
-    if (!editable) return;
-
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== "granted") {
@@ -118,7 +106,7 @@ export default function ProfileSettingsHub({ navigation }) {
       allowsEditing: true,
       quality: 0.7,
       aspect: [1, 1],
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
     });
 
     if (!result.canceled) {
@@ -224,85 +212,79 @@ export default function ProfileSettingsHub({ navigation }) {
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND.bg }}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile & Settings</Text>
+          <Text style={styles.headerTitle}>Account</Text>
         </View>
         {/* PROFILE CARD */}
         <View style={styles.profileCard}>
           <TouchableOpacity
-            activeOpacity={editable ? 0.85 : 1}
-            onPress={editable ? handleAvatarChange : null}
+            activeOpacity={0.85}
+            onPress={handleAvatarChange}
+            style={styles.avatarTopRight}
           >
             {user.avatar ? (
               <Image source={{ uri: user.avatar }} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Ionicons name="person" size={36} color={BRAND.sub} />
+                <Ionicons name="person" size={32} color={BRAND.sub} />
               </View>
             )}
+
+            <View style={styles.avatarEditBadge}>
+              <Ionicons name="pencil" size={12} color="#0A0A0A" />
+            </View>
           </TouchableOpacity>
 
-          <Text style={styles.name}>{fullName}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name}>{fullName}</Text>
+
+            {!editable && (
+              <TouchableOpacity
+                style={styles.nameEditBtn}
+                onPress={() => setEditable(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="pencil" size={13} color={BRAND.sub} />
+              </TouchableOpacity>
+            )}
+          </View>
+
           <Text style={styles.email}>{user.email || "No email available"}</Text>
 
-          <View style={styles.intelligenceCard}>
-            <Ionicons name="sparkles-outline" size={20} color={BRAND.accent} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.intelligenceTitle}>
-                Alphaclara Intelligence
-              </Text>
-              <Text style={styles.intelligenceSub}>
-                AI-powered market insights and decision support
-              </Text>
-            </View>
-          </View>
-          {editable && (
-            <TouchableOpacity
-              style={styles.photoBtn}
-              onPress={handleAvatarChange}
-            >
-              <Ionicons name="camera-outline" size={15} color={BRAND.accent} />
-              <Text style={styles.photoBtnText}>Change Photo</Text>
-            </TouchableOpacity>
-          )}
-          {!editable ? (
-            <TouchableOpacity
-              style={styles.editInline}
-              onPress={() => setEditable(true)}
-            >
-              <Ionicons name="pencil" size={16} color={BRAND.accent} />
-              <Text style={styles.editInlineText}>Edit</Text>
-            </TouchableOpacity>
+          {!!user.bio ? (
+            <Text style={styles.profileBio}>{user.bio}</Text>
           ) : null}
         </View>
 
-        {/* EDIT MODE */}
         {editable && (
           <View style={styles.editCard}>
             <View style={styles.editHeaderRow}>
               <Text style={styles.sectionTitle}>Edit Profile</Text>
-              <Ionicons name="person-outline" size={18} color={BRAND.accent} />
             </View>
 
-            <View style={styles.fieldBlock}>
-              <Text style={styles.fieldLabel}>First Name</Text>
-              <TextInput
-                placeholder="First name"
-                placeholderTextColor={BRAND.muted}
-                style={styles.input}
-                value={user.firstName}
-                onChangeText={(v) => handleFieldChange("firstName", v)}
-              />
-            </View>
+            <View style={styles.nameFieldsRow}>
+              <View style={styles.nameFieldCol}>
+                <Text style={styles.fieldLabel}>First Name</Text>
 
-            <View style={styles.fieldBlock}>
-              <Text style={styles.fieldLabel}>Last Name</Text>
-              <TextInput
-                placeholder="Last name"
-                placeholderTextColor={BRAND.muted}
-                style={styles.input}
-                value={user.lastName}
-                onChangeText={(v) => handleFieldChange("lastName", v)}
-              />
+                <TextInput
+                  placeholder="First name"
+                  placeholderTextColor={BRAND.muted}
+                  style={styles.input}
+                  value={user.firstName}
+                  onChangeText={(v) => handleFieldChange("firstName", v)}
+                />
+              </View>
+
+              <View style={styles.nameFieldCol}>
+                <Text style={styles.fieldLabel}>Last Name</Text>
+
+                <TextInput
+                  placeholder="Last name"
+                  placeholderTextColor={BRAND.muted}
+                  style={styles.input}
+                  value={user.lastName}
+                  onChangeText={(v) => handleFieldChange("lastName", v)}
+                />
+              </View>
             </View>
 
             <View style={styles.fieldBlock}>
@@ -413,7 +395,7 @@ export default function ProfileSettingsHub({ navigation }) {
           <Text style={styles.toastText}>{toastMessage}</Text>
         </Animated.View>
         <Text style={styles.powered}>
-          Powered by <Text style={{ color: BRAND.accent }}>Alphaclara</Text>
+          Powered by <Text style={{ color: BRAND.text }}>Alphaclara</Text>
         </Text>
 
         <Text style={styles.disclaimer}>
@@ -440,109 +422,135 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 
-  profileCard: {
-    backgroundColor: BRAND.card,
-    borderRadius: 18,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    alignItems: "center",
-    marginTop: 10,
+  header: {
+    marginBottom: 6,
   },
 
+  headerTitle: {
+    color: BRAND.text,
+    fontSize: 26,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
+  },
+
+  profileCard: {
+    backgroundColor: "rgba(17,24,39,0.82)",
+
+    borderRadius: 24,
+
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 18,
+
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+
+    marginTop: 8,
+  },
   avatar: {
     width: 82,
     height: 82,
     borderRadius: 41,
   },
 
+  avatarPlaceholder: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    backgroundColor: BRAND.card2,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
   name: {
     color: BRAND.text,
-    fontSize: 20,
-    fontWeight: "800",
-    marginTop: 10,
+    fontSize: 22,
+    fontFamily: TYPO.fontFamily.extrabold,
+    flexShrink: 1,
   },
 
   email: {
     color: BRAND.sub,
     fontSize: 13,
     marginTop: 4,
+    fontFamily: TYPO.fontFamily.medium,
+    paddingRight: 90,
+  },
+  editCard: {
+    backgroundColor: "rgba(17,24,39,0.82)",
+
+    borderRadius: 22,
+
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+
+    paddingHorizontal: 15,
+    paddingTop: 15,
+    paddingBottom: 14,
+
+    marginTop: 12,
   },
 
-  intelligenceCard: {
-    marginTop: 18,
-    backgroundColor: BRAND.card2,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 14,
+  editHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    width: "100%",
-  },
-
-  intelligenceTitle: {
-    color: BRAND.accent,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  intelligenceSub: {
-    color: BRAND.sub,
-    fontSize: 12,
-    marginTop: 2,
-  },
-
-  editBtn: {
-    marginTop: 18,
-    backgroundColor: BRAND.accent,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 999,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-
-  editBtnText: {
-    color: "#000",
-    fontWeight: "800",
-    fontSize: 14,
-  },
-
-  groupTitle: {
-    color: BRAND.sub,
-    fontSize: 15,
-    fontWeight: "700",
-    marginTop: 22,
-    marginBottom: 8,
-  },
-
-  card: {
-    backgroundColor: BRAND.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 14,
+    justifyContent: "space-between",
+    marginBottom: 10,
   },
 
   sectionTitle: {
     color: BRAND.text,
     fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 14,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  fieldBlock: {
+    marginBottom: 9,
+  },
+
+  fieldLabel: {
+    color: BRAND.sub,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.bold,
+    marginBottom: 7,
   },
 
   input: {
-    backgroundColor: "#050505",
-    borderRadius: 10,
-    padding: 12,
-    color: "#FFF",
-    marginBottom: 10,
+    backgroundColor: BRAND.card2,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    color: BRAND.text,
     fontSize: 15,
+    fontFamily: TYPO.fontFamily.semibold,
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  bioInput: {
+    height: 72,
+    textAlignVertical: "top",
+  },
+
+  lockedInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: BRAND.card2,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    opacity: 0.65,
+  },
+
+  lockedInput: {
+    flex: 1,
+    paddingVertical: 13,
+    color: BRAND.muted,
+    fontSize: 15,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   actionRow: {
@@ -553,28 +561,49 @@ const styles = StyleSheet.create({
 
   saveBtn: {
     flex: 1,
-    backgroundColor: BRAND.accent,
-    paddingVertical: 12,
-    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 11,
+    borderRadius: 14,
     alignItems: "center",
   },
 
   saveText: {
-    color: "#000",
-    fontWeight: "800",
+    color: "#0A0A0A",
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   cancelBtn: {
     flex: 1,
-    backgroundColor: "#222",
-    paddingVertical: 12,
-    borderRadius: 10,
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    paddingVertical: 11,
+    borderRadius: 14,
     alignItems: "center",
   },
 
   cancelText: {
-    color: "#FFF",
-    fontWeight: "700",
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  groupTitle: {
+    color: BRAND.muted,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.bold,
+    marginTop: 16,
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  card: {
+    backgroundColor: "rgba(17,24,39,0.82)",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 14,
+    paddingVertical: 4,
   },
 
   row: {
@@ -583,7 +612,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: BRAND.border,
+    borderBottomColor: "rgba(255,255,255,0.06)",
   },
 
   rowLeft: {
@@ -595,43 +624,44 @@ const styles = StyleSheet.create({
   rowLabel: {
     color: BRAND.text,
     fontSize: 15,
-    fontWeight: "500",
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   toast: {
     position: "absolute",
     bottom: 90,
     alignSelf: "center",
-    backgroundColor: "#111",
+    backgroundColor: BRAND.card,
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: "rgba(255,255,255,0.08)",
   },
 
   toastText: {
-    color: BRAND.accent,
-    fontWeight: "700",
-  },
-  photoBtn: {
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,227,150,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(0,227,150,0.35)",
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
-  photoBtnText: {
-    color: BRAND.accent,
+  powered: {
+    color: BRAND.sub,
     fontSize: 12,
-    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 14,
+    fontFamily: TYPO.fontFamily.medium,
   },
+
+  disclaimer: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    lineHeight: 15,
+    textAlign: "center",
+    marginTop: 6,
+    paddingHorizontal: 20,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+
   versionWrap: {
     alignItems: "center",
     marginTop: 26,
@@ -640,155 +670,73 @@ const styles = StyleSheet.create({
   versionText: {
     color: BRAND.muted,
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   versionSubText: {
     color: BRAND.muted,
     fontSize: 11,
     marginTop: 4,
+    fontFamily: TYPO.fontFamily.regular,
   },
-  header: {
-    marginBottom: 10,
+  avatarTopRight: {
+    position: "absolute",
+    top: 18,
+    right: 18,
   },
 
-  headerTitle: {
-    color: BRAND.text,
-    fontSize: 22,
-    fontWeight: "900",
+  profileBio: {
+    color: BRAND.sub,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 10,
+    fontFamily: TYPO.fontFamily.regular,
+    paddingRight: 90,
   },
-  avatarPlaceholder: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    backgroundColor: BRAND.card2,
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+    paddingRight: 110,
+  },
+  nameEditBtn: {
+    marginLeft: 8,
+
+    width: 24,
+    height: 24,
+
+    borderRadius: 12,
+
+    backgroundColor: "rgba(255,255,255,0.06)",
+
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: BRAND.border,
-  },
-  powered: {
-    color: BRAND.sub,
-    fontSize: 12,
-    textAlign: "center",
-    marginTop: 14,
+
+    flexShrink: 0,
   },
 
-  disclaimer: {
-    color: BRAND.muted,
-    fontSize: 10,
-    textAlign: "center",
-    marginTop: 6,
-    paddingHorizontal: 20,
-  },
-  editInline: {
+  avatarEditBadge: {
     position: "absolute",
-    top: 16,
-    right: 16,
-    flexDirection: "row",
+    right: -2,
+    bottom: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
-    gap: 6,
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: BRAND.card,
   },
-
-  editInlineText: {
-    color: BRAND.accent,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  editCard: {
-    backgroundColor: BRAND.card,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 16,
-    marginTop: 14,
-  },
-
-  editHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 14,
-  },
-
-  fieldBlock: {
-    marginBottom: 12,
-  },
-
-  fieldLabel: {
-    color: BRAND.sub,
-    fontSize: 12,
-    fontWeight: "800",
-    marginBottom: 7,
-  },
-
-  input: {
-    backgroundColor: BRAND.card2,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    color: BRAND.text,
-    fontSize: 15,
-    fontWeight: "700",
-    borderWidth: 1,
-    borderColor: BRAND.softBorder,
-  },
-
-  bioInput: {
-    height: 90,
-    textAlignVertical: "top",
-  },
-
-  lockedInputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: BRAND.card2,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: BRAND.softBorder,
-    opacity: 0.65,
-  },
-
-  lockedInput: {
-    flex: 1,
-    paddingVertical: 13,
-    color: BRAND.muted,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-
-  actionRow: {
+  nameFieldsRow: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 8,
   },
 
-  saveBtn: {
+  nameFieldCol: {
     flex: 1,
-    backgroundColor: BRAND.accent,
-    paddingVertical: 13,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-
-  saveText: {
-    color: BRAND.bg,
-    fontWeight: "900",
-  },
-
-  cancelBtn: {
-    flex: 1,
-    backgroundColor: BRAND.card2,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    paddingVertical: 13,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-
-  cancelText: {
-    color: BRAND.text,
-    fontWeight: "800",
   },
 });

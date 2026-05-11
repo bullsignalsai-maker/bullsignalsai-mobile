@@ -7,20 +7,11 @@ import {
   Linking,
   TouchableOpacity,
 } from "react-native";
-
-const BRAND = {
-  bg: "#000000",
-  card: "#0B1220",
-  border: "#1F2937",
-  text: "#FFFFFF",
-  sub: "#9CA3AF",
-  muted: "#6B7280",
-  accent: "#00E396",
-};
-
+import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 export default function SupportScreen() {
   const handleEmail = () => {
-    Linking.openURL("mailto:support@alphaclara.com");
+    Linking.openURL("mailto:support@alphaclara.ai");
   };
 
   return (
@@ -30,7 +21,7 @@ export default function SupportScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* HEADER */}
-
+      <Text style={styles.title}>Support</Text>
       <Text style={styles.subtitle}>
         We're here to help you with your Alphaclara experience.
       </Text>
@@ -74,7 +65,10 @@ export default function SupportScreen() {
       {/* FOOTER */}
       <View style={styles.footerWrap}>
         <Text style={styles.powered}>
-          Powered by <Text style={{ color: BRAND.accent }}>Alphaclara</Text>
+          Powered by{" "}
+          <Text style={{ color: BRAND.text, fontFamily: TYPO.fontFamily.bold }}>
+            Alphaclara
+          </Text>
         </Text>
 
         <Text style={styles.footer}>
@@ -100,76 +94,81 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    color: BRAND.accent,
-    fontSize: 24,
-    fontWeight: "900",
+    color: BRAND.text,
+    fontSize: 28,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.4,
     textAlign: "center",
   },
 
   subtitle: {
     color: BRAND.sub,
     fontSize: 13,
+    lineHeight: 18,
     textAlign: "center",
     marginTop: 6,
     marginBottom: 18,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   card: {
-    backgroundColor: BRAND.card,
-    borderRadius: 16,
+    backgroundColor: "rgba(17,24,39,0.82)",
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 14,
+    borderColor: "rgba(255,255,255,0.06)",
+    padding: 16,
     marginBottom: 12,
   },
 
   sectionTitle: {
-    color: BRAND.accent,
-    fontSize: 15,
-    fontWeight: "800",
-    marginBottom: 6,
+    color: BRAND.text,
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
+    marginBottom: 8,
   },
 
   text: {
     color: BRAND.sub,
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 21,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   bullet: {
     color: BRAND.sub,
     fontSize: 14,
-    marginBottom: 4,
+    marginBottom: 6,
+    lineHeight: 20,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   emailBtn: {
-    marginTop: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: "rgba(0,227,150,0.1)",
-    borderWidth: 1,
-    borderColor: BRAND.accent,
+    marginTop: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
   },
 
   emailText: {
-    color: BRAND.accent,
-    fontWeight: "800",
-  },
-
-  footerWrap: {
-    alignItems: "center",
-    marginTop: 20,
+    color: "#0A0A0A",
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   powered: {
     color: BRAND.sub,
     fontSize: 12,
     marginBottom: 8,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   footer: {
     color: BRAND.muted,
     fontSize: 11,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+  footerWrap: {
+    alignItems: "center",
+    marginTop: 20,
   },
 });

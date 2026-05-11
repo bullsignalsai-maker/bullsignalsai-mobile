@@ -19,10 +19,14 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { auth, buyShares, sellShares } from "../firebaseConfig";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 export default function EditPositionScreen({ route, navigation }) {
-  const { symbol, shares: currentShares = 0, avgCost: currentAvg = 0 } =
-    route.params || {};
+  const {
+    symbol,
+    shares: currentShares = 0,
+    avgCost: currentAvg = 0,
+  } = route.params || {};
 
   const [txType, setTxType] = useState("BUY");
   const [txShares, setTxShares] = useState("");
@@ -71,7 +75,10 @@ export default function EditPositionScreen({ route, navigation }) {
 
     const userId = auth.currentUser?.uid;
     if (!userId) {
-      Alert.alert("Sign In Required", "Please sign in to update this position.");
+      Alert.alert(
+        "Sign In Required",
+        "Please sign in to update this position.",
+      );
       return;
     }
 
@@ -96,7 +103,10 @@ export default function EditPositionScreen({ route, navigation }) {
         await buyShares(userId, symbol, s, p);
       } else {
         if (s > Number(currentShares || 0)) {
-          Alert.alert("Too Many Shares", `You only have ${currentShares} ${symbol}.`);
+          Alert.alert(
+            "Too Many Shares",
+            `You only have ${currentShares} ${symbol}.`,
+          );
           setLoading(false);
           return;
         }
@@ -107,7 +117,10 @@ export default function EditPositionScreen({ route, navigation }) {
       requestAnimationFrame(() => navigation.goBack());
     } catch (err) {
       console.warn("Edit transaction error:", err);
-      Alert.alert("Unable to Apply Transaction", err?.message || "Please try again.");
+      Alert.alert(
+        "Unable to Apply Transaction",
+        err?.message || "Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -213,7 +226,7 @@ export default function EditPositionScreen({ route, navigation }) {
             </View>
 
             {txType === "BUY" && (
-              <View style={styles.fieldBlock}>
+              <View style={[styles.fieldBlock, styles.lastFieldBlock]}>
                 <Text style={styles.label}>Price per Share</Text>
                 <TextInput
                   ref={priceRef}
@@ -255,13 +268,16 @@ export default function EditPositionScreen({ route, navigation }) {
 
             <View style={styles.previewRow}>
               <Text style={styles.previewLabel}>
-                {txType === "BUY" ? "Estimated Buy Value" : "Estimated Position Reduction"}
+                {txType === "BUY"
+                  ? "Estimated Buy Value"
+                  : "Estimated Position Reduction"}
               </Text>
               <Text style={styles.previewValue}>
-              {Number(txShares) > 0 && (txType === "SELL" || Number(txPrice) > 0)
-                ? money(txValue)
-                : "—"}
-            </Text>
+                {Number(txShares) > 0 &&
+                (txType === "SELL" || Number(txPrice) > 0)
+                  ? money(txValue)
+                  : "—"}
+              </Text>
             </View>
           </View>
 
@@ -278,8 +294,8 @@ export default function EditPositionScreen({ route, navigation }) {
               {loading
                 ? "Applying Transaction…"
                 : txType === "BUY"
-                ? "Apply Buy Transaction"
-                : "Update Shares"}
+                  ? "Apply Buy Transaction"
+                  : "Update Shares"}
             </Text>
           </Pressable>
 
@@ -290,7 +306,8 @@ export default function EditPositionScreen({ route, navigation }) {
 
             <Text style={styles.disclaimer}>
               Portfolio transactions are used for tracking and educational
-              purposes only. This is not financial, investment, trading, or tax advice.
+              purposes only. This is not financial, investment, trading, or tax
+              advice.
             </Text>
           </View>
         </ScrollView>
@@ -307,8 +324,8 @@ const styles = StyleSheet.create({
 
   wrapper: {
     paddingHorizontal: 18,
-    paddingTop: 58,
-    paddingBottom: 50,
+    paddingTop: 54,
+    paddingBottom: 90,
   },
 
   topRow: {
@@ -330,30 +347,38 @@ const styles = StyleSheet.create({
 
   headerBox: {
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 14,
   },
 
   headerTitle: {
-    color: BRAND.accent,
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: 0.4,
-    marginBottom: 4,
+    color: BRAND.text,
+    fontSize: 30,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.4,
+    marginBottom: 5,
   },
-
   headerSub: {
     color: BRAND.muted,
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   snapshotCard: {
-    backgroundColor: BRAND.card,
-    borderRadius: 20,
+    backgroundColor: "rgba(17,24,39,0.82)",
+
+    borderRadius: 24,
+
     borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 14,
-    marginBottom: 14,
+    borderColor: "rgba(255,255,255,0.05)",
+
+    padding: 18,
+
+    marginBottom: 12,
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
   },
 
   snapshotRow: {
@@ -371,28 +396,34 @@ const styles = StyleSheet.create({
     height: 34,
     backgroundColor: BRAND.softBorder,
   },
-
   snapshotLabel: {
     color: BRAND.muted,
     fontSize: 11,
-    fontWeight: "800",
-    marginBottom: 4,
+    fontFamily: TYPO.fontFamily.bold,
+    marginBottom: 5,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
 
   snapshotValue: {
     color: BRAND.text,
-    fontSize: 15,
-    fontWeight: "900",
+    fontSize: 18,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
   },
-
   typeToggle: {
     flexDirection: "row",
-    backgroundColor: BRAND.card2,
+
+    backgroundColor: "rgba(255,255,255,0.04)",
+
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: "rgba(255,255,255,0.06)",
+
     borderRadius: 999,
+
     padding: 4,
-    marginBottom: 14,
+
+    marginBottom: 12,
   },
 
   typeButton: {
@@ -403,58 +434,63 @@ const styles = StyleSheet.create({
   },
 
   typeButtonBuyActive: {
-    backgroundColor: "rgba(0,227,150,0.12)",
+    backgroundColor: "rgba(255,255,255,0.10)",
   },
 
   typeButtonSellActive: {
-    backgroundColor: "rgba(239,68,68,0.12)",
+    backgroundColor: "rgba(255,255,255,0.10)",
   },
-
   typeText: {
     color: BRAND.sub,
     fontSize: 13,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   formCard: {
-    backgroundColor: BRAND.card,
+    backgroundColor: "rgba(17,24,39,0.82)",
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 16,
-    marginBottom: 14,
+    borderColor: "rgba(255,255,255,0.05)",
+    padding: 15,
+    marginBottom: 12,
   },
 
   fieldBlock: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
 
   label: {
     color: BRAND.sub,
-    marginBottom: 7,
+    marginBottom: 8,
     fontSize: 12,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
+    letterSpacing: 0.15,
   },
 
   input: {
     backgroundColor: BRAND.card2,
+
     borderWidth: 1,
-    borderColor: BRAND.softBorder,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    borderColor: "rgba(255,255,255,0.08)",
+
+    borderRadius: 16,
+
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+
     color: BRAND.text,
+
     fontSize: 15,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   previewCard: {
-    backgroundColor: BRAND.card,
+    backgroundColor: "rgba(17,24,39,0.82)",
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 16,
-    marginBottom: 14,
+    borderColor: "rgba(255,255,255,0.05)",
+    padding: 15,
+    marginBottom: 12,
   },
 
   previewHeaderRow: {
@@ -465,8 +501,8 @@ const styles = StyleSheet.create({
 
   previewTitle: {
     color: BRAND.text,
-    fontSize: 15,
-    fontWeight: "900",
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
   },
 
   previewBadge: {
@@ -485,21 +521,31 @@ const styles = StyleSheet.create({
   previewLabel: {
     color: BRAND.sub,
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   previewValue: {
     color: BRAND.text,
-    fontSize: 12.5,
-    fontWeight: "900",
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
   },
 
   saveBtn: {
-    marginTop: 8,
-    backgroundColor: BRAND.accent,
+    marginTop: 4,
+
+    backgroundColor: "#FFFFFF",
+
     paddingVertical: 15,
-    borderRadius: 16,
+
+    borderRadius: 18,
+
     alignItems: "center",
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
   },
 
   saveDisabled: {
@@ -507,13 +553,12 @@ const styles = StyleSheet.create({
   },
 
   saveText: {
-    color: BRAND.bg,
+    color: "#0A0A0A",
     fontSize: 15,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
   },
-
   footerWrap: {
-    marginTop: 28,
+    marginTop: 18,
     alignItems: "center",
     paddingHorizontal: 14,
   },
@@ -525,14 +570,18 @@ const styles = StyleSheet.create({
   },
 
   footerBrand: {
-    color: BRAND.accent,
-    fontWeight: "600",
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   disclaimer: {
     color: BRAND.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontFamily: TYPO.fontFamily.regular,
     textAlign: "center",
+  },
+  lastFieldBlock: {
+    marginBottom: 0,
   },
 });

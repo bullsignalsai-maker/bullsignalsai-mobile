@@ -1,16 +1,7 @@
 import React from "react";
 import { View, Text, ScrollView, StyleSheet, Image } from "react-native";
-
-const BRAND = {
-  bg: "#000000",
-  card: "#0B1220",
-  border: "#1F2937",
-  text: "#FFFFFF",
-  sub: "#9CA3AF",
-  muted: "#6B7280",
-  accent: "#00E396",
-};
-
+import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 export default function AboutScreen() {
   return (
     <ScrollView
@@ -89,7 +80,10 @@ export default function AboutScreen() {
       {/* FOOTER */}
       <View style={styles.footerWrap}>
         <Text style={styles.powered}>
-          Powered by <Text style={{ color: BRAND.accent }}>Alphaclara</Text>
+          Powered by{" "}
+          <Text style={{ color: BRAND.text, fontFamily: TYPO.fontFamily.bold }}>
+            Alphaclara
+          </Text>
         </Text>
 
         <Text style={styles.footer}>
@@ -119,64 +113,66 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
 
-  logoWrap: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    backgroundColor: BRAND.card,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
-  },
-
-  logo: {
-    width: 60,
-    height: 60,
-  },
-
   title: {
-    color: BRAND.accent,
-    fontSize: 26,
-    fontWeight: "900",
+    color: BRAND.text,
+    fontSize: 28,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.4,
   },
 
   tagline: {
     color: BRAND.sub,
     fontSize: 13,
     marginTop: 4,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+  logoWrap: {
+    width: 78,
+    height: 78,
+    borderRadius: 24,
+    backgroundColor: "rgba(17,24,39,0.82)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+
+  logo: {
+    width: 56,
+    height: 56,
   },
 
   card: {
-    backgroundColor: BRAND.card,
-    borderRadius: 16,
+    backgroundColor: "rgba(17,24,39,0.82)",
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 14,
+    borderColor: "rgba(255,255,255,0.06)",
+    padding: 16,
     marginBottom: 12,
   },
 
   subTitle: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontSize: 16,
-    fontWeight: "800",
-    marginBottom: 6,
+    fontFamily: TYPO.fontFamily.extrabold,
+    marginBottom: 8,
   },
 
   text: {
     color: BRAND.sub,
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 21,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   bullet: {
     color: BRAND.sub,
     fontSize: 14,
-    marginBottom: 4,
-    lineHeight: 20,
+    marginBottom: 6,
+    lineHeight: 21,
+    fontFamily: TYPO.fontFamily.regular,
   },
-
   footerWrap: {
     alignItems: "center",
     marginTop: 20,
@@ -186,10 +182,12 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     fontSize: 12,
     marginBottom: 8,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   footer: {
     color: BRAND.muted,
     fontSize: 11,
+    fontFamily: TYPO.fontFamily.regular,
   },
 });

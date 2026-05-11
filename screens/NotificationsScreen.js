@@ -13,6 +13,7 @@ import { db, auth } from "../firebaseConfig";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 export default function NotificationsScreen() {
   const [prefs, setPrefs] = useState(null);
@@ -72,12 +73,15 @@ export default function NotificationsScreen() {
               ...defaultPrefs,
               updatedAt: new Date().toISOString(),
             },
-            { merge: true }
+            { merge: true },
           );
         }
       } catch (e) {
         console.warn("Notification preferences load failed:", e?.message || e);
-        Alert.alert("Unable to Load", "Could not load notification preferences.");
+        Alert.alert(
+          "Unable to Load",
+          "Could not load notification preferences.",
+        );
       } finally {
         setLoading(false);
       }
@@ -102,11 +106,14 @@ export default function NotificationsScreen() {
           ...updated,
           updatedAt: new Date().toISOString(),
         },
-        { merge: true }
+        { merge: true },
       );
     } catch (err) {
       Alert.alert("Update Failed", "Could not update this preference.");
-      console.warn("Notification preference update failed:", err?.message || err);
+      console.warn(
+        "Notification preference update failed:",
+        err?.message || err,
+      );
     }
   };
 
@@ -164,8 +171,11 @@ export default function NotificationsScreen() {
                 value={prefs[item.key]}
                 disabled={disabled}
                 onValueChange={() => togglePref(item.key)}
-                trackColor={{ true: BRAND.accent, false: "#374151" }}
-                thumbColor="#FFF"
+                trackColor={{
+                  true: "rgba(255,255,255,0.22)",
+                  false: "rgba(255,255,255,0.10)",
+                }}
+                thumbColor={prefs[item.key] ? "#F5F5F5" : "#9CA3AF"}
               />
             </View>
           );
@@ -209,7 +219,7 @@ const styles = StyleSheet.create({
     color: BRAND.muted,
     marginTop: 10,
     fontSize: 13,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   header: {
@@ -217,9 +227,10 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    color: BRAND.accent,
-    fontSize: 24,
-    fontWeight: "900",
+    color: BRAND.text,
+    fontSize: 26,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
     textAlign: "center",
   },
 
@@ -230,13 +241,14 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 6,
     paddingHorizontal: 8,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   card: {
-    backgroundColor: BRAND.card,
+    backgroundColor: "rgba(17,24,39,0.82)",
     borderWidth: 1,
-    borderColor: BRAND.border,
-    borderRadius: 20,
+    borderColor: "rgba(255,255,255,0.06)",
+    borderRadius: 22,
     paddingHorizontal: 14,
   },
 
@@ -244,9 +256,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 15,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: BRAND.border,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+
+  iconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
   },
 
   lastRow: {
@@ -264,22 +288,10 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
 
-  iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: BRAND.card2,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-
   label: {
     color: BRAND.text,
     fontSize: 14,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   desc: {
@@ -287,6 +299,7 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     lineHeight: 16,
     marginTop: 3,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   footerWrap: {
@@ -295,21 +308,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
 
+  footerBrand: {
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
   footerText: {
     color: BRAND.sub,
     fontSize: 12,
     marginBottom: 8,
-  },
-
-  footerBrand: {
-    color: BRAND.accent,
-    fontWeight: "600",
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   disclaimer: {
     color: BRAND.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 10.5,
+    lineHeight: 15,
     textAlign: "center",
+    fontFamily: TYPO.fontFamily.regular,
   },
 });

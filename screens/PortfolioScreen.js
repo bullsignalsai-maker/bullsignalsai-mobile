@@ -24,6 +24,7 @@ import { API_BASE_URL } from "../config/apiKeys";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import AstraChat from "../components/AstraChat";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 export default function PortfolioScreen({ navigation }) {
   const [portfolio, setPortfolio] = useState([]);
@@ -383,13 +384,10 @@ export default function PortfolioScreen({ navigation }) {
             <View style={{ flex: 1 }}>
               <View style={styles.symbolLine}>
                 <Text style={styles.symbol}>{p.symbol}</Text>
-                <Text style={styles.allocationPill}>
-                  {fmt(p.allocationPct)}%
-                </Text>
               </View>
 
               <Text style={styles.companyMeta}>
-                {p.shares} shares · Avg {money(p.avgCost)}
+                {fmt(p.allocationPct)}% allocation · {p.shares} shares
               </Text>
             </View>
 
@@ -398,7 +396,7 @@ export default function PortfolioScreen({ navigation }) {
               <Text
                 style={[styles.todayText, { color: getGainColor(p.today) }]}
               >
-                Today {signedMoney(p.today)}
+                Day P&L {signedMoney(p.today)}
               </Text>
             </View>
           </View>
@@ -414,12 +412,13 @@ export default function PortfolioScreen({ navigation }) {
                 handleToggleAIInsight(p.symbol, p, totalValue);
               }}
               style={({ pressed }) => [
-                styles.aiIconBtn,
-                pressed && { opacity: 0.7 },
+                styles.aiInlineBtn,
+                pressed && { opacity: 0.6 },
               ]}
             >
-              <Ionicons name="sparkles-outline" size={16} color={BRAND.amber} />
-              <Text style={styles.aiBtnText}>AI View</Text>
+              <Text style={styles.aiInlineText}>
+                {insight.expanded ? "Hide AI View" : "AI View →"}
+              </Text>
             </Pressable>
           </View>
 
@@ -519,9 +518,18 @@ export default function PortfolioScreen({ navigation }) {
         }
       >
         <View style={styles.heroCard}>
-          <Text style={styles.headerTitle}>Portfolio</Text>
-          <Text style={styles.headerSub}>AI-Powered Portfolio Tracking</Text>
-          <Text style={styles.headerMeta}>Live portfolio value</Text>
+          <View style={styles.heroTopRow}>
+            <View>
+              <Text style={styles.headerTitle}>Portfolio</Text>
+              <Text style={styles.headerSub}>Live portfolio intelligence</Text>
+            </View>
+
+            <View style={styles.livePill}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>Live</Text>
+            </View>
+          </View>
+
           <Text style={styles.totalValue}>{money(totalValue)}</Text>
 
           <Text style={[styles.totalGain, { color: getGainColor(totalGain) }]}>
@@ -550,7 +558,7 @@ export default function PortfolioScreen({ navigation }) {
         <View style={styles.insightsCard}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.sectionTitle}>Portfolio Insights</Text>
-            <Text style={styles.cardHint}>Snapshot</Text>
+            <Text style={styles.cardHint}>Live</Text>
           </View>
 
           <View style={styles.insightRow}>
@@ -640,7 +648,7 @@ export default function PortfolioScreen({ navigation }) {
         style={styles.fab}
         onPress={() => navigation.navigate("AddPositionScreen")}
       >
-        <Ionicons name="add" size={36} color={BRAND.green} />
+        <Ionicons name="add" size={30} color="#0A0A0A" />
       </Pressable>
 
       {portfolio.length > 0 && (
@@ -721,17 +729,23 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     fontSize: 13,
   },
-
   heroCard: {
-    backgroundColor: BRAND.card,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 18,
-    marginBottom: 14,
-    alignItems: "stretch",
-  },
+    backgroundColor: "rgba(17,24,39,0.82)",
 
+    borderRadius: 28,
+
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+
+    padding: 22,
+
+    marginBottom: 8,
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 22,
+  },
   eyebrow: {
     color: BRAND.muted,
     fontSize: 12,
@@ -740,18 +754,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 8,
   },
-
   totalValue: {
     color: BRAND.text,
-    fontSize: 32,
-    fontWeight: "900",
-    letterSpacing: 0.2,
+    fontSize: 34,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.4,
+    fontVariant: ["tabular-nums"],
   },
 
   totalGain: {
     fontSize: 15,
     marginTop: 5,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
   },
 
   heroStatsRow: {
@@ -831,18 +846,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   sectionTitle: {
-    color: BRAND.green,
-    fontSize: 16,
-    fontWeight: "900",
+    color: BRAND.text,
+    fontSize: 17,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.2,
   },
 
   sectionSub: {
     color: BRAND.muted,
     fontSize: 11,
     marginTop: 3,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   filterBtn: {
@@ -858,11 +873,20 @@ const styles = StyleSheet.create({
 
   positionCard: {
     backgroundColor: BRAND.card,
-    padding: 14,
-    borderRadius: 18,
-    borderColor: BRAND.softBorder,
+
+    padding: 16,
+
+    borderRadius: 22,
+
+    borderColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    marginBottom: 10,
+
+    marginBottom: 14,
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
   },
 
   positionTopRow: {
@@ -879,28 +903,16 @@ const styles = StyleSheet.create({
   symbol: {
     color: BRAND.text,
     fontSize: 18,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
     marginRight: 8,
-  },
-
-  allocationPill: {
-    color: BRAND.green,
-    fontSize: 10.5,
-    fontWeight: "900",
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,227,150,0.10)",
-    overflow: "hidden",
   },
 
   companyMeta: {
     color: BRAND.muted,
     fontSize: 11,
     marginTop: 4,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.semibold,
   },
-
   positionRight: {
     alignItems: "flex-end",
   },
@@ -908,13 +920,15 @@ const styles = StyleSheet.create({
   currentValue: {
     color: BRAND.text,
     fontSize: 14,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
   },
 
   todayText: {
     fontSize: 11.5,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
     marginTop: 4,
+    fontVariant: ["tabular-nums"],
   },
 
   positionMiddle: {
@@ -929,26 +943,18 @@ const styles = StyleSheet.create({
 
   plValue: {
     fontSize: 14,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
     flex: 1,
+    fontVariant: ["tabular-nums"],
+  },
+  aiInlineBtn: {
+    paddingLeft: 10,
   },
 
-  aiIconBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    columnGap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(250,204,21,0.35)",
-    backgroundColor: "rgba(250,204,21,0.08)",
-  },
-
-  aiBtnText: {
-    color: BRAND.amber,
-    fontSize: 11,
-    fontWeight: "900",
+  aiInlineText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   priceRow: {
@@ -960,7 +966,8 @@ const styles = StyleSheet.create({
   priceMeta: {
     color: BRAND.sub,
     fontSize: 11.5,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.medium,
+    fontVariant: ["tabular-nums"],
   },
 
   editBtn: {
@@ -1129,8 +1136,8 @@ const styles = StyleSheet.create({
   },
 
   footerBrand: {
-    color: BRAND.accent,
-    fontWeight: "600",
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   disclaimer: {
@@ -1139,7 +1146,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: "center",
   },
-
   fab: {
     position: "absolute",
     right: 20,
@@ -1147,9 +1153,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: BRAND.card2,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: "rgba(255,255,255,0.16)",
     alignItems: "center",
     justifyContent: "center",
     elevation: 10,
@@ -1173,30 +1179,60 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   headerTitle: {
-    color: BRAND.accent,
-    fontSize: 23,
-    fontWeight: "900",
-    letterSpacing: 0.4,
+    color: BRAND.text,
+    fontSize: 26,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
     marginBottom: 2,
     textAlign: "center",
   },
 
   headerSub: {
     color: BRAND.muted,
-    fontSize: 11.5,
-    fontWeight: "700",
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.medium,
     marginBottom: 12,
-  },
-  headerMeta: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    fontWeight: "700",
-    marginBottom: 8,
   },
   footerMeta: {
     color: BRAND.muted,
     fontSize: 10.5,
     marginBottom: 8,
     fontWeight: "700",
+  },
+  liveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: BRAND.green,
+    marginRight: 6,
+  },
+
+  liveText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 5,
+  },
+
+  livePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
   },
 });

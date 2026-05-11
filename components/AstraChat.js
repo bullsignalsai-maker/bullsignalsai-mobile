@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { askAstra as askAstraService } from "../services/astraService";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 export default function AstraChat({ visible, onClose, portfolioData }) {
   const [messages, setMessages] = useState([]);
@@ -116,8 +117,8 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
             portfolioData?.contextType === "market"
               ? "Ask Astra about market context, risk sentiment, movers, news, crypto, and major indexes."
               : portfolioData?.contextType === "stock_detail"
-              ? `Ask Astra about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
-              : "Ask Astra about your portfolio, holdings, risk exposure, and performance context.",
+                ? `Ask Astra about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
+                : "Ask Astra about your portfolio, holdings, risk exposure, and performance context.",
         },
       ]);
 
@@ -157,7 +158,7 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
 
     if (question_id) {
       setAskedIds((prev) =>
-        prev.includes(question_id) ? prev : [...prev, question_id]
+        prev.includes(question_id) ? prev : [...prev, question_id],
       );
     }
 
@@ -198,10 +199,10 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
         {
           id: makeId("astra"),
           from: "astra",
-         text:
-          result?.answer?.trim() ||
-          "Astra could not generate a response right now. Please try again.",
-        cards: result?.cards || [],
+          text:
+            result?.answer?.trim() ||
+            "Astra could not generate a response right now. Please try again.",
+          cards: result?.cards || [],
         },
       ]);
 
@@ -232,24 +233,24 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
     Keyboard.dismiss();
     askAstra({ question_text: text });
   };
-const resetChat = () => {
-  setMessages([
-    {
-      id: "welcome",
-      from: "astra",
-      text:
-        portfolioData?.contextType === "market"
-          ? "Ask Astra about market context, risk sentiment, movers, news, crypto, and major indexes."
-          : portfolioData?.contextType === "stock_detail"
-          ? `Ask Astra about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
-          : "Ask Astra about your portfolio, holdings, risk exposure, and performance context.",
-    },
-  ]);
+  const resetChat = () => {
+    setMessages([
+      {
+        id: "welcome",
+        from: "astra",
+        text:
+          portfolioData?.contextType === "market"
+            ? "Ask Astra about market context, risk sentiment, movers, news, crypto, and major indexes."
+            : portfolioData?.contextType === "stock_detail"
+              ? `Ask Astra about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
+              : "Ask Astra about your portfolio, holdings, risk exposure, and performance context.",
+      },
+    ]);
 
-  setInput("");
-  setAskedIds([]);
-  setSuggestedFollowups([]);
-};
+    setInput("");
+    setAskedIds([]);
+    setSuggestedFollowups([]);
+  };
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
@@ -334,7 +335,7 @@ const resetChat = () => {
                         </View>
                       )}
                     </View>
-                  )
+                  ),
                 )}
 
                 {!hasAsked && (
@@ -349,7 +350,10 @@ const resetChat = () => {
                           pressed && { opacity: 0.75 },
                         ]}
                         onPress={() =>
-                          askAstra({ question_id: c.id, question_text: c.label })
+                          askAstra({
+                            question_id: c.id,
+                            question_text: c.label,
+                          })
                         }
                       >
                         <Ionicons
@@ -365,27 +369,33 @@ const resetChat = () => {
               </ScrollView>
             </View>
 
-            {hasAsked && suggestedFollowups.length === 0 && moreChips.length > 0 && (
-              <View style={styles.followupArea}>
-                <Text style={styles.chipHeader}>More insights</Text>
+            {hasAsked &&
+              suggestedFollowups.length === 0 &&
+              moreChips.length > 0 && (
+                <View style={styles.followupArea}>
+                  <Text style={styles.chipHeader}>More insights</Text>
 
-                {moreChips.slice(0, 2).map((q) => (
-                  <Pressable
-                    key={q.id}
-                    style={({ pressed }) => [
-                      styles.chip,
-                      pressed && { opacity: 0.75 },
-                    ]}
-                    onPress={() =>
-                      askAstra({ question_id: q.id, question_text: q.label })
-                    }
-                  >
-                    <Ionicons name="sparkles-outline" size={14} color={BRAND.amber} />
-                    <Text style={styles.chipText}>{q.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
+                  {moreChips.slice(0, 2).map((q) => (
+                    <Pressable
+                      key={q.id}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        pressed && { opacity: 0.75 },
+                      ]}
+                      onPress={() =>
+                        askAstra({ question_id: q.id, question_text: q.label })
+                      }
+                    >
+                      <Ionicons
+                        name="sparkles-outline"
+                        size={14}
+                        color={BRAND.amber}
+                      />
+                      <Text style={styles.chipText}>{q.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
 
             {suggestedFollowups.length > 0 && (
               <View style={styles.followupArea}>
@@ -412,7 +422,8 @@ const resetChat = () => {
             )}
 
             <Text style={styles.disclaimerText}>
-              Educational AI insights only. Not financial, investment, trading, or tax advice.
+              Educational AI insights only. Not financial, investment, trading,
+              or tax advice.
             </Text>
 
             <View style={styles.inputRow}>
@@ -435,7 +446,7 @@ const resetChat = () => {
                 disabled={!input.trim() || loading}
                 onPress={sendCustom}
               >
-                <Ionicons name="send" size={15} color={BRAND.bg} />
+                <Ionicons name="send" size={15} color="#0A0A0A" />
               </Pressable>
             </View>
           </View>
@@ -505,16 +516,16 @@ const styles = StyleSheet.create({
   },
 
   astraTitle: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: 1.2,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: 0.2,
   },
 
   astraTagline: {
     color: BRAND.muted,
     fontSize: 11.5,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.medium,
     marginTop: 1,
   },
 
@@ -550,28 +561,29 @@ const styles = StyleSheet.create({
   },
 
   userText: {
-    color: BRAND.bg,
-    fontWeight: "800",
-    fontSize: 12.5,
-    lineHeight: 17,
+    color: "#0A0A0A",
+    fontFamily: TYPO.fontFamily.semibold,
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   botBubble: {
     alignSelf: "flex-start",
-    backgroundColor: BRAND.card,
+    backgroundColor: "rgba(17,24,39,0.92)",
     borderWidth: 1,
-    borderColor: BRAND.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 16,
-    marginVertical: 4,
+    borderColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    borderRadius: 18,
+    marginVertical: 5,
     maxWidth: "92%",
   },
 
   botText: {
     color: BRAND.text,
-    fontSize: 12.5,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   typingBubble: {
@@ -608,8 +620,15 @@ const styles = StyleSheet.create({
   chipHeader: {
     color: BRAND.muted,
     fontSize: 11,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
     marginBottom: 6,
+  },
+
+  chipText: {
+    color: BRAND.text,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.semibold,
+    flexShrink: 1,
   },
 
   chip: {
@@ -625,13 +644,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 
-  chipText: {
-    color: BRAND.text,
-    fontSize: 12,
-    fontWeight: "700",
-    flexShrink: 1,
-  },
-
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -643,18 +655,19 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND.card,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
+    borderColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     color: BRAND.text,
-    fontSize: 12.5,
+    fontSize: 13,
     marginRight: 8,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   sendBtn: {
     width: 36,
     height: 36,
-    backgroundColor: BRAND.accent,
+    backgroundColor: "#FFFFFF",
     borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
@@ -693,13 +706,13 @@ const styles = StyleSheet.create({
     color: BRAND.muted,
     fontSize: 10.5,
     marginBottom: 3,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   answerCardValue: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontSize: 13,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
   },
 
   answerCardSubtitle: {
@@ -707,27 +720,28 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     lineHeight: 14,
     marginTop: 3,
+    fontFamily: TYPO.fontFamily.regular,
   },
   headerActions: {
-  flexDirection: "row",
-  alignItems: "center",
-  columnGap: 8,
-},
+    flexDirection: "row",
+    alignItems: "center",
+    columnGap: 8,
+  },
 
-clearBtn: {
-  paddingHorizontal: 10,
-  height: 34,
-  borderRadius: 17,
-  backgroundColor: BRAND.card,
-  borderWidth: 1,
-  borderColor: BRAND.border,
-  alignItems: "center",
-  justifyContent: "center",
-},
+  clearBtn: {
+    paddingHorizontal: 10,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: BRAND.card,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
-clearText: {
-  color: BRAND.muted,
-  fontSize: 11,
-  fontWeight: "800",
-},
+  clearText: {
+    color: BRAND.muted,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+  },
 });

@@ -1321,7 +1321,7 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.medium,
   },
   footerBrand: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontWeight: "600",
   },
 

@@ -977,7 +977,7 @@ const styles = StyleSheet.create({
   },
 
   footerBrand: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontWeight: "600",
   },
 
