@@ -438,7 +438,11 @@ export default function MarketMoversScreen({ navigation }) {
     <View style={styles.wrapper}>
       <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
       <View style={styles.hiddenShareCardWrap} pointerEvents="none">
-        <ViewShot ref={shareCardRef} options={{ format: "png", quality: 1 }}>
+        <ViewShot
+          ref={shareCardRef}
+          collapsable={false}
+          options={{ format: "png", quality: 1, result: "tmpfile" }}
+        >
           <View style={styles.shareCard}>
             <View style={styles.shareBrandRow}>
               <Image source={ALPHACLARA_LOGO} style={styles.shareLogo} />
@@ -460,11 +464,13 @@ export default function MarketMoversScreen({ navigation }) {
                   Rising
                 </Text>
 
-                <Text style={styles.shareHeaderSymbol}>Symbol</Text>
-                <Text style={styles.shareHeaderLabel}>Move</Text>
-                <Text style={styles.shareHeaderPrice}>Price</Text>
-                <Text style={styles.shareHeaderDollar}>$ Chg</Text>
-                <Text style={styles.shareHeaderMove}>% Chg</Text>
+                <View style={styles.shareTableHeader}>
+                  <Text style={styles.shareHeaderSymbol}>Symbol</Text>
+                  <Text style={styles.shareHeaderLabel}>Move</Text>
+                  <Text style={styles.shareHeaderPrice}>Price</Text>
+                  <Text style={styles.shareHeaderDollar}>$ Chg</Text>
+                  <Text style={styles.shareHeaderMove}>% Chg</Text>
+                </View>
 
                 {shareRising.map((m, index) => (
                   <View
@@ -472,6 +478,7 @@ export default function MarketMoversScreen({ navigation }) {
                     style={styles.shareTableRow}
                   >
                     <Text style={styles.shareColSymbol}>{m.symbol}</Text>
+
                     <View style={styles.shareColLabel}>
                       <MoveLabel
                         changePct={Number(m.changePct)}
@@ -504,11 +511,13 @@ export default function MarketMoversScreen({ navigation }) {
                   Dropping
                 </Text>
 
-                <Text style={styles.shareHeaderSymbol}>Symbol</Text>
-                <Text style={styles.shareHeaderLabel}>Move</Text>
-                <Text style={styles.shareHeaderPrice}>Price</Text>
-                <Text style={styles.shareHeaderDollar}>$ Chg</Text>
-                <Text style={styles.shareHeaderMove}>% Chg</Text>
+                <View style={styles.shareTableHeader}>
+                  <Text style={styles.shareHeaderSymbol}>Symbol</Text>
+                  <Text style={styles.shareHeaderLabel}>Move</Text>
+                  <Text style={styles.shareHeaderPrice}>Price</Text>
+                  <Text style={styles.shareHeaderDollar}>$ Chg</Text>
+                  <Text style={styles.shareHeaderMove}>% Chg</Text>
+                </View>
 
                 {sharePullingBack.map((m, index) => (
                   <View
@@ -516,6 +525,7 @@ export default function MarketMoversScreen({ navigation }) {
                     style={styles.shareTableRow}
                   >
                     <Text style={styles.shareColSymbol}>{m.symbol}</Text>
+
                     <View style={styles.shareColLabel}>
                       <MoveLabel
                         changePct={Number(m.changePct)}
@@ -1096,8 +1106,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     top: 0,
-    opacity: 0.01,
-    zIndex: -1,
+    opacity: 1,
+    transform: [{ translateY: -3000 }],
   },
 
   shareCard: {
@@ -1161,6 +1171,7 @@ const styles = StyleSheet.create({
 
   shareTableHeader: {
     flexDirection: "row",
+    alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: BRAND.softBorder,
     paddingBottom: 8,
@@ -1169,31 +1180,30 @@ const styles = StyleSheet.create({
 
   shareTableRow: {
     flexDirection: "row",
-    paddingVertical: 5,
+    alignItems: "center",
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.04)",
   },
 
   shareColSymbol: {
-    flex: 1,
+    width: 120,
     color: BRAND.text,
     fontSize: 15,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
   },
-
   shareColPrice: {
-    flex: 1,
+    width: 150,
     color: BRAND.sub,
     fontSize: 15,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
     textAlign: "right",
   },
-
   shareColMove: {
-    flex: 1,
+    width: 150,
     color: BRAND.text,
     fontSize: 15,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
     textAlign: "right",
   },
 
@@ -1205,48 +1215,48 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   shareHeaderSymbol: {
-    flex: 1,
+    width: 120,
     color: BRAND.muted,
     fontSize: 13,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-
   shareHeaderPrice: {
-    flex: 1,
+    width: 150,
     color: BRAND.muted,
     fontSize: 13,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
     textAlign: "right",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
 
   shareHeaderMove: {
-    flex: 1,
+    width: 150,
     color: BRAND.muted,
     fontSize: 13,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
     textAlign: "right",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
+
   shareHeaderDollar: {
-    flex: 1,
+    width: 150,
     color: BRAND.muted,
     fontSize: 13,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
     textAlign: "right",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
 
   shareColDollar: {
-    flex: 1,
+    width: 150,
     color: BRAND.text,
     fontSize: 15,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
     textAlign: "right",
   },
   marketMoverLabel: {
@@ -1258,7 +1268,7 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   shareHeaderLabel: {
-    flex: 1.15,
+    width: 210,
     color: BRAND.muted,
     fontSize: 13,
     fontFamily: TYPO.fontFamily.bold,
@@ -1267,7 +1277,7 @@ const styles = StyleSheet.create({
   },
 
   shareColLabel: {
-    flex: 1.15,
+    width: 210,
     justifyContent: "center",
   },
 
