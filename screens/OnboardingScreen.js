@@ -15,7 +15,6 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
-import AppButton from "../components/AppButton";
 const { width } = Dimensions.get("window");
 const slides = [
   { key: "1", premiumIntro: true },
@@ -232,12 +231,9 @@ export default function OnboardingScreen() {
     item.premiumIntro ? renderPremiumFirstSlide() : renderNormalSlide({ item });
 
   const renderNextButton = () => (
-    <AppButton
-      title="Next"
-      size="small"
-      variant="primary"
-      style={styles.sliderButton}
-    />
+    <View style={styles.sliderButton}>
+      <Text style={styles.sliderButtonText}>Next</Text>
+    </View>
   );
 
   const renderSkipButton = () => (
@@ -247,12 +243,9 @@ export default function OnboardingScreen() {
   );
 
   const renderDoneButton = () => (
-    <AppButton
-      title="Get Started"
-      size="small"
-      variant="primary"
-      style={styles.sliderButton}
-    />
+    <View style={styles.sliderButton}>
+      <Text style={styles.sliderButtonText}>Get Started</Text>
+    </View>
   );
 
   return (
@@ -405,5 +398,20 @@ const styles = StyleSheet.create({
   sliderButton: {
     minWidth: 126,
     paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+  },
+  sliderButtonText: {
+    color: "#0A0A0A",
+    fontSize: 14.5,
+    fontFamily: TYPO.bold,
+    letterSpacing: 0.1,
   },
 });
