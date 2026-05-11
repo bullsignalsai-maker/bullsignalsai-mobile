@@ -1,15 +1,38 @@
 import React from "react";
 import { Text } from "react-native";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 export function getMoveLabel(changePct) {
-  if (typeof changePct !== "number" || Number.isNaN(changePct)) return null;
+  if (typeof changePct !== "number" || Number.isNaN(changePct)) {
+    return null;
+  }
 
-  if (changePct >= 3) return "↗ Rising fast";
-  if (changePct >= 1) return "↗ Rising";
-  if (changePct <= -3) return "↘ Dropping fast";
-  if (changePct <= -1) return "↘ Pulling back";
-  return "Mostly steady";
+  // -------------------------------------------------
+  // Bullish
+  // -------------------------------------------------
+
+  if (changePct >= 5) return "↗ Exploding";
+
+  if (changePct >= 2) return "↗ Rising fast";
+
+  if (changePct >= 0.35) return "↗ Rising";
+
+  // -------------------------------------------------
+  // Neutral
+  // -------------------------------------------------
+
+  if (changePct > -0.35) return "Mostly steady";
+
+  // -------------------------------------------------
+  // Bearish
+  // -------------------------------------------------
+
+  if (changePct > -2) return "↘ Pulling back";
+
+  if (changePct > -5) return "↘ Dropping fast";
+
+  return "↘ Breaking down";
 }
 
 export function getMoveLabelColor(changePct) {
@@ -17,14 +40,27 @@ export function getMoveLabelColor(changePct) {
     return BRAND.sub;
   }
 
-  if (changePct > 0) return "#6CCB5F"; // premium green
-  if (changePct < 0) return "#FF99A4"; // soft bearish red
+  // Bullish
+  if (changePct >= 5) return "#00E396";
 
-  return BRAND.sub;
+  if (changePct >= 2) return "#6CCB5F";
+
+  if (changePct >= 0.35) return "#8CD97A";
+
+  // Neutral
+  if (changePct > -0.35) return BRAND.sub;
+
+  // Bearish
+  if (changePct > -2) return "#FF99A4";
+
+  if (changePct > -5) return "#FF6B81";
+
+  return "#FF4D67";
 }
 
 export default function MoveLabel({ changePct, style, numberOfLines = 1 }) {
   const label = getMoveLabel(changePct);
+
   if (!label) return null;
 
   return (
@@ -35,7 +71,7 @@ export default function MoveLabel({ changePct, style, numberOfLines = 1 }) {
           color: getMoveLabelColor(changePct),
 
           fontSize: 10.5,
-          fontWeight: "700",
+          fontFamily: TYPO.fontFamily.semibold,
 
           fontStyle: "italic",
 

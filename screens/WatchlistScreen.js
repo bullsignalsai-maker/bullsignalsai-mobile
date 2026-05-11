@@ -556,10 +556,16 @@ export default function WatchlistScreen({ navigation }) {
           <View style={styles.cardHeader}>
             {/* LEFT — Symbol + Company */}
             <View style={{ flex: 1 }}>
-              <Text style={styles.symbol}>{item.symbol}</Text>
-              <Text style={styles.name}>{item.companyName || item.symbol}</Text>
+              <View style={styles.symbolRow}>
+                <Text style={styles.symbol}>{item.symbol}</Text>
 
-              <MoveLabel changePct={item.changePct} style={styles.moveLabel} />
+                <MoveLabel
+                  changePct={item.changePct}
+                  style={styles.moveLabelInline}
+                />
+              </View>
+
+              <Text style={styles.name}>{item.companyName || item.symbol}</Text>
             </View>
 
             {/* {/* RIGHT — Price + Change */}
@@ -989,18 +995,12 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: BRAND.card,
-    borderRadius: 22,
-    padding: 16,
-    marginHorizontal: 14,
+    borderRadius: 18,
+    padding: 12,
+    marginHorizontal: 10,
     marginBottom: 10,
-
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
+    borderColor: BRAND.border,
   },
 
   cardHeader: {
@@ -1011,14 +1011,14 @@ const styles = StyleSheet.create({
 
   symbol: {
     color: BRAND.text,
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: TYPO.fontFamily.bold,
-    letterSpacing: 0.2,
   },
+
   name: {
     color: BRAND.sub,
-    fontSize: 13,
-    marginTop: 3,
+    fontSize: 12,
+    marginTop: 2,
     fontFamily: TYPO.fontFamily.medium,
   },
   priceBlock: {
@@ -1028,16 +1028,46 @@ const styles = StyleSheet.create({
 
   price: {
     color: BRAND.text,
-    fontSize: 22,
+    fontSize: 18,
     fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.2,
+    fontVariant: ["tabular-nums"],
   },
-
   changePct: {
     fontSize: 12,
-    fontWeight: "600",
+    fontFamily: TYPO.fontFamily.semibold,
+    fontVariant: ["tabular-nums"],
   },
 
+  summary: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  signalText: {
+    color: "#000",
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  confInline: {
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  lastUpdated: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    opacity: 0.85,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  tapHint: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
   signalRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1081,12 +1111,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  summary: {
-    color: "#D1D5DB",
-    fontSize: 13.5,
-    lineHeight: 21,
-    fontFamily: TYPO.fontFamily.regular,
-  },
   patternRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1306,9 +1330,18 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: "center",
   },
-  moveLabel: {
-    fontSize: 12,
-    fontWeight: "900",
-    marginTop: 3,
+  symbolRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+
+  moveLabelInline: {
+    marginLeft: 7,
+    marginTop: 0,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.semibold,
+    fontStyle: "italic",
+    letterSpacing: -0.15,
   },
 });
