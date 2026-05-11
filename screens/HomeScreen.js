@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { getHomeScreen } from "../services/HomeService";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 import MoveLabel from "../components/MoveLabel";
 const LOGO = require("../assets/alpha-transparent.png");
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -356,13 +357,16 @@ export default function HomeScreen({ navigation }) {
               <View style={styles.cardHeader}>
                 {/* LEFT */}
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.symbol}>{item.symbol}</Text>
-                  <Text style={styles.name}>{item.companyName}</Text>
+                  <View style={styles.symbolRow}>
+                    <Text style={styles.symbol}>{item.symbol}</Text>
 
-                  <MoveLabel
-                    changePct={item.changePct}
-                    style={styles.moveLabel}
-                  />
+                    <MoveLabel
+                      changePct={item.changePct}
+                      style={styles.moveLabelInline}
+                    />
+                  </View>
+
+                  <Text style={styles.name}>{item.companyName}</Text>
                 </View>
 
                 {/* RIGHT */}
@@ -503,8 +507,18 @@ const styles = StyleSheet.create({
   header: { paddingTop: 56, alignItems: "center", marginBottom: 6 },
   headerBrandRow: { flexDirection: "row", alignItems: "center" },
   logo: { width: 25, height: 25, marginRight: 6 },
-  title: { color: BRAND.accent, fontSize: 25, fontWeight: "800" },
-  subtitle: { color: BRAND.sub, fontSize: 12, marginTop: 4 },
+  title: {
+    color: BRAND.accent,
+    fontSize: 25,
+    fontFamily: TYPO.extrabold,
+  },
+
+  subtitle: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginTop: 4,
+    fontFamily: TYPO.medium,
+  },
   carousel: {
     marginTop: 5,
     marginBottom: 8,
@@ -535,8 +549,8 @@ const styles = StyleSheet.create({
   },
   featureTitle: {
     color: BRAND.text,
-    fontWeight: "800",
     fontSize: 14,
+    fontFamily: TYPO.bold,
   },
   featureValue: { color: BRAND.sub, fontSize: 12 },
 
@@ -555,14 +569,31 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  symbol: { color: BRAND.text, fontSize: 17, fontWeight: "700" },
-  name: { color: BRAND.sub, fontSize: 12, marginTop: 2 },
+  symbol: {
+    color: BRAND.text,
+    fontSize: 17,
+    fontFamily: TYPO.bold,
+  },
+
+  name: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginTop: 2,
+    fontFamily: TYPO.medium,
+  },
+
   price: {
     color: BRAND.text,
     fontSize: 18,
-    fontWeight: "900",
+    fontFamily: TYPO.extrabold,
+    fontVariant: ["tabular-nums"],
   },
-  changePct: { fontSize: 12, fontWeight: "600" },
+
+  changePct: {
+    fontSize: 12,
+    fontFamily: TYPO.semibold,
+    fontVariant: ["tabular-nums"],
+  },
 
   signalRow: {
     flexDirection: "row",
@@ -577,7 +608,7 @@ const styles = StyleSheet.create({
   },
   confInline: {
     fontSize: 12,
-    fontWeight: "800",
+    fontFamily: TYPO.bold,
   },
   cardDivider: {
     height: 1,
@@ -589,7 +620,7 @@ const styles = StyleSheet.create({
   signalText: {
     color: "#000",
     fontSize: 11.5,
-    fontWeight: "900",
+    fontFamily: TYPO.bold,
   },
 
   cardFooterRow: {
@@ -602,17 +633,18 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     fontSize: 12.5,
     lineHeight: 18,
+    fontFamily: TYPO.medium,
   },
   lastUpdated: {
     color: BRAND.muted,
     fontSize: 10.5,
-    fontWeight: "700",
     opacity: 0.85,
+    fontFamily: TYPO.semibold,
   },
   tapHint: {
     color: BRAND.muted,
     fontSize: 10.5,
-    fontWeight: "700",
+    fontFamily: TYPO.semibold,
   },
 
   modalOverlay: {
@@ -661,8 +693,8 @@ const styles = StyleSheet.create({
   sectorText: {
     fontSize: 12,
     color: BRAND.sub,
-    fontWeight: "700",
     lineHeight: 17,
+    fontFamily: TYPO.semibold,
   },
   segmentWrap: {
     flexDirection: "row",
@@ -672,8 +704,8 @@ const styles = StyleSheet.create({
   segmentText: {
     fontSize: 12,
     color: BRAND.sub,
-    fontWeight: "700",
     lineHeight: 17,
+    fontFamily: TYPO.semibold,
   },
   changeLine: {
     fontSize: 12,
@@ -685,7 +717,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: "center",
     marginBottom: 8,
-    fontWeight: "700",
+    fontFamily: TYPO.semibold,
   },
 
   footerWrap: {
@@ -699,18 +731,19 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     fontSize: 12,
     marginBottom: 8,
+    fontFamily: TYPO.medium,
   },
 
   footerBrand: {
     color: BRAND.accent,
-    fontWeight: "600",
+    fontFamily: TYPO.semibold,
   },
-
   disclaimer: {
     color: BRAND.muted,
     fontSize: 11,
     lineHeight: 16,
     textAlign: "center",
+    fontFamily: TYPO.regular,
   },
   marketRow: {
     flexDirection: "row",
@@ -728,7 +761,7 @@ const styles = StyleSheet.create({
   marketText: {
     color: BRAND.sub,
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: TYPO.semibold,
   },
   patternRow: {
     flexDirection: "row",
@@ -746,19 +779,31 @@ const styles = StyleSheet.create({
   patternLabel: {
     color: BRAND.muted,
     fontSize: 10,
-    fontWeight: "900",
     marginRight: 6,
     textTransform: "uppercase",
+    fontFamily: TYPO.bold,
   },
 
   patternValue: {
     color: BRAND.sub,
     fontSize: 10.5,
-    fontWeight: "800",
+    fontFamily: TYPO.semibold,
   },
-  moveLabel: {
-    fontSize: 12,
-    fontWeight: "900",
-    marginTop: 3,
+
+  symbolRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+
+  moveLabelInline: {
+    marginLeft: 7,
+    marginTop: 0,
+
+    fontSize: 10.5,
+    fontFamily: TYPO.semibold,
+    fontStyle: "italic",
+
+    letterSpacing: -0.15,
   },
 });

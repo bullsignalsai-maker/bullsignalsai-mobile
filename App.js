@@ -1,4 +1,12 @@
 // App.js (with Push Notification Integration + Notifications Screen)
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+} from "@expo-google-fonts/inter";
 import React, { useEffect, useState, useRef } from "react";
 import { ActivityIndicator, View, Text } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -86,9 +94,17 @@ function MainTabs() {
 
 // === ROOT STACK ===
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+  });
   const [initialRoute, setInitialRoute] = useState(null);
   const navigationRef = useRef(null);
   const isNavigationReady = useRef(false);
+
   const handleNotificationNavigation = (response) => {
     const data = response?.notification?.request?.content?.data || {};
 
@@ -146,6 +162,7 @@ export default function App() {
       }, 800);
     }
   };
+
   // === Check login/onboarding state ===
   useEffect(() => {
     const checkUserStatus = async () => {
@@ -153,9 +170,7 @@ export default function App() {
         const onboarded = await AsyncStorage.getItem("onboarded");
         const userToken = await AsyncStorage.getItem("userToken");
 
-        if (userToken) setInitialRoute("Main");
-        else if (onboarded) setInitialRoute("Login");
-        else setInitialRoute("Onboarding");
+        setInitialRoute("Onboarding"); // TEMP: force onboarding for testing
       } catch {
         setInitialRoute("Onboarding");
       }
@@ -190,7 +205,7 @@ export default function App() {
     return () => sub.remove();
   }, [initialRoute]);
 
-  if (!initialRoute) {
+  if (!initialRoute || !fontsLoaded) {
     return (
       <View
         style={{

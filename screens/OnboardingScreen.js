@@ -15,6 +15,7 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 const { width } = Dimensions.get("window");
 
@@ -311,39 +312,6 @@ const styles = StyleSheet.create({
 
   contentArea: { alignItems: "center", width: "100%" },
 
-  clarityText: {
-    color: BRAND.accent,
-    fontSize: 36,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-
-  brandText: {
-    color: BRAND.text,
-    fontSize: 42,
-    fontWeight: "900",
-    letterSpacing: 1.4,
-  },
-
-  tagline: {
-    color: BRAND.text,
-    fontSize: 20,
-    fontWeight: "700",
-    textAlign: "center",
-    marginTop: 12,
-    marginBottom: 16,
-    letterSpacing: 0.6,
-  },
-  subtitle: {
-    color: BRAND.muted,
-    fontSize: 15.5,
-    lineHeight: 24,
-    textAlign: "center",
-    paddingHorizontal: 12,
-    marginBottom: 24,
-  },
-
   slide: {
     flex: 1,
     backgroundColor: BRAND.bg,
@@ -353,10 +321,94 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   textContent: { alignItems: "center" },
+
+  skipButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+  },
+  skipText: {
+    color: BRAND.muted,
+    fontFamily: TYPO.medium,
+    fontSize: 15.5,
+  },
+  dot: {
+    backgroundColor: "#27272A",
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+  activeDot: {
+    backgroundColor: "#FFFFFF",
+    width: 28,
+    height: 8,
+    borderRadius: 4,
+  },
+  primaryButton: {
+    backgroundColor: "#FFFFFF",
+
+    paddingHorizontal: 42,
+    paddingVertical: 14,
+
+    borderRadius: 25,
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+  },
+  buttonText: {
+    color: "#0A0A0A",
+    fontFamily: TYPO.bold,
+    fontSize: 16,
+    letterSpacing: 0.2,
+  },
+
+  skipButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+  },
+
+  skipText: {
+    color: BRAND.muted,
+    fontFamily: TYPO.medium,
+    fontSize: 15.5,
+  },
+  clarityText: {
+    color: BRAND.accent,
+    fontSize: 36,
+    fontFamily: TYPO.extrabold,
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  brandText: {
+    color: BRAND.text,
+    fontSize: 42,
+    fontFamily: TYPO.extrabold,
+    letterSpacing: 0.6,
+  },
+  tagline: {
+    color: BRAND.text,
+    fontSize: 20,
+    fontFamily: TYPO.bold,
+    textAlign: "center",
+    marginTop: 12,
+    marginBottom: 16,
+    letterSpacing: 0.2,
+  },
+  subtitle: {
+    color: BRAND.muted,
+    fontSize: 15.5,
+    lineHeight: 24,
+    textAlign: "center",
+    paddingHorizontal: 12,
+    marginBottom: 24,
+    fontFamily: TYPO.regular,
+  },
   title: {
     color: BRAND.text,
     fontSize: 28,
-    fontWeight: "900",
+    fontFamily: TYPO.extrabold,
     textAlign: "center",
     marginBottom: 16,
   },
@@ -366,54 +418,16 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     textAlign: "center",
     paddingHorizontal: 10,
+    fontFamily: TYPO.regular,
   },
-
   disclaimer: {
     color: BRAND.muted,
     fontSize: 12.5,
     textAlign: "center",
-    marginTop: 40,
+    marginTop: 20,
     opacity: 0.75,
     lineHeight: 18,
-  },
-
-  primaryButton: {
-    backgroundColor: BRAND.accent,
-    paddingHorizontal: 42,
-    paddingVertical: 14,
-    borderRadius: 30,
-    shadowColor: BRAND.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-  },
-  buttonText: {
-    color: BRAND.bg,
-    fontWeight: "800",
-    fontSize: 16,
-    letterSpacing: 0.5,
-  },
-  skipButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-  },
-  skipText: {
-    color: BRAND.muted,
-    fontWeight: "600",
-    fontSize: 15.5,
-  },
-
-  dot: {
-    backgroundColor: "#27272A",
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
-  activeDot: {
-    backgroundColor: BRAND.accent,
-    width: 28,
-    height: 8,
-    borderRadius: 4,
+    fontFamily: TYPO.regular,
+    marginBottom: 60,
   },
 });

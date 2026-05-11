@@ -27,8 +27,9 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { auth, db } from "../firebaseConfig";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 import { SafeAreaView } from "react-native-safe-area-context"; // ← Added for SafeAreaView fix
-
+import AppButton from "../components/AppButton";
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -194,19 +195,15 @@ export default function LoginScreen({ navigation }) {
                 <Text style={styles.forgotText}>Forgot password?</Text>
               </TouchableOpacity>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.button,
-                  !canLogin && styles.buttonDisabled,
-                  pressed && canLogin && { opacity: 0.72 },
-                ]}
+              <AppButton
+                title="Sign In"
                 onPress={handleLogin}
-                disabled={!canLogin || loading}
-              >
-                <Text style={styles.buttonText}>
-                  {loading ? "Signing in…" : "Sign In"}
-                </Text>
-              </Pressable>
+                disabled={!canLogin}
+                loading={loading}
+                size="large"
+                variant="primary"
+                style={styles.signInButton}
+              />
 
               <TouchableOpacity
                 onPress={() => navigation.navigate("Signup")}
@@ -279,29 +276,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  title: {
-    color: BRAND.accent,
-    fontSize: 28,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-  },
-
-  subtitle: {
-    color: BRAND.text,
-    fontSize: 20,
-    fontWeight: "900",
-    marginTop: 10,
-  },
-
-  tagline: {
-    color: BRAND.muted,
-    fontSize: 12.5,
-    textAlign: "center",
-    lineHeight: 18,
-    marginTop: 6,
-    paddingHorizontal: 10,
-  },
-
   formCard: {
     backgroundColor: BRAND.card,
     borderWidth: 1,
@@ -314,25 +288,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
-  label: {
-    color: BRAND.sub,
-    fontSize: 12,
-    fontWeight: "800",
-    marginBottom: 7,
-  },
-
-  input: {
-    backgroundColor: BRAND.card2,
-    borderWidth: 1,
-    borderColor: BRAND.softBorder,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    color: BRAND.text,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-
   passwordWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -340,15 +295,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BRAND.softBorder,
     borderRadius: 14,
-  },
-
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    color: BRAND.text,
-    fontSize: 15,
-    fontWeight: "700",
   },
 
   eyeBtn: {
@@ -364,48 +310,80 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  forgotText: {
-    color: BRAND.accent,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-
-  button: {
-    backgroundColor: BRAND.accent,
-    paddingVertical: 15,
-    borderRadius: 16,
+  footerWrap: {
+    marginTop: 22,
+    paddingHorizontal: 10,
     alignItems: "center",
-    marginTop: 4,
   },
 
-  buttonDisabled: {
-    backgroundColor: "#374151",
-    opacity: 0.85,
+  title: {
+    color: BRAND.text,
+    fontSize: 28,
+    fontFamily: TYPO.extrabold,
+    letterSpacing: 0.2,
   },
 
-  buttonText: {
-    color: BRAND.bg,
-    fontWeight: "900",
+  subtitle: {
+    color: BRAND.text,
+    fontSize: 20,
+    fontFamily: TYPO.bold,
+    marginTop: 10,
+  },
+
+  tagline: {
+    color: BRAND.muted,
+    fontSize: 12.5,
+    textAlign: "center",
+    lineHeight: 18,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    fontFamily: TYPO.regular,
+  },
+
+  label: {
+    color: BRAND.sub,
+    fontSize: 12,
+    fontFamily: TYPO.bold,
+    marginBottom: 7,
+  },
+
+  input: {
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    color: BRAND.text,
     fontSize: 15,
+    fontFamily: TYPO.semibold,
   },
 
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    color: BRAND.text,
+    fontSize: 15,
+    fontFamily: TYPO.semibold,
+  },
+
+  forgotText: {
+    color: BRAND.sub,
+    fontSize: 13,
+    fontFamily: TYPO.semibold,
+  },
   link: {
     color: BRAND.sub,
     textAlign: "center",
     marginTop: 20,
     fontSize: 14,
-    fontWeight: "700",
+    fontFamily: TYPO.medium,
   },
 
   linkHighlight: {
-    color: BRAND.accent,
-    fontWeight: "900",
-  },
-
-  footerWrap: {
-    marginTop: 22,
-    paddingHorizontal: 10,
-    alignItems: "center",
+    color: BRAND.text,
+    fontFamily: TYPO.bold,
   },
 
   footerText: {
@@ -413,11 +391,12 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     lineHeight: 15,
     textAlign: "center",
+    fontFamily: TYPO.regular,
   },
 
   footerLink: {
-    color: BRAND.accent,
-    fontWeight: "800",
+    color: BRAND.text,
+    fontFamily: TYPO.semibold,
   },
 
   disclaimer: {
@@ -426,5 +405,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 12,
     opacity: 0.8,
+    fontFamily: TYPO.regular,
+  },
+  signInButton: {
+    marginTop: 4,
   },
 });
