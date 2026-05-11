@@ -1113,17 +1113,20 @@ const styles = StyleSheet.create({
   shareCard: {
     width: 900,
     backgroundColor: BRAND.bg,
-    padding: 30,
+
+    paddingHorizontal: 34,
+    paddingTop: 76,
+    paddingBottom: 34,
+
     borderRadius: 28,
     borderWidth: 1,
     borderColor: BRAND.border,
   },
-
   shareBrandRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 12,
+    marginBottom: 16,
   },
 
   shareLogo: {
@@ -1150,8 +1153,8 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     textAlign: "center",
     fontSize: 14,
-    fontWeight: "700",
-    marginBottom: 22,
+    fontFamily: TYPO.fontFamily.semibold,
+    marginBottom: 26,
   },
 
   shareSection: {
