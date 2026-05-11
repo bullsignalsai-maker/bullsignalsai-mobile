@@ -13,12 +13,10 @@ import AppIntroSlider from "react-native-app-intro-slider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
-
+import AppButton from "../components/AppButton";
 const { width } = Dimensions.get("window");
-
 const slides = [
   { key: "1", premiumIntro: true },
   {
@@ -234,9 +232,12 @@ export default function OnboardingScreen() {
     item.premiumIntro ? renderPremiumFirstSlide() : renderNormalSlide({ item });
 
   const renderNextButton = () => (
-    <View style={styles.primaryButton}>
-      <Text style={styles.buttonText}>Next</Text>
-    </View>
+    <AppButton
+      title="Next"
+      size="small"
+      variant="primary"
+      style={styles.sliderButton}
+    />
   );
 
   const renderSkipButton = () => (
@@ -246,9 +247,12 @@ export default function OnboardingScreen() {
   );
 
   const renderDoneButton = () => (
-    <View style={styles.primaryButton}>
-      <Text style={styles.buttonText}>Get Started</Text>
-    </View>
+    <AppButton
+      title="Get Started"
+      size="small"
+      variant="primary"
+      style={styles.sliderButton}
+    />
   );
 
   return (
@@ -309,9 +313,7 @@ const styles = StyleSheet.create({
     width: width * 0.58,
     height: width * 0.58,
   },
-
   contentArea: { alignItems: "center", width: "100%" },
-
   slide: {
     flex: 1,
     backgroundColor: BRAND.bg,
@@ -321,7 +323,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   textContent: { alignItems: "center" },
-
   skipButton: {
     paddingHorizontal: 24,
     paddingVertical: 14,
@@ -344,36 +345,7 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
-  primaryButton: {
-    backgroundColor: "#FFFFFF",
 
-    paddingHorizontal: 42,
-    paddingVertical: 14,
-
-    borderRadius: 25,
-
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-  },
-  buttonText: {
-    color: "#0A0A0A",
-    fontFamily: TYPO.bold,
-    fontSize: 16,
-    letterSpacing: 0.2,
-  },
-
-  skipButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-  },
-
-  skipText: {
-    color: BRAND.muted,
-    fontFamily: TYPO.medium,
-    fontSize: 15.5,
-  },
   clarityText: {
     color: BRAND.accent,
     fontSize: 36,
@@ -429,5 +401,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: TYPO.regular,
     marginBottom: 60,
+  },
+  sliderButton: {
+    minWidth: 126,
+    paddingHorizontal: 22,
   },
 });

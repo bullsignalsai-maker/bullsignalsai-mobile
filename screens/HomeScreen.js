@@ -24,10 +24,7 @@ const SCREEN_WIDTH = Dimensions.get("window").width;
 const CAROUSEL_CARD_WIDTH = SCREEN_WIDTH - 40;
 const CAROUSEL_GAP = 12;
 // % formatter (market style)
-const fmtPct = (v) =>
-  typeof v === "number" && !Number.isNaN(v)
-    ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
-    : "--";
+
 const displayRating = (signal) => {
   if (signal === "BUY") return "Bullish";
   if (signal === "SELL") return "Bearish";
@@ -45,22 +42,6 @@ function timeAgo(isoString) {
   if (mins < 60) return `Updated ${mins}m ago`;
   if (hrs < 24) return `Updated ${hrs}h ago`;
   return `Updated ${days}d ago`;
-}
-
-function formatPattern(pattern, winRate) {
-  if (!pattern) return null;
-  if (typeof winRate === "number") {
-    return `${pattern} · ${(winRate * 100).toFixed(0)}% win rate`;
-  }
-  return pattern;
-}
-
-function getPatternColor(winRate) {
-  if (typeof winRate !== "number") return "#374151"; // neutral gray
-  if (winRate >= 0.7) return "#16A34A"; // strong green
-  if (winRate >= 0.6) return "#22C55E"; // green
-  if (winRate >= 0.5) return "#FACC15"; // yellow
-  return "#EF4444"; // red
 }
 
 function formatPatternLabel(pattern, winRate) {
@@ -331,9 +312,7 @@ export default function HomeScreen({ navigation }) {
               : item.signal === "SELL"
                 ? BRAND.red
                 : BRAND.amber;
-          const hasLivePrice = typeof item.price === "number";
 
-          const changeColor = item.changePct >= 0 ? BRAND.accent : BRAND.red;
           // ensure animation value exists per symbol
           if (!priceFlash[item.symbol]) {
             priceFlash[item.symbol] = new Animated.Value(0);
@@ -508,7 +487,7 @@ const styles = StyleSheet.create({
   headerBrandRow: { flexDirection: "row", alignItems: "center" },
   logo: { width: 25, height: 25, marginRight: 6 },
   title: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontSize: 25,
     fontFamily: TYPO.extrabold,
   },
@@ -552,7 +531,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: TYPO.bold,
   },
-  featureValue: { color: BRAND.sub, fontSize: 12 },
 
   card: {
     backgroundColor: BRAND.card,
@@ -646,45 +624,6 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontFamily: TYPO.semibold,
   },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  modalBox: {
-    backgroundColor: BRAND.card,
-    borderColor: BRAND.border,
-    borderWidth: 1,
-    borderRadius: 14,
-    width: "100%",
-    padding: 16,
-  },
-  modalTitle: {
-    color: BRAND.text,
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 10,
-  },
-  input: {
-    backgroundColor: "#0A0A0A",
-    color: BRAND.text,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    marginBottom: 12,
-  },
-  modalActions: { flexDirection: "row", justifyContent: "space-between" },
-  cancelText: { color: BRAND.sub, fontSize: 14, fontWeight: "600" },
-  addText: { color: BRAND.accent, fontSize: 14, fontWeight: "700" },
-  priceBlock: {
-    alignItems: "flex-end",
-    minWidth: 90,
-  },
   sectorWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -706,11 +645,6 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     lineHeight: 17,
     fontFamily: TYPO.semibold,
-  },
-  changeLine: {
-    fontSize: 12,
-    fontWeight: "700",
-    marginTop: 2,
   },
   listHelper: {
     color: BRAND.muted,

@@ -24,6 +24,8 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { auth, db } from "../firebaseConfig";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
+import AppButton from "../components/AppButton";
 import { SafeAreaView } from "react-native-safe-area-context"; // Added
 
 export default function SignupScreen({ navigation }) {
@@ -187,20 +189,15 @@ export default function SignupScreen({ navigation }) {
                 onChangeText={setBio}
                 multiline
               />
-
-              <Pressable
-                style={({ pressed }) => [
-                  styles.button,
-                  !canSignup && styles.buttonDisabled,
-                  pressed && canSignup && { opacity: 0.7 },
-                ]}
+              <AppButton
+                title="Create Account"
                 onPress={handleSignup}
                 disabled={!canSignup}
-              >
-                <Text style={styles.buttonText}>
-                  {loading ? "Creating…" : "Create Account"}
-                </Text>
-              </Pressable>
+                loading={loading}
+                size="large"
+                variant="primary"
+                style={styles.createButton}
+              />
 
               {/* Fixed Link */}
               <TouchableOpacity onPress={() => navigation.navigate("Login")}>
@@ -240,9 +237,7 @@ export default function SignupScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: BRAND.bg },
-
   screen: { flex: 1, backgroundColor: BRAND.bg },
-
   wrapper: {
     flexGrow: 1,
     justifyContent: "center",
@@ -250,31 +245,8 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 40,
   },
-
   header: { alignItems: "center", marginBottom: 20 },
   logo: { width: 70, height: 70 },
-  title: { color: BRAND.accent, fontSize: 26, fontWeight: "900" },
-  subtitle: { color: BRAND.text, fontSize: 20, fontWeight: "900" },
-  tagline: { color: BRAND.muted, fontSize: 12, textAlign: "center" },
-
-  formCard: {
-    backgroundColor: BRAND.card,
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-  },
-
-  input: {
-    backgroundColor: BRAND.card2,
-    borderRadius: 14,
-    padding: 14,
-    color: BRAND.text,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: BRAND.softBorder,
-  },
-
   passwordWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -285,43 +257,71 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginBottom: 10,
   },
-
+  footerWrap: { marginTop: 20, alignItems: "center" },
+  title: {
+    color: BRAND.text,
+    fontSize: 28,
+    fontFamily: TYPO.extrabold,
+    letterSpacing: 0.2,
+  },
+  subtitle: {
+    color: BRAND.text,
+    fontSize: 20,
+    fontFamily: TYPO.bold,
+    marginTop: 8,
+  },
+  tagline: {
+    color: BRAND.muted,
+    fontSize: 12.5,
+    textAlign: "center",
+    lineHeight: 18,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    fontFamily: TYPO.regular,
+  },
+  input: {
+    backgroundColor: BRAND.card2,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    color: BRAND.text,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    fontSize: 15,
+    fontFamily: TYPO.semibold,
+  },
   passwordInput: {
     flex: 1,
     color: BRAND.text,
-    paddingVertical: 12,
+    paddingVertical: 13,
+    fontSize: 15,
+    fontFamily: TYPO.semibold,
   },
-
-  button: {
-    backgroundColor: BRAND.accent,
-    padding: 14,
-    borderRadius: 14,
-    alignItems: "center",
+  createButton: {
     marginTop: 10,
   },
-
-  buttonDisabled: {
-    backgroundColor: "#374151",
-  },
-
-  buttonText: {
-    color: BRAND.bg,
-    fontWeight: "900",
-  },
-
   link: {
     color: BRAND.sub,
     textAlign: "center",
-    marginTop: 16,
+    marginTop: 18,
     fontSize: 14,
+    fontFamily: TYPO.medium,
   },
-
   linkHighlight: {
-    color: BRAND.accent,
-    fontWeight: "900",
+    color: BRAND.text,
+    fontFamily: TYPO.bold,
+  },
+  footerText: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    lineHeight: 15,
+    textAlign: "center",
+    fontFamily: TYPO.regular,
   },
 
-  footerWrap: { marginTop: 20, alignItems: "center" },
-  footerText: { color: BRAND.muted, fontSize: 11, textAlign: "center" },
-  footerLink: { color: BRAND.accent, fontWeight: "800" },
+  footerLink: {
+    color: BRAND.text,
+    fontFamily: TYPO.semibold,
+  },
 });
