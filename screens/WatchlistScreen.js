@@ -35,6 +35,7 @@ import {
 } from "../services/watchlistService";
 
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 const fmt = (v) =>
   typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "--";
 
@@ -893,36 +894,49 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BRAND.bg },
 
   header: { paddingTop: 56, alignItems: "center", marginBottom: 4 },
-  headerTitle: { color: BRAND.accent, fontSize: 21, fontWeight: "800" },
-  headerSubtitle: { color: BRAND.sub, fontSize: 11, marginTop: 2 },
-
+  headerTitle: {
+    color: BRAND.text,
+    fontSize: 26,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    marginTop: 4,
+    fontFamily: TYPO.fontFamily.medium,
+  },
   syncText: { textAlign: "center", color: BRAND.sub, fontSize: 11 },
-
   addRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: BRAND.card,
-    borderRadius: 10,
-    paddingHorizontal: 10,
+    backgroundColor: BRAND.card2,
+    borderRadius: 18,
+    paddingHorizontal: 14,
     marginHorizontal: 18,
-    marginTop: 6,
+    marginTop: 10,
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: "rgba(255,255,255,0.08)",
+    minHeight: 54,
   },
 
   input: {
     flex: 1,
     color: BRAND.text,
-    fontSize: 13,
-    paddingVertical: 10,
+    fontSize: 15,
+    paddingVertical: 12,
+    marginLeft: 10,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   addBtn: {
-    backgroundColor: BRAND.accent,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 9,
-    marginLeft: 6,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
   },
 
   suggestionsBox: {
@@ -975,12 +989,18 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: BRAND.card,
-    borderRadius: 16,
-    padding: 12,
-    marginHorizontal: 10,
-    marginBottom: 8,
+    borderRadius: 22,
+    padding: 16,
+    marginHorizontal: 14,
+    marginBottom: 10,
+
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: "rgba(255,255,255,0.06)",
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
   },
 
   cardHeader: {
@@ -991,16 +1011,16 @@ const styles = StyleSheet.create({
 
   symbol: {
     color: BRAND.text,
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 18,
+    fontFamily: TYPO.fontFamily.bold,
+    letterSpacing: 0.2,
   },
-
   name: {
     color: BRAND.sub,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.medium,
   },
-
   priceBlock: {
     alignItems: "flex-end",
     minWidth: 90,
@@ -1008,8 +1028,9 @@ const styles = StyleSheet.create({
 
   price: {
     color: BRAND.text,
-    fontSize: 18,
-    fontWeight: "900",
+    fontSize: 22,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.2,
   },
 
   changePct: {
@@ -1061,9 +1082,10 @@ const styles = StyleSheet.create({
   },
 
   summary: {
-    color: BRAND.sub,
-    fontSize: 12.5,
-    lineHeight: 18,
+    color: "#D1D5DB",
+    fontSize: 13.5,
+    lineHeight: 21,
+    fontFamily: TYPO.fontFamily.regular,
   },
   patternRow: {
     flexDirection: "row",
@@ -1271,8 +1293,8 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     fontSize: 12,
     marginBottom: 8,
+    fontFamily: TYPO.fontFamily.medium,
   },
-
   footerBrand: {
     color: BRAND.accent,
     fontWeight: "600",
