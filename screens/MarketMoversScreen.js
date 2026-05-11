@@ -460,12 +460,11 @@ export default function MarketMoversScreen({ navigation }) {
                   Rising
                 </Text>
 
-                <View style={styles.shareTableHeader}>
-                  <Text style={styles.shareHeaderSymbol}>Symbol</Text>
-                  <Text style={styles.shareHeaderPrice}>Price</Text>
-                  <Text style={styles.shareHeaderDollar}>$ Chg</Text>
-                  <Text style={styles.shareHeaderMove}>% Chg</Text>
-                </View>
+                <Text style={styles.shareHeaderSymbol}>Symbol</Text>
+                <Text style={styles.shareHeaderLabel}>Move</Text>
+                <Text style={styles.shareHeaderPrice}>Price</Text>
+                <Text style={styles.shareHeaderDollar}>$ Chg</Text>
+                <Text style={styles.shareHeaderMove}>% Chg</Text>
 
                 {shareRising.map((m, index) => (
                   <View
@@ -473,6 +472,13 @@ export default function MarketMoversScreen({ navigation }) {
                     style={styles.shareTableRow}
                   >
                     <Text style={styles.shareColSymbol}>{m.symbol}</Text>
+                    <View style={styles.shareColLabel}>
+                      <MoveLabel
+                        changePct={Number(m.changePct)}
+                        price={Number(m.price)}
+                        style={styles.shareMoveLabel}
+                      />
+                    </View>
 
                     <Text style={styles.shareColPrice}>
                       {formatPrice(m.price)}
@@ -495,15 +501,14 @@ export default function MarketMoversScreen({ navigation }) {
             {sharePullingBack.length > 0 && (
               <View style={styles.shareSection}>
                 <Text style={[styles.shareSectionTitle, { color: BRAND.red }]}>
-                  Pulling Back
+                  Dropping
                 </Text>
 
-                <View style={styles.shareTableHeader}>
-                  <Text style={styles.shareHeaderSymbol}>Symbol</Text>
-                  <Text style={styles.shareHeaderPrice}>Price</Text>
-                  <Text style={styles.shareHeaderDollar}>$ Chg</Text>
-                  <Text style={styles.shareHeaderMove}>% Chg</Text>
-                </View>
+                <Text style={styles.shareHeaderSymbol}>Symbol</Text>
+                <Text style={styles.shareHeaderLabel}>Move</Text>
+                <Text style={styles.shareHeaderPrice}>Price</Text>
+                <Text style={styles.shareHeaderDollar}>$ Chg</Text>
+                <Text style={styles.shareHeaderMove}>% Chg</Text>
 
                 {sharePullingBack.map((m, index) => (
                   <View
@@ -511,6 +516,13 @@ export default function MarketMoversScreen({ navigation }) {
                     style={styles.shareTableRow}
                   >
                     <Text style={styles.shareColSymbol}>{m.symbol}</Text>
+                    <View style={styles.shareColLabel}>
+                      <MoveLabel
+                        changePct={Number(m.changePct)}
+                        price={Number(m.price)}
+                        style={styles.shareMoveLabel}
+                      />
+                    </View>
 
                     <Text style={styles.shareColPrice}>
                       {formatPrice(m.price)}
@@ -1082,8 +1094,10 @@ const styles = StyleSheet.create({
   },
   hiddenShareCardWrap: {
     position: "absolute",
-    left: -10000,
+    left: 0,
     top: 0,
+    opacity: 0.01,
+    zIndex: -1,
   },
 
   shareCard: {
@@ -1112,14 +1126,13 @@ const styles = StyleSheet.create({
   shareCardTitle: {
     color: BRAND.text,
     fontSize: 34,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
     letterSpacing: 0.2,
   },
-
   shareCardSubTitle: {
-    color: BRAND.accent,
+    color: BRAND.sub,
     fontSize: 18,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
     marginTop: -2,
   },
 
@@ -1242,6 +1255,27 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     letterSpacing: -0.15,
     marginLeft: 4,
+    marginTop: 0,
+  },
+  shareHeaderLabel: {
+    flex: 1.15,
+    color: BRAND.muted,
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  shareColLabel: {
+    flex: 1.15,
+    justifyContent: "center",
+  },
+
+  shareMoveLabel: {
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.semibold,
+    fontStyle: "italic",
+    letterSpacing: -0.15,
     marginTop: 0,
   },
 });
