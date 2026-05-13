@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
   },
   skipText: {
     color: BRAND.muted,
-    fontFamily: TYPO.medium,
+    fontFamily: TYPO.fontFamily.medium,
     fontSize: 15.5,
   },
   dot: {
@@ -342,20 +342,20 @@ const styles = StyleSheet.create({
   clarityText: {
     color: BRAND.accent,
     fontSize: 36,
-    fontFamily: TYPO.extrabold,
+    fontFamily: TYPO.fontFamily.extrabold,
     letterSpacing: 0.8,
     marginBottom: 8,
   },
   brandText: {
     color: BRAND.text,
     fontSize: 42,
-    fontFamily: TYPO.extrabold,
+    fontFamily: TYPO.fontFamily.extrabold,
     letterSpacing: 0.6,
   },
   tagline: {
     color: BRAND.text,
     fontSize: 20,
-    fontFamily: TYPO.bold,
+    fontFamily: TYPO.fontFamily.bold,
     textAlign: "center",
     marginTop: 12,
     marginBottom: 16,
@@ -368,12 +368,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 12,
     marginBottom: 24,
-    fontFamily: TYPO.regular,
+    fontFamily: TYPO.fontFamily.regular,
   },
   title: {
     color: BRAND.text,
     fontSize: 28,
-    fontFamily: TYPO.extrabold,
+    fontFamily: TYPO.fontFamily.extrabold,
     textAlign: "center",
     marginBottom: 16,
   },
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     textAlign: "center",
     paddingHorizontal: 10,
-    fontFamily: TYPO.regular,
+    fontFamily: TYPO.fontFamily.regular,
   },
   disclaimer: {
     color: BRAND.muted,
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     opacity: 0.75,
     lineHeight: 18,
-    fontFamily: TYPO.regular,
+    fontFamily: TYPO.fontFamily.regular,
     marginBottom: 60,
   },
   sliderButton: {
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
   sliderButtonText: {
     color: "#0A0A0A",
     fontSize: 14.5,
-    fontFamily: TYPO.bold,
+    fontFamily: TYPO.fontFamily.bold,
     letterSpacing: 0.1,
   },
 });

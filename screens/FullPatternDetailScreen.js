@@ -11,8 +11,8 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  Modal, // ✅ ADD
-  Pressable, // ✅ ADD
+  Modal,
+  Pressable,
   ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -25,6 +25,7 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 const TOOLTIP = {
   EXPECTED_RANGE: {
@@ -300,7 +301,7 @@ const AnimatedRangeBar = memo(function AnimatedRangeBar({
   });
 
   return (
-    <View style={{ marginTop: 10 }}>
+    <View style={{ marginTop: 6 }}>
       <Text style={styles.rangeTitle}>{label}</Text>
 
       <View style={styles.rangeTrack}>
@@ -661,31 +662,35 @@ export default function FullPatternDetailScreen({ route, navigation }) {
         </LinearGradient>
 
         {/* PATTERN OVERVIEW */}
-        <View style={styles.card}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionAccent} />
-            <Text style={styles.sectionTitle}>Pattern Overview</Text>
-          </View>
-
-          <Text style={styles.patternTitle}>{bundle.patternName}</Text>
-
-          {/* Confidence row (if present) */}
-          <View style={styles.overviewRow}>
+        <View style={styles.patternHeroCard}>
+          <View style={styles.patternHeroTop}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.subLabel}>Confidence</Text>
+              <Text style={styles.patternEyebrow}>Pattern Overview</Text>
+              <Text style={styles.patternHeroTitle}>{bundle.patternName}</Text>
+            </View>
+
+            <View
+              style={[
+                styles.patternConfidenceBadge,
+                { borderColor: labelColorFromConfidence(confidencePct) },
+              ]}
+            >
               <Text
                 style={[
-                  styles.bigValue,
+                  styles.patternConfidenceValue,
                   { color: labelColorFromConfidence(confidencePct) },
                 ]}
               >
                 {confidencePct == null ? "—" : `${confidencePct.toFixed(0)}%`}
               </Text>
+              <Text style={styles.patternConfidenceLabel}>Confidence</Text>
             </View>
+          </View>
 
-            <View style={{ flex: 1 }}>
-              <Text style={styles.subLabel}>Label</Text>
-              <Text style={styles.bigValue}>
+          <View style={styles.patternStatsRow}>
+            <View style={styles.patternStatChip}>
+              <Text style={styles.patternStatLabel}>Label</Text>
+              <Text style={styles.patternStatValue} numberOfLines={1}>
                 {bundle.label ||
                   (confidencePct == null
                     ? "—"
@@ -695,15 +700,14 @@ export default function FullPatternDetailScreen({ route, navigation }) {
               </Text>
             </View>
 
-            <View style={{ flex: 1 }}>
-              <Text style={styles.subLabel}>Occurrences</Text>
-              <Text style={styles.bigValue}>
+            <View style={styles.patternStatChip}>
+              <Text style={styles.patternStatLabel}>Occurrences</Text>
+              <Text style={styles.patternStatValue}>
                 {occurrences == null ? "—" : String(occurrences)}
               </Text>
             </View>
           </View>
 
-          {/* Confidence bar */}
           <View style={styles.confTrack}>
             <View
               style={[
@@ -718,19 +722,22 @@ export default function FullPatternDetailScreen({ route, navigation }) {
 
           <Text style={styles.explanation}>{bundle.explanation}</Text>
         </View>
-
         {/* ==== DEEP ANALYTICS WRAPPER (locked overlay if not premium) ==== */}
         <View style={{ position: "relative" }}>
           {/* FORWARD RETURNS */}
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
               <View style={styles.sectionAccent} />
-              <Text style={styles.sectionTitle}>
-                Historical Forward Returns
-              </Text>
-              <View style={{ flex: 1 }} />
 
-              {/* Toggle */}
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.sectionTitle}>
+                  Historical Forward Returns
+                </Text>
+                <Text style={styles.sectionSubtitle} numberOfLines={2}>
+                  Pattern outcome history after this setup appeared.
+                </Text>
+              </View>
+
               <View style={styles.toggleRow}>
                 {[
                   { key: "days5", label: "5D" },
@@ -742,7 +749,6 @@ export default function FullPatternDetailScreen({ route, navigation }) {
                     <TouchableOpacity
                       key={t.key}
                       onPress={() => {
-                        // 🔒 force UI refresh + state update
                         LayoutAnimation.configureNext(
                           LayoutAnimation.Presets.easeInEaseOut,
                         );
@@ -827,50 +833,36 @@ export default function FullPatternDetailScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.coneHeaderRow}>
-              {/* LEFT: Anchor */}
-              <View style={styles.coneLeft}>
+            <View style={styles.expectedRangeTop}>
+              <View>
                 <Text style={styles.subLabel}>ANCHOR PRICE</Text>
                 <Text style={styles.bigValue}>{fmtMoney(coneAnchor)}</Text>
-
-                {cone5?.mid != null && (
-                  <View style={styles.biasRow}>
-                    <Ionicons
-                      name={
-                        getRangeBias(coneAnchor, cone5.mid) === "Bullish bias"
-                          ? "trending-up"
-                          : getRangeBias(coneAnchor, cone5.mid) ===
-                              "Bearish bias"
-                            ? "trending-down"
-                            : "remove-outline"
-                      }
-                      size={14}
-                      color={
-                        getRangeBias(coneAnchor, cone5.mid) === "Bullish bias"
-                          ? BRAND.accent
-                          : getRangeBias(coneAnchor, cone5.mid) ===
-                              "Bearish bias"
-                            ? BRAND.red
-                            : BRAND.amber
-                      }
-                    />
-                    <Text style={styles.biasText}>
-                      {getRangeBias(coneAnchor, cone5.mid)} (5D)
-                    </Text>
-                  </View>
-                )}
               </View>
 
-              {/* RIGHT: Pattern context */}
-              <View style={styles.coneRight}>
-                <Text style={styles.metaText}>Pattern</Text>
-                <Text style={styles.metaStrong}>{conePattern}</Text>
-
-                <Text style={[styles.metaText, { marginTop: 6 }]}>
-                  Occurrences
-                </Text>
-                <Text style={styles.metaStrong}>{coneOcc}</Text>
-              </View>
+              {cone5?.mid != null && (
+                <View style={styles.biasChip}>
+                  <Ionicons
+                    name={
+                      getRangeBias(coneAnchor, cone5.mid) === "Bullish bias"
+                        ? "trending-up"
+                        : getRangeBias(coneAnchor, cone5.mid) === "Bearish bias"
+                          ? "trending-down"
+                          : "remove-outline"
+                    }
+                    size={14}
+                    color={
+                      getRangeBias(coneAnchor, cone5.mid) === "Bullish bias"
+                        ? BRAND.accent
+                        : getRangeBias(coneAnchor, cone5.mid) === "Bearish bias"
+                          ? BRAND.red
+                          : BRAND.amber
+                    }
+                  />
+                  <Text style={styles.biasText}>
+                    {getRangeBias(coneAnchor, cone5.mid)}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {cone && (cone5 || cone10) ? (
@@ -1031,7 +1023,7 @@ export default function FullPatternDetailScreen({ route, navigation }) {
                                   (s.changePct ?? 0) >= 0
                                     ? BRAND.accent
                                     : BRAND.red,
-                                fontWeight: "600",
+                                fontFamily: TYPO.fontFamily.bold,
                               }}
                             >
                               {fmtReturn(s.changePct)}
@@ -1046,7 +1038,7 @@ export default function FullPatternDetailScreen({ route, navigation }) {
                                   (s.fwd5d ?? 0) >= 0
                                     ? BRAND.accent
                                     : BRAND.red,
-                                fontWeight: "600",
+                                fontFamily: TYPO.fontFamily.bold,
                               }}
                             >
                               {fmtReturn(s.fwd5d)}
@@ -1061,7 +1053,7 @@ export default function FullPatternDetailScreen({ route, navigation }) {
                                   (s.fwd10d ?? 0) >= 0
                                     ? BRAND.accent
                                     : BRAND.red,
-                                fontWeight: "600",
+                                fontFamily: TYPO.fontFamily.bold,
                               }}
                             >
                               {fmtReturn(s.fwd10d)}
@@ -1125,7 +1117,7 @@ export default function FullPatternDetailScreen({ route, navigation }) {
                         <Text
                           style={[
                             styles.barLabel,
-                            isCurrent && { color: BRAND.accent },
+                            isCurrent && { color: BRAND.text },
                           ]}
                         >
                           {p?.pattern || "—"}
@@ -1214,148 +1206,285 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BRAND.bg,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: 14,
+    paddingTop: 10,
   },
-
   headerCard: {
-    borderRadius: 16,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 8,
+    borderColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    marginBottom: 2,
     overflow: "hidden",
   },
-
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  symbol: { color: BRAND.text, fontSize: 26, fontWeight: "800" },
-  name: { color: BRAND.sub, fontSize: 13, marginTop: 2 },
+  symbol: {
+    color: BRAND.text,
+    fontSize: 28,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
+  },
+  name: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.medium,
+  },
   priceBlock: { alignItems: "flex-end", maxWidth: "50%" },
-  price: { color: BRAND.text, fontSize: 22, fontWeight: "700" },
-  pct: { fontSize: 13, fontWeight: "600", marginTop: 2 },
+  price: {
+    color: BRAND.text,
+    fontSize: 22,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
+  },
+  pct: {
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.bold,
+    marginTop: 2,
+    fontVariant: ["tabular-nums"],
+  },
   positive: { color: BRAND.accent },
   negative: { color: BRAND.red },
-  asofText: {
-    color: BRAND.sub,
-    fontSize: 11,
-    marginTop: 8,
-    textAlign: "right",
-  },
 
   headerMiniRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 10,
+    gap: 7,
+    marginTop: 12,
   },
+
   headerMiniPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.04)",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
   },
-  headerMiniText: { color: BRAND.sub, fontSize: 12, fontWeight: "600" },
+
+  headerMiniText: {
+    color: BRAND.sub,
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
 
   card: {
     backgroundColor: BRAND.card,
-    borderRadius: 12,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: BRAND.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginTop: 10,
   },
   sectionHeaderRow: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
+    alignItems: "flex-start",
+    marginBottom: 2,
   },
+  sectionHeaderBlock: { marginBottom: 6 },
   sectionAccent: {
-    width: 4,
-    height: 18,
-    borderRadius: 2,
-    backgroundColor: BRAND.accent,
-    marginRight: 8,
+    width: 3,
+    height: 16,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.55)",
+    marginRight: 9,
   },
-  sectionTitle: { color: BRAND.accent, fontSize: 15, fontWeight: "800" },
-
-  patternTitle: {
+  sectionTitle: {
     color: BRAND.text,
-    fontSize: 20,
-    fontWeight: "900",
-    marginTop: 4,
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.15,
   },
+  sectionSubtitle: {
+    color: BRAND.sub,
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 0,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+  sectionMeta: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginBottom: 4,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  patternHeroCard: {
+    backgroundColor: BRAND.card,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    padding: 16,
+    marginTop: 8,
+  },
+  patternHeroTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    columnGap: 12,
+  },
+  patternEyebrow: {
+    color: BRAND.muted,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 5,
+  },
+  patternHeroTitle: {
+    color: BRAND.text,
+    fontSize: 21,
+    lineHeight: 26,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
+  },
+  patternConfidenceBadge: {
+    minWidth: 82,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: BRAND.card2,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    alignItems: "center",
+  },
+  patternConfidenceValue: {
+    fontSize: 18,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
+  },
+  patternConfidenceLabel: {
+    color: BRAND.muted,
+    fontSize: 10,
+    marginTop: 2,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+  patternStatsRow: { flexDirection: "row", columnGap: 8, marginTop: 14 },
+  patternStatChip: {
+    flex: 1,
+    backgroundColor: BRAND.card2,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+  },
+  patternStatLabel: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.35,
+    marginBottom: 4,
+  },
+  patternStatValue: {
+    color: BRAND.text,
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  confTrack: {
+    height: 8,
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    borderRadius: 999,
+    overflow: "hidden",
+    marginTop: 14,
+  },
+  confFill: { height: "100%", borderRadius: 999 },
   explanation: {
-    color: BRAND.text,
-    fontSize: 13.5,
+    color: BRAND.sub,
+    fontSize: 13,
     lineHeight: 19,
-    marginTop: 10,
+    marginTop: 12,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
-  overviewRow: { flexDirection: "row", marginTop: 12, gap: 10 },
   subLabel: {
     color: BRAND.sub,
     fontSize: 11,
     marginBottom: 3,
     textTransform: "uppercase",
     letterSpacing: 0.5,
+    fontFamily: TYPO.fontFamily.bold,
   },
-  bigValue: { color: BRAND.text, fontSize: 14.5, fontWeight: "800" },
+  bigValue: {
+    color: BRAND.text,
+    fontSize: 14.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
 
-  confTrack: {
-    height: 10,
-    backgroundColor: "#0b1220",
-    borderWidth: 1,
-    borderColor: BRAND.border,
+  sectionHeaderBlock: {
+    marginBottom: 6,
+  },
+
+  toggleWrap: {
+    marginTop: 0,
+    alignItems: "flex-end",
+  },
+  toggleRow: {
+    flexDirection: "row",
+    backgroundColor: BRAND.card2,
     borderRadius: 999,
-    overflow: "hidden",
-    marginTop: 10,
-  },
-  confFill: { height: "100%", borderRadius: 999 },
-
-  toggleRow: { flexDirection: "row", gap: 6 },
-  togglePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "transparent",
-    backgroundColor: "#0b1220",
+    borderColor: BRAND.softBorder,
+    padding: 3,
   },
-  togglePillActive: { borderColor: BRAND.accent, backgroundColor: "#022c22" },
-  toggleText: { color: BRAND.sub, fontSize: 12, fontWeight: "700" },
-  toggleTextActive: { color: BRAND.accent },
+  togglePill: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999 },
+  togglePillActive: { backgroundColor: "rgba(255,255,255,0.12)" },
+  toggleText: {
+    color: BRAND.muted,
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+  toggleTextActive: { color: BRAND.text },
 
-  metricGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8 },
+  metricGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 4,
+  },
   metricBox: {
     width: "48%",
     borderWidth: 1,
-    borderColor: BRAND.border,
-    backgroundColor: "#020617",
-    borderRadius: 10,
-    padding: 10,
+    borderColor: BRAND.softBorder,
+    backgroundColor: BRAND.card2,
+    borderRadius: 16,
+    padding: 12,
   },
-  metricLabel: { color: BRAND.sub, fontSize: 12, fontWeight: "700" },
-  metricValue: { marginTop: 6, fontSize: 16, fontWeight: "900" },
+  metricLabel: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.35,
+  },
+  metricValue: {
+    marginTop: 6,
+    fontSize: 17,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
+  },
 
-  // Histogram
   histRow: {
     marginTop: 8,
-    height: 52,
+    height: 58,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    backgroundColor: "#020617",
-    borderRadius: 10,
-    paddingHorizontal: 8,
+    borderColor: BRAND.softBorder,
+    backgroundColor: BRAND.card2,
+    borderRadius: 16,
+    paddingHorizontal: 9,
+    paddingTop: 6,
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
@@ -1367,67 +1496,92 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     paddingHorizontal: 2,
   },
-  histBar: {
-    width: "100%",
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-  },
+  histBar: { width: "100%", borderTopLeftRadius: 6, borderTopRightRadius: 6 },
   histMetaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 6,
   },
-  histMetaText: { color: BRAND.sub, fontSize: 11, fontWeight: "700" },
+  histMetaText: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
 
   barRowTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginTop: 10,
   },
+
   barLabel: {
     color: BRAND.text,
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 12.8,
+    fontFamily: TYPO.fontFamily.semibold,
     flex: 1,
     paddingRight: 12,
   },
-  barValue: { color: BRAND.sub, fontSize: 13, fontWeight: "800" },
+
+  barValue: {
+    color: BRAND.muted,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
   barTrack: {
-    height: 10,
-    backgroundColor: "#0b1220",
+    height: 7,
+    backgroundColor: BRAND.card2,
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: BRAND.softBorder,
     borderRadius: 999,
     overflow: "hidden",
-    marginTop: 6,
+    marginTop: 5,
   },
-  barFill: { height: "100%", borderRadius: 999 },
 
+  barFill: {
+    height: "100%",
+    borderRadius: 999,
+  },
   emptyBox: {
     marginTop: 10,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    backgroundColor: "#020617",
-    borderRadius: 10,
+    borderColor: BRAND.softBorder,
+    backgroundColor: BRAND.card2,
+    borderRadius: 14,
     padding: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
   },
-  emptyText: { color: BRAND.sub, fontSize: 12.5, flex: 1, lineHeight: 18 },
+  emptyText: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    flex: 1,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.medium,
+  },
   emptyRow: { marginTop: 10 },
   smallNote: {
-    color: BRAND.sub,
+    color: BRAND.muted,
     fontSize: 11.5,
-    marginTop: 10,
+    marginTop: 7,
     lineHeight: 16,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  rangeTitle: {
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.bold,
+    fontSize: 14,
+    marginBottom: 6,
   },
   rangeTrack: {
     height: 12,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    backgroundColor: "#0b1220",
+    borderColor: BRAND.softBorder,
+    backgroundColor: BRAND.card2,
     overflow: "hidden",
     flexDirection: "row",
     alignItems: "center",
@@ -1441,111 +1595,61 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: BRAND.accent,
   },
-  rangeCaption: { color: BRAND.sub, fontSize: 11, fontWeight: "700" },
-  sampleDot: { width: 10, height: 10, borderRadius: 999, marginTop: 6 },
-  sampleTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  sampleDate: { color: BRAND.text, fontSize: 12.5, fontWeight: "800" },
-  biasPill: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  biasPillText: { fontSize: 11, fontWeight: "900" },
-  sampleHeadline: {
-    color: BRAND.sub,
-    fontSize: 12.5,
-    marginTop: 6,
-    lineHeight: 18,
-  },
-
-  rangeNarrative: {
-    marginTop: 10,
-    color: BRAND.text,
-    fontSize: 12.5,
-    lineHeight: 18,
-  },
-
-  bold: {
-    fontWeight: "900",
-    color: BRAND.accent,
-  },
-
-  rangeTitle: {
-    color: "#E8F0FF",
-    fontWeight: "600",
-    fontSize: 14,
-    marginBottom: 6,
-  },
-
   rangeValueRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 8,
     paddingHorizontal: 2,
   },
-
-  rangeCol: {
-    alignItems: "center",
-    flex: 1,
-  },
-
+  rangeCol: { alignItems: "center", flex: 1 },
   rangeValue: {
-    color: BRAND.accent,
-    fontWeight: "700",
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.bold,
     fontSize: 13,
     marginBottom: 2,
   },
-
   rangeCaption: {
     color: BRAND.sub,
     fontSize: 11,
+    fontFamily: TYPO.fontFamily.medium,
   },
-  coneHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 14,
-  },
-
-  coneLeft: {
-    flex: 1,
-  },
-
-  coneRight: {
-    alignItems: "flex-end",
-    justifyContent: "center",
-  },
-
-  metaText: {
-    color: BRAND.sub,
-    fontSize: 11,
-  },
-
-  metaStrong: {
-    color: "#E8F0FF",
-    fontWeight: "600",
-    fontSize: 12,
-  },
-
-  biasRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 6,
-  },
-
   biasText: {
     marginLeft: 6,
     fontSize: 12,
-    fontWeight: "600",
+    fontFamily: TYPO.fontFamily.semibold,
     color: BRAND.accent,
+  },
+
+  rangeNarrative: {
+    marginTop: 10,
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+  bold: { fontFamily: TYPO.fontFamily.bold, color: BRAND.text },
+
+  sampleQualityBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    padding: 9,
+    borderRadius: 14,
+    backgroundColor: "rgba(250,204,21,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(250,204,21,0.18)",
+  },
+  sampleQualityText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    lineHeight: 17,
+    flex: 1,
+    fontFamily: TYPO.fontFamily.medium,
   },
   sampleCard: {
     flexDirection: "row",
-    marginBottom: 10,
+    marginBottom: 12,
   },
 
   timelineCol: {
@@ -1553,46 +1657,75 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
+  sampleDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    marginTop: 6,
+  },
+
   timelineLine: {
-    width: 2,
+    width: 1,
     flex: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
-    marginTop: 4,
+    marginTop: 5,
   },
 
   sampleContent: {
     flex: 1,
     paddingLeft: 8,
+    paddingBottom: 2,
+  },
+
+  sampleTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  sampleDate: {
+    color: BRAND.text,
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  biasPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+
+  biasPillText: {
+    fontSize: 10,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   returnsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 6,
-    marginBottom: 6,
+    marginTop: 7,
+    marginBottom: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 9,
+    borderRadius: 12,
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
   },
 
   returnItem: {
-    color: BRAND.sub,
-    fontSize: 12,
+    color: BRAND.muted,
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   sampleHeadline: {
-    color: "#D6E2FF",
-    fontSize: 13,
-    lineHeight: 18,
-    opacity: 0.85,
-  },
-  sectionSubtitle: {
     color: BRAND.sub,
     fontSize: 12.5,
-    lineHeight: 17,
-    marginBottom: 6,
-  },
-  sectionMeta: {
-    color: BRAND.sub,
-    fontSize: 12,
-    marginBottom: 4,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.medium,
   },
   tooltipOverlay: {
     position: "absolute",
@@ -1605,8 +1738,8 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   tooltipCard: {
-    backgroundColor: "#020617",
-    borderRadius: 16,
+    backgroundColor: BRAND.card,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: BRAND.border,
     padding: 14,
@@ -1619,85 +1752,70 @@ const styles = StyleSheet.create({
   tooltipTitle: {
     color: BRAND.text,
     fontSize: 15,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.extrabold,
   },
   tooltipBody: {
     marginTop: 10,
     color: BRAND.sub,
     fontSize: 13,
     lineHeight: 18,
+    fontFamily: TYPO.fontFamily.regular,
   },
   tooltipFoot: {
     marginTop: 12,
-    color: BRAND.sub,
+    color: BRAND.muted,
     fontSize: 11,
-    opacity: 0.8,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
-  sampleQualityBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 10,
-    padding: 8,
-    borderRadius: 10,
-    backgroundColor: "rgba(250,204,21,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(250,204,21,0.18)",
-  },
-
-  sampleQualityText: {
-    color: BRAND.sub,
-    fontSize: 12,
-    lineHeight: 17,
-    flex: 1,
-  },
-  disclaimerCard: {
-    backgroundColor: "#020617",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginTop: 10,
-    marginBottom: 20,
-  },
-
-  disclaimerTitle: {
-    color: BRAND.amber,
-    fontSize: 14,
-    fontWeight: "800",
-    marginLeft: 8,
-  },
-
-  disclaimerText: {
-    color: BRAND.sub,
-    fontSize: 12.5,
-    lineHeight: 18,
-    marginTop: 6,
-  },
   footerWrap: {
     alignItems: "center",
-    marginTop: 40,
+    marginTop: 28,
     marginBottom: 24,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
-
   powered: {
     color: BRAND.sub,
     fontSize: 12,
     marginBottom: 8,
+    fontFamily: TYPO.fontFamily.medium,
   },
-
   brandText: {
-    color: BRAND.accent,
-    fontWeight: "700",
+    color: BRAND.text,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.45,
   },
-
   footerDisclaimer: {
     color: BRAND.muted,
     fontSize: 10.5,
     lineHeight: 16,
     textAlign: "center",
+    fontFamily: TYPO.fontFamily.regular,
+  },
+  expectedRangeTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 6,
+    marginBottom: 6,
+  },
+
+  biasChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+
+  biasText: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.semibold,
+    color: BRAND.accent,
   },
 });

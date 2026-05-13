@@ -518,10 +518,10 @@ export default function PortfolioScreen({ navigation }) {
         }
       >
         <View style={styles.heroCard}>
-          <View style={styles.heroTopRow}>
+          <View style={styles.portfolioHeaderRow}>
             <View>
               <Text style={styles.headerTitle}>Portfolio</Text>
-              <Text style={styles.headerSub}>Live portfolio intelligence</Text>
+              <Text style={styles.headerSub}>Total value</Text>
             </View>
 
             <View style={styles.livePill}>
@@ -530,66 +530,77 @@ export default function PortfolioScreen({ navigation }) {
             </View>
           </View>
 
-          <Text style={styles.totalValue}>{money(totalValue)}</Text>
+          <View style={styles.valueRow}>
+            <Text style={styles.totalValue}>{money(totalValue)}</Text>
 
-          <Text style={[styles.totalGain, { color: getGainColor(totalGain) }]}>
-            {signedMoney(totalGain)} ({fmt(totalGainPct)}%)
-          </Text>
-
-          <View style={styles.heroStatsRow}>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatLabel}>Today P&L</Text>
-              <Text
-                style={[
-                  styles.heroStatValue,
-                  { color: getGainColor(todayGain) },
-                ]}
-              >
-                {signedMoney(todayGain)}
-              </Text>
-            </View>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatLabel}>Holdings</Text>
-              <Text style={styles.heroStatValue}>{portfolio.length}</Text>
-            </View>
+            <Text
+              style={[styles.totalGain, { color: getGainColor(totalGain) }]}
+            >
+              {signedMoney(totalGain)} · {fmt(totalGainPct)}%
+            </Text>
           </View>
         </View>
 
-        <View style={styles.insightsCard}>
-          <View style={styles.cardHeaderRow}>
-            <Text style={styles.sectionTitle}>Portfolio Insights</Text>
-            <Text style={styles.cardHint}>Live</Text>
+        <View style={styles.insightChipsRow}>
+          <View style={styles.insightChip}>
+            <Text style={styles.insightChipLabel}>Today</Text>
+            <Text
+              style={[
+                styles.insightChipValue,
+                { color: getGainColor(todayGain) },
+              ]}
+            >
+              {signedMoney(todayGain)}
+            </Text>
+            <Text style={styles.insightChipSub}>P&L</Text>
           </View>
 
-          <View style={styles.insightRow}>
-            <Text style={styles.insightLabel}>Largest Holding</Text>
-            <Text style={styles.insightValue}>
-              {topHolding?.symbol || "--"}{" "}
-              {topHolding ? `(${fmt(topHolding.allocationPct)}%)` : ""}
+          <View style={styles.insightChip}>
+            <Text style={styles.insightChipLabel}>Holdings</Text>
+            <Text style={styles.insightChipValue}>{portfolio.length}</Text>
+            <Text style={styles.insightChipSub}>Positions</Text>
+          </View>
+
+          <View style={styles.insightChip}>
+            <Text style={styles.insightChipLabel}>Largest</Text>
+            <Text style={styles.insightChipValue}>
+              {topHolding?.symbol || "--"}
+            </Text>
+            <Text style={styles.insightChipSub}>
+              {topHolding ? `${fmt(topHolding.allocationPct)}%` : "Allocation"}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.insightChipsRow}>
+          <View style={styles.insightChip}>
+            <Text style={styles.insightChipLabel}>Best</Text>
+            <Text style={[styles.insightChipValue, { color: BRAND.green }]}>
+              {topPerformer?.symbol || "--"}
+            </Text>
+            <Text style={styles.insightChipSub}>
+              {topPerformer ? signedMoney(topPerformer.gain) : "Performer"}
             </Text>
           </View>
 
-          <View style={styles.insightRow}>
-            <Text style={styles.insightLabel}>Top Performer</Text>
-            <Text style={[styles.insightValue, { color: BRAND.green }]}>
-              {topPerformer?.symbol || "--"}{" "}
-              {topPerformer ? signedMoney(topPerformer.gain) : ""}
+          <View style={styles.insightChip}>
+            <Text style={styles.insightChipLabel}>Weakest</Text>
+            <Text style={[styles.insightChipValue, { color: BRAND.red }]}>
+              {worstPerformer?.symbol || "--"}
+            </Text>
+            <Text style={styles.insightChipSub}>
+              {worstPerformer ? signedMoney(worstPerformer.gain) : "Performer"}
             </Text>
           </View>
 
-          <View style={styles.insightRow}>
-            <Text style={styles.insightLabel}>Weakest Performer</Text>
-            <Text style={[styles.insightValue, { color: BRAND.red }]}>
-              {worstPerformer?.symbol || "--"}{" "}
-              {worstPerformer ? signedMoney(worstPerformer.gain) : ""}
-            </Text>
-          </View>
-
-          <View style={styles.insightRow}>
-            <Text style={styles.insightLabel}>Risk Exposure</Text>
-            <Text style={[styles.insightValue, { color: riskExposure.color }]}>
+          <View style={styles.insightChip}>
+            <Text style={styles.insightChipLabel}>Risk</Text>
+            <Text
+              style={[styles.insightChipValue, { color: riskExposure.color }]}
+            >
               {riskExposure.label}
             </Text>
+            <Text style={styles.insightChipSub}>Exposure</Text>
           </View>
         </View>
 
@@ -659,7 +670,7 @@ export default function PortfolioScreen({ navigation }) {
             style={styles.astraFab}
             onPress={() => setAstraVisible(true)}
           >
-            <AstraAnimatedIcon size={40} />
+            <AstraAnimatedIcon size={52} />
           </Pressable>
         </Animated.View>
       )}
@@ -703,140 +714,113 @@ export default function PortfolioScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    backgroundColor: BRAND.bg,
-  },
-
-  container: {
-    flex: 1,
-    paddingHorizontal: 14,
-  },
-
-  scrollContent: {
-    paddingTop: 70,
-    paddingBottom: 130,
-  },
-
+  wrapper: { flex: 1, backgroundColor: BRAND.bg },
+  container: { flex: 1, paddingHorizontal: 14 },
+  scrollContent: { paddingTop: 56, paddingBottom: 170 },
   loading: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: BRAND.bg,
   },
+  loadingText: { color: BRAND.sub, fontSize: 13 },
 
-  loadingText: {
-    color: BRAND.sub,
-    fontSize: 13,
-  },
   heroCard: {
-    backgroundColor: "rgba(17,24,39,0.82)",
-
-    borderRadius: 28,
-
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
-
-    padding: 22,
-
-    marginBottom: 8,
-
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
-    shadowRadius: 22,
-  },
-  eyebrow: {
-    color: BRAND.muted,
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  totalValue: {
-    color: BRAND.text,
-    fontSize: 34,
-    fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.4,
-    fontVariant: ["tabular-nums"],
-  },
-
-  totalGain: {
-    fontSize: 15,
-    marginTop: 5,
-    fontFamily: TYPO.fontFamily.bold,
-    fontVariant: ["tabular-nums"],
-  },
-
-  heroStatsRow: {
-    flexDirection: "row",
-    columnGap: 10,
-    marginTop: 16,
-  },
-
-  heroStat: {
-    flex: 1,
-    backgroundColor: BRAND.card2,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: BRAND.softBorder,
-    padding: 11,
-  },
-
-  heroStatLabel: {
-    color: BRAND.muted,
-    fontSize: 11,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-
-  heroStatValue: {
-    color: BRAND.text,
-    fontSize: 14,
-    fontWeight: "900",
-  },
-
-  insightsCard: {
     backgroundColor: BRAND.card,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: BRAND.border,
-    padding: 15,
-    marginBottom: 14,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
   },
-
-  cardHeaderRow: {
+  portfolioHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: 10,
   },
-
-  cardHint: {
+  valueRow: { marginTop: 2 },
+  headerTitle: {
+    color: BRAND.text,
+    fontSize: 24,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
+  },
+  headerSub: {
     color: BRAND.muted,
     fontSize: 11,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 2,
   },
-
-  insightRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 7,
-    borderBottomWidth: 1,
-    borderBottomColor: BRAND.softBorder,
-  },
-
-  insightLabel: {
-    color: BRAND.sub,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  insightValue: {
+  totalValue: {
     color: BRAND.text,
-    fontSize: 12,
-    fontWeight: "900",
+    fontSize: 30,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.5,
+    fontVariant: ["tabular-nums"],
+  },
+  totalGain: {
+    fontSize: 13,
+    marginTop: 4,
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
+  },
+
+  livePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: BRAND.green,
+    marginRight: 6,
+  },
+  liveText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  insightChipsRow: { flexDirection: "row", columnGap: 8, marginBottom: 8 },
+  insightChip: {
+    flex: 1,
+    backgroundColor: BRAND.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  insightChipLabel: {
+    color: BRAND.muted,
+    fontSize: 10,
+    fontFamily: TYPO.fontFamily.bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 5,
+  },
+  insightChipValue: {
+    color: BRAND.text,
+    fontSize: 14,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+  insightChipSub: {
+    color: BRAND.sub,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 3,
   },
 
   sectionHeader: {
@@ -852,14 +836,12 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.extrabold,
     letterSpacing: -0.2,
   },
-
   sectionSub: {
     color: BRAND.muted,
     fontSize: 11,
     marginTop: 3,
     fontFamily: TYPO.fontFamily.semibold,
   },
-
   filterBtn: {
     width: 36,
     height: 36,
@@ -873,64 +855,47 @@ const styles = StyleSheet.create({
 
   positionCard: {
     backgroundColor: BRAND.card,
-
-    padding: 16,
-
-    borderRadius: 22,
-
+    padding: 14,
+    borderRadius: 20,
     borderColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-
-    marginBottom: 14,
-
+    marginBottom: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
   },
-
   positionTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-
-  symbolLine: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
+  symbolLine: { flexDirection: "row", alignItems: "center" },
   symbol: {
     color: BRAND.text,
     fontSize: 18,
     fontFamily: TYPO.fontFamily.extrabold,
     marginRight: 8,
   },
-
   companyMeta: {
     color: BRAND.muted,
     fontSize: 11,
     marginTop: 4,
     fontFamily: TYPO.fontFamily.semibold,
   },
-  positionRight: {
-    alignItems: "flex-end",
-  },
-
+  positionRight: { alignItems: "flex-end" },
   currentValue: {
     color: BRAND.text,
     fontSize: 14,
     fontFamily: TYPO.fontFamily.extrabold,
     fontVariant: ["tabular-nums"],
   },
-
   todayText: {
     fontSize: 11.5,
     fontFamily: TYPO.fontFamily.bold,
     marginTop: 4,
     fontVariant: ["tabular-nums"],
   },
-
   positionMiddle: {
     marginTop: 12,
     paddingTop: 10,
@@ -940,29 +905,23 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   plValue: {
     fontSize: 14,
     fontFamily: TYPO.fontFamily.extrabold,
     flex: 1,
     fontVariant: ["tabular-nums"],
   },
-  aiInlineBtn: {
-    paddingLeft: 10,
-  },
-
+  aiInlineBtn: { paddingLeft: 10 },
   aiInlineText: {
     color: BRAND.sub,
     fontSize: 12,
     fontFamily: TYPO.fontFamily.semibold,
   },
-
   priceRow: {
     marginTop: 10,
     flexDirection: "row",
     justifyContent: "space-between",
   },
-
   priceMeta: {
     color: BRAND.sub,
     fontSize: 11.5,
@@ -978,7 +937,6 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     borderRadius: 14,
   },
-
   deleteBtn: {
     backgroundColor: BRAND.red,
     width: 78,
@@ -987,11 +945,7 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     borderRadius: 14,
   },
-
-  actionText: {
-    color: BRAND.text,
-    fontWeight: "900",
-  },
+  actionText: { color: BRAND.text, fontWeight: "900" },
 
   aiBox: {
     marginTop: 12,
@@ -1001,21 +955,18 @@ const styles = StyleSheet.create({
     borderColor: BRAND.softBorder,
     backgroundColor: BRAND.card2,
   },
-
   aiTitle: {
     color: BRAND.amber,
     fontSize: 13,
     fontWeight: "900",
     marginBottom: 10,
   },
-
   aiGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
     rowGap: 8,
   },
-
   aiMiniCard: {
     width: "48%",
     borderRadius: 12,
@@ -1024,37 +975,16 @@ const styles = StyleSheet.create({
     padding: 9,
     backgroundColor: "rgba(15,23,42,0.75)",
   },
-
   aiLabel: {
     color: BRAND.muted,
     fontSize: 10.5,
     fontWeight: "800",
     marginBottom: 3,
   },
-
-  aiValue: {
-    color: BRAND.text,
-    fontSize: 11.5,
-    fontWeight: "900",
-  },
-
-  aiParagraph: {
-    color: BRAND.sub,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 9,
-  },
-
-  aiLoading: {
-    color: BRAND.sub,
-    fontSize: 12,
-  },
-
-  aiError: {
-    color: BRAND.amber,
-    fontSize: 12,
-  },
-
+  aiValue: { color: BRAND.text, fontSize: 11.5, fontWeight: "900" },
+  aiParagraph: { color: BRAND.sub, fontSize: 12, lineHeight: 17, marginTop: 9 },
+  aiLoading: { color: BRAND.sub, fontSize: 12 },
+  aiError: { color: BRAND.amber, fontSize: 12 },
   aiRebalancingTitle: {
     color: BRAND.amber,
     fontSize: 12,
@@ -1062,12 +992,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
   },
-
-  aiRebalancingText: {
-    color: BRAND.sub,
-    fontSize: 12,
-    lineHeight: 17,
-  },
+  aiRebalancingText: { color: BRAND.sub, fontSize: 12, lineHeight: 17 },
 
   emptyBox: {
     backgroundColor: BRAND.card,
@@ -1078,14 +1003,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 14,
   },
-
   emptyTitle: {
     color: BRAND.text,
     fontSize: 15,
     fontWeight: "900",
     marginTop: 10,
   },
-
   emptySub: {
     color: BRAND.sub,
     fontSize: 12,
@@ -1107,49 +1030,40 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     elevation: 10,
   },
+  sortItem: { paddingVertical: 11, paddingHorizontal: 14 },
+  sortItemText: { color: BRAND.text, fontSize: 14, fontWeight: "700" },
+  sortItemTextActive: { color: BRAND.accent, fontWeight: "900" },
 
-  sortItem: {
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-  },
-
-  sortItemText: {
-    color: BRAND.text,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  sortItemTextActive: {
-    color: BRAND.accent,
-    fontWeight: "900",
-  },
   footerWrap: {
     marginTop: 28,
     marginBottom: 30,
     paddingHorizontal: 18,
     alignItems: "center",
   },
-
-  footerText: {
-    color: BRAND.sub,
-    fontSize: 12,
-    marginBottom: 8,
-  },
-
+  footerText: { color: BRAND.sub, fontSize: 12, marginBottom: 8 },
   footerBrand: {
     color: BRAND.text,
-    fontFamily: TYPO.fontFamily.bold,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.35,
   },
-
+  footerMeta: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    marginBottom: 8,
+    fontWeight: "700",
+  },
   disclaimer: {
     color: BRAND.muted,
     fontSize: 11,
     lineHeight: 16,
     textAlign: "center",
   },
+
   fab: {
     position: "absolute",
     right: 20,
-    bottom: 32,
+    bottom: 25,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -1159,80 +1073,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     elevation: 10,
+    zIndex: 50,
   },
 
-  astraWrap: {
-    position: "absolute",
-    left: 20,
-    bottom: 32,
-  },
-
+  astraWrap: { position: "absolute", left: 20, bottom: 25, zIndex: 50 },
   astraFab: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: BRAND.card2,
-    borderWidth: 1,
-    borderColor: BRAND.border,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "transparent",
+    borderWidth: 0,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 10,
-  },
-  headerTitle: {
-    color: BRAND.text,
-    fontSize: 26,
-    fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.3,
-    marginBottom: 2,
-    textAlign: "center",
-  },
-
-  headerSub: {
-    color: BRAND.muted,
-    fontSize: 12,
-    fontFamily: TYPO.fontFamily.medium,
-    marginBottom: 12,
-  },
-  footerMeta: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    marginBottom: 8,
-    fontWeight: "700",
-  },
-  liveRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: BRAND.green,
-    marginRight: 6,
-  },
-
-  liveText: {
-    color: BRAND.sub,
-    fontSize: 11,
-    fontFamily: TYPO.fontFamily.semibold,
-  },
-  heroTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 5,
-  },
-
-  livePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
   },
 });

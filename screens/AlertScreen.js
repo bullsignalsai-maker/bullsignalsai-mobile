@@ -12,18 +12,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
-
-const BRAND = {
-  bg: "#000000",
-  card: "#111827",
-  border: "#1F2937",
-  text: "#FFFFFF",
-  sub: "#9CA3AF",
-  accent: "#00E396",
-  red: "#FF4560",
-  amber: "#FEB019",
-};
-
+import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 const STORAGE_KEY = "@bullsignals_alerts";
 
 export default function AlertScreen({ navigation }) {
@@ -45,7 +35,9 @@ export default function AlertScreen({ navigation }) {
   const loadAlerts = async () => {
     const saved = await AsyncStorage.getItem(STORAGE_KEY);
     const parsed = saved ? JSON.parse(saved) : [];
-    setAlerts(parsed.map(a => ({ ...a, createdAt: a.createdAt || Date.now() })));
+    setAlerts(
+      parsed.map((a) => ({ ...a, createdAt: a.createdAt || Date.now() })),
+    );
     setLastSyncedAt(Date.now());
   };
 
@@ -90,10 +82,10 @@ export default function AlertScreen({ navigation }) {
               a.status === "Active"
                 ? "Triggered"
                 : a.status === "Triggered"
-                ? "Expired"
-                : "Active",
+                  ? "Expired"
+                  : "Active",
           }
-        : a
+        : a,
     );
     setAlerts(updated);
     await saveAlerts(updated);
@@ -152,7 +144,11 @@ export default function AlertScreen({ navigation }) {
           style={styles.headerLeft}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="chevron-back-outline" size={22} color={BRAND.accent} />
+          <Ionicons
+            name="chevron-back-outline"
+            size={22}
+            color={BRAND.accent}
+          />
           <Text style={styles.mainText}></Text>
         </TouchableOpacity>
 
@@ -171,7 +167,9 @@ export default function AlertScreen({ navigation }) {
 
       {/* SUBHEADER */}
       <View style={styles.headerInfo}>
-        <Text style={styles.headerSubtitle}>Smart Price Triggers & Watchpoints</Text>
+        <Text style={styles.headerSubtitle}>
+          Smart Price Triggers & Watchpoints
+        </Text>
         <Text style={styles.syncText}>
           Synced {timeAgo(lastSyncedAt)} • {counts.active} Active Alerts
         </Text>
@@ -206,9 +204,15 @@ export default function AlertScreen({ navigation }) {
       >
         {sortedAlerts.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="notifications-off-outline" size={48} color={BRAND.sub} />
+            <Ionicons
+              name="notifications-off-outline"
+              size={48}
+              color={BRAND.sub}
+            />
             <Text style={styles.emptyTitle}>No Alerts Yet</Text>
-            <Text style={styles.emptyText}>Tap “Add New Alert” to get started.</Text>
+            <Text style={styles.emptyText}>
+              Tap “Add New Alert” to get started.
+            </Text>
           </View>
         ) : (
           sortedAlerts.map((a) => {
@@ -216,10 +220,13 @@ export default function AlertScreen({ navigation }) {
               a.status === "Active"
                 ? BRAND.accent
                 : a.status === "Triggered"
-                ? BRAND.amber
-                : BRAND.red;
+                  ? BRAND.amber
+                  : BRAND.red;
             return (
-              <View key={a.id} style={[styles.card, { borderLeftColor: color }]}>
+              <View
+                key={a.id}
+                style={[styles.card, { borderLeftColor: color }]}
+              >
                 <View style={styles.cardHeader}>
                   <View>
                     <Text style={styles.symbol}>{a.symbol}</Text>
@@ -227,7 +234,9 @@ export default function AlertScreen({ navigation }) {
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
                     <Text style={styles.target}>${a.target.toFixed(2)}</Text>
-                    <View style={[styles.statusPill, { backgroundColor: color }]}>
+                    <View
+                      style={[styles.statusPill, { backgroundColor: color }]}
+                    >
                       <Ionicons
                         name={getStatusIcon(a.status)}
                         size={12}
@@ -243,10 +252,18 @@ export default function AlertScreen({ navigation }) {
                 </Text>
                 <View style={styles.actionsRow}>
                   <TouchableOpacity onPress={() => toggleStatus(a.id)}>
-                    <Ionicons name="refresh-circle" size={22} color={BRAND.accent} />
+                    <Ionicons
+                      name="refresh-circle"
+                      size={22}
+                      color={BRAND.accent}
+                    />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => removeAlert(a.id)}>
-                    <Ionicons name="trash-outline" size={22} color={BRAND.red} />
+                    <Ionicons
+                      name="trash-outline"
+                      size={22}
+                      color={BRAND.red}
+                    />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -265,11 +282,18 @@ export default function AlertScreen({ navigation }) {
 
       {/* SORT MENU */}
       <Modal transparent visible={sortOpen} animationType="fade">
-        <Pressable style={styles.sortOverlay} onPress={() => setSortOpen(false)}>
+        <Pressable
+          style={styles.sortOverlay}
+          onPress={() => setSortOpen(false)}
+        >
           <View style={styles.sortMenu}>
             <Text style={styles.sortTitle}>Sort by</Text>
             {[
-              { key: "status", label: "Status (Active → Expired)", icon: "flash-outline" },
+              {
+                key: "status",
+                label: "Status (Active → Expired)",
+                icon: "flash-outline",
+              },
               { key: "symbol", label: "Symbol (A–Z)", icon: "text-outline" },
               { key: "date", label: "Date (Newest)", icon: "time-outline" },
             ].map((opt) => (
@@ -344,23 +368,43 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: "row", alignItems: "center" },
   mainText: { color: BRAND.text, fontSize: 15, marginLeft: 4 },
   headerTitleWrap: { flexDirection: "row", alignItems: "center" },
-  headerTitle: { color: BRAND.accent, fontSize: 20, fontWeight: "800" },
   headerInfo: { alignItems: "center", marginBottom: 10 },
-  headerSubtitle: { color: BRAND.sub, fontSize: 12, marginTop: 2 },
-  syncText: { color: BRAND.sub, fontSize: 12, marginTop: 4 },
+  headerTitle: {
+    color: BRAND.text,
+    fontSize: 24,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
+  },
+
+  headerSubtitle: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginTop: 2,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  syncText: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 4,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
 
   addRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: BRAND.card,
-    borderRadius: 10,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: BRAND.border,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    paddingVertical: 12,
     marginVertical: 12,
   },
-  addText: { color: BRAND.accent, fontWeight: "700", fontSize: 14 },
+
+  addText: {
+    color: "#0A0A0A",
+    fontSize: 14,
+    fontFamily: TYPO.fontFamily.bold,
+  },
 
   sortRow: {
     flexDirection: "row",
@@ -371,25 +415,38 @@ const styles = StyleSheet.create({
   sortLabel: { color: BRAND.sub, fontSize: 13, marginRight: 6 },
 
   emptyState: { alignItems: "center", marginTop: 100 },
-  emptyTitle: { color: BRAND.text, fontSize: 16, fontWeight: "700", marginTop: 10 },
+  emptyTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 10,
+  },
   emptyText: { color: BRAND.sub, fontSize: 13, marginTop: 4 },
 
   card: {
     backgroundColor: BRAND.card,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     borderLeftWidth: 3,
     borderColor: BRAND.border,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  cardHeader: {
+  Header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  symbol: { color: BRAND.text, fontSize: 17, fontWeight: "700" },
-  target: { color: BRAND.text, fontSize: 15, fontWeight: "600" },
+  symbol: {
+    color: BRAND.text,
+    fontSize: 17,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+  target: {
+    color: BRAND.text,
+    fontSize: 15,
+    fontFamily: TYPO.fontFamily.bold,
+  },
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -398,9 +455,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     marginTop: 4,
   },
-  statusText: { color: "#000", fontSize: 11, fontWeight: "700" },
-  subText: { color: BRAND.sub, fontSize: 12, marginTop: 2 },
-  aiText: { color: BRAND.sub, fontSize: 13, marginTop: 6 },
+  statusText: {
+    color: "#000",
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+  subText: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 2,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  aiText: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginTop: 7,
+    fontFamily: TYPO.fontFamily.medium,
+  },
   actionsRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
@@ -468,7 +541,12 @@ const styles = StyleSheet.create({
     width: "100%",
     padding: 16,
   },
-  modalTitle: { color: BRAND.text, fontSize: 16, fontWeight: "700", marginBottom: 10 },
+  modalTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
   input: {
     backgroundColor: "#0A0A0A",
     color: BRAND.text,
@@ -479,7 +557,11 @@ const styles = StyleSheet.create({
     borderColor: BRAND.border,
     marginBottom: 10,
   },
-  modalActions: { flexDirection: "row", justifyContent: "space-between", marginTop: 10 },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
   cancelText: { color: BRAND.sub, fontSize: 14, fontWeight: "600" },
   addBtnText: { color: BRAND.accent, fontSize: 14, fontWeight: "700" },
 });

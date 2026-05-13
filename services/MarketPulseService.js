@@ -40,9 +40,7 @@ export async function getMarketOverview() {
     if (!snapRes.ok) return null;
 
     const snapJson = await snapRes.json();
-    const carousel = Array.isArray(snapJson.carousel)
-      ? snapJson.carousel
-      : [];
+    const carousel = Array.isArray(snapJson.carousel) ? snapJson.carousel : [];
 
     // 2️⃣ Collect unique symbols from carousel
     const symbolsSet = new Set();
@@ -60,7 +58,7 @@ export async function getMarketOverview() {
     // 3️⃣ Fetch LIVE quotes in bulk (TTL + needs_refresh aware)
     if (symbols.length) {
       const qRes = await fetch(
-        `${API_BASE_URL}/quotes-bulk?scope=market&symbols=${symbols.join(",")}`
+        `${API_BASE_URL}/quotes-bulk?scope=market&symbols=${symbols.join(",")}`,
       );
 
       if (qRes.ok) {
@@ -79,9 +77,7 @@ export async function getMarketOverview() {
         return {
           ...it,
           symbol: sym,
-          quote: live
-            ? normalizeQuote(live)
-            : normalizeQuote(it.quote),
+          quote: live ? normalizeQuote(live) : normalizeQuote(it.quote),
         };
       }),
     }));
@@ -116,43 +112,98 @@ export async function getMarketMovers() {
     if (!res.ok) return null;
 
     const json = await res.json();
+    const baseMovers = Array.isArray(json.movers) ? json.movers : [];
 
-    const movers = (json.movers || []).map((m) => {
-      const q = normalizeQuote(m.quote || {});
+    // 1) Collect mover symbols
+    const symbols = [
+      ...new Set(
+        baseMovers
+          .map((m) =>
+            String(m.symbol || "")
+              .trim()
+              .toUpperCase(),
+          )
+          .filter(Boolean),
+      ),
+    ];
+
+    // 2) Fetch latest quote repo values, same strategy as Home
+    let liveQuotes = {};
+
+    if (symbols.length) {
+      const qRes = await fetch(
+        `${API_BASE_URL}/quotes-bulk?scope=movers&symbols=${symbols.join(",")}`,
+      );
+
+      if (qRes.ok) {
+        const qJson = await qRes.json();
+        liveQuotes = qJson?.quotes || {};
+      }
+    }
+
+    // 3) Merge live quote over mover snapshot quote
+    const movers = baseMovers.map((m) => {
+      const sym = String(m.symbol || "")
+        .trim()
+        .toUpperCase();
+
+      const snapshotQuote = normalizeQuote(m.quote || {});
+      const liveQuote = normalizeQuote(liveQuotes[sym] || {});
+
+      const q = liveQuotes[sym] ? liveQuote : snapshotQuote;
+
+      const liveDirection =
+        typeof q.changePct === "number"
+          ? q.changePct >= 0
+            ? "up"
+            : "down"
+          : m.direction;
 
       return {
-        symbol: m.symbol,
-        company: m.company || m.symbol,
+        symbol: sym,
+        company: m.company || sym,
 
-        // live-safe quote
         price: q.price,
         change: q.change,
         changePct: q.changePct,
         needs_refresh: q.needs_refresh,
+        quote_updated_at: q.updated_at,
 
-        direction: m.direction,
+        // Recalculate direction from live quote
+        direction: liveDirection,
+
         trendLabel: m.trend?.label || null,
+
         pattern:
-          m.pattern?.name &&
-          m.pattern.name !== "NO CLEAR PATTERN"
+          m.pattern?.name && m.pattern.name !== "NO CLEAR PATTERN"
             ? m.pattern.name
             : null,
+
         oneLiner: m.oneLiner || null,
       };
     });
 
+    // 4) Re-split using latest quote direction
+    const gainers = movers
+      .filter((m) => m.direction === "up")
+      .sort((a, b) => Number(b.changePct || 0) - Number(a.changePct || 0));
+
+    const losers = movers
+      .filter((m) => m.direction === "down")
+      .sort((a, b) => Number(a.changePct || 0) - Number(b.changePct || 0));
+
     return {
-      gainers: movers.filter((m) => m.direction === "up"),
-      losers: movers.filter((m) => m.direction === "down"),
+      gainers,
+      losers,
       updated_at: json.updated_at || null,
       as_of: json.as_of || null,
+      quote_refreshed: true,
     };
   } catch (e) {
     console.warn("❌ getMarketMovers error:", e.message);
     return null;
   }
 }
-
 /* ---------------------------------------------------------
    3) MARKET NEWS
 --------------------------------------------------------- */

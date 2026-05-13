@@ -266,7 +266,7 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
             <View style={styles.headerRow}>
               <View style={styles.headerLeft}>
                 <View style={styles.avatar}>
-                  <AstraAnimatedIcon size={38} />
+                  <AstraAnimatedIcon size={42} />
                 </View>
 
                 <View style={{ flex: 1 }}>
@@ -502,17 +502,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
-
   avatar: {
     width: 42,
     height: 42,
     borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,227,150,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(0,227,150,0.24)",
-    marginRight: 10,
+    backgroundColor: "transparent",
+    marginRight: 8,
   },
 
   astraTitle: {

@@ -66,7 +66,14 @@ export default function SupportScreen() {
       <View style={styles.footerWrap}>
         <Text style={styles.powered}>
           Powered by{" "}
-          <Text style={{ color: BRAND.text, fontFamily: TYPO.fontFamily.bold }}>
+          <Text
+            style={{
+              color: BRAND.text,
+              fontSize: 13.5,
+              fontFamily: TYPO.fontFamily.brand,
+              letterSpacing: -0.45,
+            }}
+          >
             Alphaclara
           </Text>
         </Text>

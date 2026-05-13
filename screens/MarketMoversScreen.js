@@ -71,7 +71,24 @@ function timeAgoFromUtc(iso) {
   if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
   return `${Math.floor(diff / 86400)} day ago`;
 }
+function priceFlashStyle(prev, next) {
+  if (typeof prev !== "number" || typeof next !== "number") {
+    return {};
+  }
 
+  if (prev === next) {
+    return {};
+  }
+
+  return {
+    backgroundColor:
+      next > prev ? "rgba(0,227,150,0.16)" : "rgba(239,68,68,0.16)",
+
+    borderWidth: 1,
+
+    borderColor: next > prev ? "rgba(0,227,150,0.28)" : "rgba(239,68,68,0.28)",
+  };
+}
 /* ---------------------------------------------------------
    Screen
 --------------------------------------------------------- */
@@ -91,6 +108,8 @@ export default function MarketMoversScreen({ navigation }) {
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const shareCardRef = useRef(null);
+  const prevMoverPriceRef = useRef({});
+  const currentMoverPriceRef = useRef({});
   const loadMovers = useCallback(
     async (silent = false) => {
       try {
@@ -104,26 +123,19 @@ export default function MarketMoversScreen({ navigation }) {
           );
           return;
         }
+        prevMoverPriceRef.current = { ...currentMoverPriceRef.current };
 
+        [...(data.gainers || []), ...(data.losers || [])].forEach((m) => {
+          if (m?.symbol && typeof m.price === "number") {
+            currentMoverPriceRef.current[m.symbol] = m.price;
+          }
+        });
         setRaw({
           gainers: data.gainers || [],
           losers: data.losers || [],
           as_of: data.as_of || null,
           updated_at: data.updated_at || null,
         });
-
-        Animated.sequence([
-          Animated.timing(fadeAnim, {
-            toValue: 0.72,
-            duration: 100,
-            useNativeDriver: true,
-          }),
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 160,
-            useNativeDriver: true,
-          }),
-        ]).start();
       } catch (e) {
         console.warn("MarketMoversScreen error:", e?.message || e);
         setErrorMessage(
@@ -141,6 +153,13 @@ export default function MarketMoversScreen({ navigation }) {
     loadMovers(false);
   }, [loadMovers]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadMovers(true);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [loadMovers]);
   const onRefresh = async () => {
     setRefreshing(true);
     await loadMovers(true);
@@ -262,7 +281,12 @@ export default function MarketMoversScreen({ navigation }) {
           });
         }}
       >
-        <View style={styles.rowCard}>
+        <View
+          style={[
+            styles.rowCard,
+            priceFlashStyle(prevMoverPriceRef.current[item.symbol], item.price),
+          ]}
+        >
           <View style={styles.rowTop}>
             <View style={styles.symbolBlock}>
               <View style={styles.symbolLine}>
@@ -445,7 +469,14 @@ export default function MarketMoversScreen({ navigation }) {
         >
           <View style={styles.shareCard}>
             <View style={styles.shareBrandRow}>
-              <Image source={ALPHACLARA_LOGO} style={styles.shareLogo} />
+              <View style={styles.shareLogoWrap}>
+                <Image
+                  source={ALPHACLARA_LOGO}
+                  style={styles.shareLogo}
+                  resizeMode="contain"
+                />
+              </View>
+
               <View>
                 <Text style={styles.shareCardTitle}>Alphaclara</Text>
                 <Text style={styles.shareCardSubTitle}>Market Movers</Text>
@@ -453,7 +484,7 @@ export default function MarketMoversScreen({ navigation }) {
             </View>
 
             <Text style={styles.shareCardMeta}>
-              Updated {stats.updated} • Informational only
+              {new Date().toLocaleString()} • Informational only
             </Text>
 
             {shareRising.length > 0 && (
@@ -462,6 +493,9 @@ export default function MarketMoversScreen({ navigation }) {
                   style={[styles.shareSectionTitle, { color: BRAND.green }]}
                 >
                   Rising
+                </Text>
+                <Text style={styles.shareSectionMeta}>
+                  Top {Math.min(shareRising.length, 15)} movers
                 </Text>
 
                 <View style={styles.shareTableHeader}>
@@ -472,7 +506,7 @@ export default function MarketMoversScreen({ navigation }) {
                   <Text style={styles.shareHeaderMove}>% Chg</Text>
                 </View>
 
-                {shareRising.map((m, index) => (
+                {shareRising.slice(0, 15).map((m, index) => (
                   <View
                     key={`rise-${m.symbol}-${index}`}
                     style={styles.shareTableRow}
@@ -510,7 +544,9 @@ export default function MarketMoversScreen({ navigation }) {
                 <Text style={[styles.shareSectionTitle, { color: BRAND.red }]}>
                   Dropping
                 </Text>
-
+                <Text style={styles.shareSectionMeta}>
+                  Top {Math.min(sharePullingBack.length, 15)} movers
+                </Text>
                 <View style={styles.shareTableHeader}>
                   <Text style={styles.shareHeaderSymbol}>Symbol</Text>
                   <Text style={styles.shareHeaderLabel}>Move</Text>
@@ -519,7 +555,7 @@ export default function MarketMoversScreen({ navigation }) {
                   <Text style={styles.shareHeaderMove}>% Chg</Text>
                 </View>
 
-                {sharePullingBack.map((m, index) => (
+                {sharePullingBack.slice(0, 15).map((m, index) => (
                   <View
                     key={`pull-${m.symbol}-${index}`}
                     style={styles.shareTableRow}
@@ -556,7 +592,7 @@ export default function MarketMoversScreen({ navigation }) {
           </View>
         </ViewShot>
       </View>
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+      <View style={{ flex: 1 }}>
         <FlatList
           data={data}
           keyExtractor={(item, index) => `${item.symbol}-${index}`}
@@ -601,7 +637,7 @@ export default function MarketMoversScreen({ navigation }) {
             />
           }
         />
-      </Animated.View>
+      </View>
     </View>
   );
 }
@@ -1104,10 +1140,9 @@ const styles = StyleSheet.create({
   },
   hiddenShareCardWrap: {
     position: "absolute",
-    left: 0,
+    left: -9999,
     top: 0,
     opacity: 1,
-    transform: [{ translateY: -3000 }],
   },
 
   shareCard: {
@@ -1129,11 +1164,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  shareLogo: {
-    width: 54,
-    height: 54,
-    borderRadius: 14,
+  shareLogoWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
+  },
+
+  shareLogo: {
+    width: 46,
+    height: 46,
   },
 
   shareCardTitle: {
@@ -1290,5 +1335,11 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     letterSpacing: -0.15,
     marginTop: 0,
+  },
+  shareSectionMeta: {
+    color: BRAND.muted,
+    fontSize: 12,
+    marginBottom: 10,
+    fontFamily: TYPO.fontFamily.medium,
   },
 });

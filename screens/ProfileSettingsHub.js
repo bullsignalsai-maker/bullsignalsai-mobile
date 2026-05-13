@@ -19,6 +19,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { registerForPushNotifications } from "../services/pushNotificationService";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { auth, db } from "../firebaseConfig";
+import { deleteUser } from "firebase/auth";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  collection,
+  getDocs,
+} from "firebase/firestore";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 
@@ -45,13 +55,27 @@ export default function ProfileSettingsHub({ navigation }) {
         if (userId) {
           registerForPushNotifications(userId);
         }
-        const saved =
-          JSON.parse(await AsyncStorage.getItem("profile_" + email)) || {};
+        let saved = {};
+
+        if (userId) {
+          const profileRef = doc(db, "users", userId, "profile", "main");
+          const profileSnap = await getDoc(profileRef);
+
+          if (profileSnap.exists()) {
+            saved = profileSnap.data() || {};
+          } else {
+            saved =
+              JSON.parse(await AsyncStorage.getItem("profile_" + email)) || {};
+          }
+        } else {
+          saved =
+            JSON.parse(await AsyncStorage.getItem("profile_" + email)) || {};
+        }
 
         setUser({
           firstName: saved.firstName || "",
           lastName: saved.lastName || "",
-          email,
+          email: saved.email || email,
           bio: saved.bio || "",
           avatar: saved.avatar || null,
         });
@@ -85,12 +109,30 @@ export default function ProfileSettingsHub({ navigation }) {
   };
 
   const handleSave = async () => {
-    await AsyncStorage.setItem("profile_" + user.email, JSON.stringify(user));
+    const userId = auth.currentUser?.uid;
+
+    const profileData = {
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      email: user.email || "",
+      bio: user.bio || "",
+      avatar: user.avatar || null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await AsyncStorage.setItem(
+      "profile_" + user.email,
+      JSON.stringify(profileData),
+    );
+
+    if (userId) {
+      const profileRef = doc(db, "users", userId, "profile", "main");
+      await setDoc(profileRef, profileData, { merge: true });
+    }
 
     setEditable(false);
     showToast("Profile updated");
   };
-
   const handleAvatarChange = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -124,6 +166,25 @@ export default function ProfileSettingsHub({ navigation }) {
         JSON.stringify(updated),
       );
 
+      const userId = auth.currentUser?.uid;
+
+      if (userId) {
+        const profileRef = doc(db, "users", userId, "profile", "main");
+
+        await setDoc(
+          profileRef,
+          {
+            firstName: updated.firstName || "",
+            lastName: updated.lastName || "",
+            email: updated.email || "",
+            bio: updated.bio || "",
+            avatar: updated.avatar || null,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true },
+        );
+      }
+
       showToast("Profile photo updated");
     }
   };
@@ -148,31 +209,73 @@ export default function ProfileSettingsHub({ navigation }) {
   const handleDeleteAccount = () => {
     Alert.alert(
       "Delete Account",
-      "This will remove your account data from this device. To permanently delete your account, contact support.",
+      "This will delete your Alphaclara profile, watchlist, portfolio, notification preferences, saved summaries, and account access. This action cannot be undone.",
       [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            await AsyncStorage.multiRemove([
-              "userToken",
-              "profile_" + user.email,
-            ]);
+            try {
+              const currentUser = auth.currentUser;
+              const userId = currentUser?.uid;
+              const email = user.email || currentUser?.email || "";
 
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "Signup" }],
-            });
+              if (!userId || !currentUser) {
+                Alert.alert(
+                  "Sign In Required",
+                  "Please sign in again to delete your account.",
+                );
+                return;
+              }
+
+              const deleteCollectionDocs = async (pathParts) => {
+                const snap = await getDocs(collection(db, ...pathParts));
+                await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+              };
+
+              await deleteCollectionDocs(["users", userId, "portfolio"]);
+              await deleteCollectionDocs(["users", userId, "watchlist"]);
+              await deleteCollectionDocs(["users", userId, "summaries"]);
+
+              await deleteDoc(doc(db, "users", userId, "profile", "main"));
+              await deleteDoc(
+                doc(db, "users", userId, "preferences", "notifications"),
+              );
+              await deleteDoc(doc(db, "users", userId));
+
+              await AsyncStorage.multiRemove(["userToken", "profile_" + email]);
+
+              await deleteUser(currentUser);
+
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Signup" }],
+              });
+            } catch (err) {
+              console.warn(
+                "Delete account failed:",
+                err?.code || err?.message || err,
+              );
+
+              if (err?.code === "auth/requires-recent-login") {
+                Alert.alert(
+                  "Please Sign In Again",
+                  "For security, please log out, sign in again, and then delete your account.",
+                );
+                return;
+              }
+
+              Alert.alert(
+                "Delete Failed",
+                "Unable to delete your account right now. Please try again.",
+              );
+            }
           },
         },
       ],
     );
   };
-
   const fullName =
     `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Your Profile";
 
@@ -394,18 +497,16 @@ export default function ProfileSettingsHub({ navigation }) {
         >
           <Text style={styles.toastText}>{toastMessage}</Text>
         </Animated.View>
-        <Text style={styles.powered}>
-          Powered by <Text style={{ color: BRAND.text }}>Alphaclara</Text>
-        </Text>
+        <View style={styles.footerWrap}>
+          <Text style={styles.powered}>
+            Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
+          </Text>
 
-        <Text style={styles.disclaimer}>
-          Information provided is for educational purposes only and is not
-          financial advice.
-        </Text>
-        <View style={styles.versionWrap}>
-          <Text style={styles.versionText}>Alphaclara v1.0.0</Text>
-          <Text style={styles.versionSubText}>
-            AI-Powered Market Intelligence
+          <Text style={styles.footerMeta}>Market Intelligence · v1.0.1</Text>
+
+          <Text style={styles.disclaimer}>
+            Information provided is for educational and informational purposes
+            only and is not financial, investment, trading, or tax advice.
           </Text>
         </View>
 
@@ -644,14 +745,6 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.bold,
   },
 
-  powered: {
-    color: BRAND.sub,
-    fontSize: 12,
-    textAlign: "center",
-    marginTop: 14,
-    fontFamily: TYPO.fontFamily.medium,
-  },
-
   disclaimer: {
     color: BRAND.muted,
     fontSize: 10.5,
@@ -659,24 +752,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 6,
     paddingHorizontal: 20,
-    fontFamily: TYPO.fontFamily.regular,
-  },
-
-  versionWrap: {
-    alignItems: "center",
-    marginTop: 26,
-  },
-
-  versionText: {
-    color: BRAND.muted,
-    fontSize: 12,
-    fontFamily: TYPO.fontFamily.semibold,
-  },
-
-  versionSubText: {
-    color: BRAND.muted,
-    fontSize: 11,
-    marginTop: 4,
     fontFamily: TYPO.fontFamily.regular,
   },
   avatarTopRight: {
@@ -738,5 +813,40 @@ const styles = StyleSheet.create({
 
   nameFieldCol: {
     flex: 1,
+  },
+  footerWrap: {
+    marginTop: 34,
+    marginBottom: 8,
+    paddingHorizontal: 24,
+    alignItems: "center",
+  },
+
+  powered: {
+    color: BRAND.sub,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  footerBrand: {
+    color: BRAND.text,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.45,
+  },
+
+  footerMeta: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 5,
+    marginBottom: 10,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  disclaimer: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    lineHeight: 16,
+    textAlign: "center",
+    fontFamily: TYPO.fontFamily.regular,
   },
 });

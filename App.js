@@ -43,6 +43,10 @@ import AddAlertScreen from "./screens/AddAlertScreen";
 import SupportScreen from "./screens/SupportScreen";
 import { BRAND } from "./constants/theme";
 import { TYPO } from "./constants/typography";
+import {
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+} from "@expo-google-fonts/montserrat";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -102,6 +106,8 @@ export default function App() {
     Inter_600SemiBold,
     Inter_700Bold,
     Inter_800ExtraBold,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
   });
   const [initialRoute, setInitialRoute] = useState(null);
   const navigationRef = useRef(null);

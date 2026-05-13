@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Alert,
   Linking,
+  Animated,
 } from "react-native";
 
 import * as Haptics from "expo-haptics";
@@ -115,7 +116,9 @@ function priceFlashStyle(prev, next) {
 
   return {
     backgroundColor:
-      next > prev ? "rgba(0,227,150,0.10)" : "rgba(239,68,68,0.10)",
+      next > prev ? "rgba(0,227,150,0.16)" : "rgba(239,68,68,0.16)",
+    borderWidth: 1,
+    borderColor: next > prev ? "rgba(0,227,150,0.28)" : "rgba(239,68,68,0.28)",
   };
 }
 
@@ -212,7 +215,7 @@ export default function MarketScreen({ navigation }) {
 
     const interval = setInterval(() => {
       loadData(true);
-    }, 45000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [loadData]);
@@ -579,13 +582,15 @@ export default function MarketScreen({ navigation }) {
         </View>
       </ScrollView>
 
-      <TouchableOpacity
-        style={styles.astraFab}
-        activeOpacity={0.85}
-        onPress={() => setAstraVisible(true)}
-      >
-        <AstraAnimatedIcon size={40} />
-      </TouchableOpacity>
+      <Animated.View style={styles.astraWrap}>
+        <TouchableOpacity
+          style={styles.astraFab}
+          activeOpacity={0.85}
+          onPress={() => setAstraVisible(true)}
+        >
+          <AstraAnimatedIcon size={52} />
+        </TouchableOpacity>
+      </Animated.View>
 
       <AstraChat
         visible={astraVisible}
@@ -612,7 +617,7 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     paddingTop: 118,
-    paddingBottom: 70,
+    paddingBottom: 170,
   },
 
   stickyHeader: {
@@ -687,15 +692,8 @@ const styles = StyleSheet.create({
   },
 
   livePillText: {
-    color: BRAND.green,
     fontSize: 11,
     fontFamily: TYPO.fontFamily.bold,
-  },
-
-  livePillText: {
-    color: BRAND.green,
-    fontSize: 11,
-    fontWeight: "900",
   },
 
   tableHeader: {
@@ -978,7 +976,9 @@ const styles = StyleSheet.create({
 
   footerBrand: {
     color: BRAND.text,
-    fontWeight: "600",
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.45,
   },
 
   disclaimer: {
@@ -987,21 +987,21 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: "center",
   },
+  astraWrap: {
+    position: "absolute",
+    left: 20,
+    bottom: 25,
+    zIndex: 50,
+  },
 
   astraFab: {
-    position: "absolute",
-    left: 18,
-    bottom: 28,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: BRAND.card2,
-    borderWidth: 1,
-    borderColor: BRAND.border,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "transparent",
+    borderWidth: 0,
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 999,
-    elevation: 10,
   },
   livePillLive: {
     backgroundColor: "rgba(0,227,150,0.10)",

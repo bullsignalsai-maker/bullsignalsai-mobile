@@ -14,7 +14,7 @@ import {
   Keyboard,
   Pressable,
   StatusBar,
-  TouchableOpacity, // Added
+  TouchableOpacity,
 } from "react-native";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -26,7 +26,7 @@ import { auth, db } from "../firebaseConfig";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 import AppButton from "../components/AppButton";
-import { SafeAreaView } from "react-native-safe-area-context"; // Added
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SignupScreen({ navigation }) {
   const [firstName, setFirstName] = useState("");
@@ -69,23 +69,72 @@ export default function SignupScreen({ navigation }) {
 
       const user = userCredential.user;
 
-      await setDoc(doc(db, "users", user.uid), {
-        firstName,
-        lastName,
-        bio,
+      const now = new Date().toISOString();
+
+      const profileData = {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         email: cleanEmail,
-        createdAt: new Date().toISOString(),
+        bio: bio.trim(),
+        avatar: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      // 1) Base user doc
+      await setDoc(doc(db, "users", user.uid), {
+        email: cleanEmail,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        createdAt: now,
+        updatedAt: now,
       });
 
+      // 2) Profile doc
+      await setDoc(doc(db, "users", user.uid, "profile", "main"), profileData);
+      // 3) Default notification preferences
+      await setDoc(doc(db, "users", user.uid, "preferences", "notifications"), {
+        enabled: true,
+        watchlist: true,
+        portfolio: true,
+        crypto: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // 4) Local session/fallback
       await AsyncStorage.setItem("userToken", user.email);
+
       await AsyncStorage.setItem(
         "profile_" + user.email,
-        JSON.stringify({ firstName, lastName, bio, email: cleanEmail }),
+        JSON.stringify(profileData),
       );
 
       navigation.replace("Main");
     } catch (error) {
       console.warn("Signup failed:", error?.code);
+
+      if (error?.code === "auth/email-already-in-use") {
+        Alert.alert(
+          "Account Already Exists",
+          "An account already exists with this email. Please sign in or use a different email.",
+        );
+        return;
+      }
+
+      if (error?.code === "auth/invalid-email") {
+        Alert.alert("Invalid Email", "Please enter a valid email address.");
+        return;
+      }
+
+      if (error?.code === "auth/weak-password") {
+        Alert.alert(
+          "Weak Password",
+          "Password should be at least 6 characters.",
+        );
+        return;
+      }
+
       Alert.alert(
         "Signup Failed",
         "Unable to create account. Please try again.",
@@ -261,13 +310,13 @@ const styles = StyleSheet.create({
   title: {
     color: BRAND.text,
     fontSize: 28,
-    fontFamily: TYPO.extrabold,
+    fontFamily: TYPO.fontFamily.extrabold,
     letterSpacing: 0.2,
   },
   subtitle: {
     color: BRAND.text,
     fontSize: 20,
-    fontFamily: TYPO.bold,
+    fontFamily: TYPO.fontFamily.bold,
     marginTop: 8,
   },
   tagline: {
@@ -277,7 +326,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 6,
     paddingHorizontal: 10,
-    fontFamily: TYPO.regular,
+    fontFamily: TYPO.fontFamily.regular,
   },
   input: {
     backgroundColor: BRAND.card2,
@@ -289,14 +338,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BRAND.softBorder,
     fontSize: 15,
-    fontFamily: TYPO.semibold,
+    fontFamily: TYPO.fontFamily.semibold,
   },
   passwordInput: {
     flex: 1,
     color: BRAND.text,
     paddingVertical: 13,
     fontSize: 15,
-    fontFamily: TYPO.semibold,
+    fontFamily: TYPO.fontFamily.semibold,
   },
   createButton: {
     marginTop: 10,
@@ -306,22 +355,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 18,
     fontSize: 14,
-    fontFamily: TYPO.medium,
+    fontFamily: TYPO.fontFamily.medium,
   },
   linkHighlight: {
     color: BRAND.text,
-    fontFamily: TYPO.bold,
+    fontFamily: TYPO.fontFamily.bold,
   },
   footerText: {
     color: BRAND.muted,
     fontSize: 10.5,
     lineHeight: 15,
     textAlign: "center",
-    fontFamily: TYPO.regular,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   footerLink: {
     color: BRAND.text,
-    fontFamily: TYPO.semibold,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 });

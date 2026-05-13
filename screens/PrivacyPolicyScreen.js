@@ -154,7 +154,9 @@ const styles = StyleSheet.create({
 
   brand: {
     color: BRAND.text,
-    fontFamily: TYPO.fontFamily.bold,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.45,
   },
 
   footer: {

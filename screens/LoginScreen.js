@@ -62,13 +62,14 @@ export default function LoginScreen({ navigation }) {
 
       const user = userCredential.user;
 
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
+      const profileRef = doc(db, "users", user.uid, "profile", "main");
 
-      if (docSnap.exists()) {
+      const profileSnap = await getDoc(profileRef);
+
+      if (profileSnap.exists()) {
         await AsyncStorage.setItem(
           "profile_" + user.email,
-          JSON.stringify(docSnap.data()),
+          JSON.stringify(profileSnap.data()),
         );
       }
 
@@ -319,14 +320,14 @@ const styles = StyleSheet.create({
   title: {
     color: BRAND.text,
     fontSize: 28,
-    fontFamily: TYPO.extrabold,
+    fontFamily: TYPO.fontFamily.extrabold,
     letterSpacing: 0.2,
   },
 
   subtitle: {
     color: BRAND.text,
     fontSize: 20,
-    fontFamily: TYPO.bold,
+    fontFamily: TYPO.fontFamily.bold,
     marginTop: 10,
   },
 
@@ -337,13 +338,13 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 6,
     paddingHorizontal: 10,
-    fontFamily: TYPO.regular,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   label: {
     color: BRAND.sub,
     fontSize: 12,
-    fontFamily: TYPO.bold,
+    fontFamily: TYPO.fontFamily.bold,
     marginBottom: 7,
   },
 
@@ -356,7 +357,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     color: BRAND.text,
     fontSize: 15,
-    fontFamily: TYPO.semibold,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   passwordInput: {
@@ -365,25 +366,25 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     color: BRAND.text,
     fontSize: 15,
-    fontFamily: TYPO.semibold,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   forgotText: {
     color: BRAND.sub,
     fontSize: 13,
-    fontFamily: TYPO.semibold,
+    fontFamily: TYPO.fontFamily.semibold,
   },
   link: {
     color: BRAND.sub,
     textAlign: "center",
     marginTop: 20,
     fontSize: 14,
-    fontFamily: TYPO.medium,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   linkHighlight: {
     color: BRAND.text,
-    fontFamily: TYPO.bold,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   footerText: {
@@ -391,12 +392,12 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     lineHeight: 15,
     textAlign: "center",
-    fontFamily: TYPO.regular,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   footerLink: {
     color: BRAND.text,
-    fontFamily: TYPO.semibold,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   disclaimer: {
@@ -405,7 +406,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 12,
     opacity: 0.8,
-    fontFamily: TYPO.regular,
+    fontFamily: TYPO.fontFamily.regular,
   },
   signInButton: {
     marginTop: 4,

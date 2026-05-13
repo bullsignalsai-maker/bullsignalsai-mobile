@@ -19,8 +19,8 @@ export default function AboutScreen() {
           />
         </View>
 
-        <Text style={styles.title}>Alphaclara</Text>
-        <Text style={styles.tagline}>AI-Powered Market Intelligence</Text>
+        <Text style={styles.titleBrand}>Alphaclara</Text>
+        <Text style={styles.tagline}>Market Intelligence</Text>
       </View>
 
       {/* CARD CONTENT */}
@@ -80,10 +80,7 @@ export default function AboutScreen() {
       {/* FOOTER */}
       <View style={styles.footerWrap}>
         <Text style={styles.powered}>
-          Powered by{" "}
-          <Text style={{ color: BRAND.text, fontFamily: TYPO.fontFamily.bold }}>
-            Alphaclara
-          </Text>
+          Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
         </Text>
 
         <Text style={styles.footer}>
@@ -112,17 +109,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 22,
   },
-
-  title: {
+  titleBrand: {
     color: BRAND.text,
-    fontSize: 28,
-    fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.4,
+    fontSize: 30,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.9,
   },
-
   tagline: {
     color: BRAND.sub,
-    fontSize: 13,
+    fontSize: 12,
     marginTop: 4,
     fontFamily: TYPO.fontFamily.medium,
   },
@@ -175,13 +170,13 @@ const styles = StyleSheet.create({
   },
   footerWrap: {
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 26,
+    paddingHorizontal: 22,
   },
-
   powered: {
     color: BRAND.sub,
     fontSize: 12,
-    marginBottom: 8,
+    marginBottom: 6,
     fontFamily: TYPO.fontFamily.medium,
   },
 
@@ -189,5 +184,11 @@ const styles = StyleSheet.create({
     color: BRAND.muted,
     fontSize: 11,
     fontFamily: TYPO.fontFamily.regular,
+  },
+  footerBrand: {
+    color: BRAND.text,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.45,
   },
 });

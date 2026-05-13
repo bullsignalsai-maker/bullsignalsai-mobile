@@ -195,10 +195,12 @@ export default function HomeScreen({ navigation }) {
       <View style={styles.header}>
         <View style={styles.headerBrandRow}>
           <Image source={LOGO} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.title}>Alphaclara</Text>
+          <Text style={styles.titleBrand}>Alphaclara</Text>
         </View>
-        <Text style={styles.subtitle}>AI-Powered Market Intelligence</Text>
-        <View style={styles.marketRow}>
+
+        <Text style={styles.subtitle}>Market Intelligence</Text>
+
+        <View style={styles.marketPill}>
           <View
             style={[
               styles.marketDot,
@@ -215,7 +217,6 @@ export default function HomeScreen({ navigation }) {
               },
             ]}
           />
-
           <Text style={styles.marketText}>
             {header.marketStatus || "Market"} ·{" "}
             {header.marketMood || "Overview"}
@@ -296,9 +297,12 @@ export default function HomeScreen({ navigation }) {
         }
         contentContainerStyle={{ paddingBottom: 50 }}
       >
-        <Text style={styles.listHelper}>
-          AI-ranked market ideas from Alphaclara’s tracked universe.
-        </Text>
+        <View style={styles.listIntroRow}>
+          <Ionicons name="sparkles-outline" size={13} color={BRAND.muted} />
+          <Text style={styles.listHelper}>
+            AI-ranked market ideas from Alphaclara’s tracked universe
+          </Text>
+        </View>
         {signals.map((item, idx) => {
           const session = getMarketSession(item.lastUpdated);
           const isLive = session === "LIVE";
@@ -484,23 +488,67 @@ export default function HomeScreen({ navigation }) {
 /* === Styles UNCHANGED === */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BRAND.bg },
-  header: { paddingTop: 56, alignItems: "center", marginBottom: 6 },
-  headerBrandRow: { flexDirection: "row", alignItems: "center" },
-  logo: { width: 25, height: 25, marginRight: 6 },
-  title: {
+
+  header: {
+    paddingTop: 54,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  headerBrandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  logo: {
+    width: 28,
+    height: 28,
+    marginRight: 7,
+  },
+
+  titleBrand: {
     color: BRAND.text,
-    fontSize: 25,
-    fontFamily: TYPO.extrabold,
+    fontSize: 28,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.9,
   },
 
   subtitle: {
     color: BRAND.sub,
     fontSize: 12,
     marginTop: 4,
-    fontFamily: TYPO.medium,
+    fontFamily: TYPO.fontFamily.medium,
   },
-  carousel: {
+
+  marketPill: {
     marginTop: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+
+  marketDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    marginRight: 6,
+  },
+
+  marketText: {
+    color: BRAND.sub,
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  carousel: {
+    marginTop: -2,
     marginBottom: 8,
   },
 
@@ -522,15 +570,57 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 30,
   },
+
   featureHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 3,
   },
+
   featureTitle: {
     color: BRAND.text,
-    fontSize: 14,
-    fontFamily: TYPO.bold,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  segmentWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+
+  segmentText: {
+    fontSize: 11.5,
+    color: BRAND.sub,
+    lineHeight: 16,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  sectorWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+
+  sectorText: {
+    fontSize: 11.5,
+    color: BRAND.sub,
+    lineHeight: 16,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  listIntroRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+    marginBottom: 8,
+    gap: 5,
+  },
+
+  listHelper: {
+    color: BRAND.muted,
+    fontSize: 11,
+    textAlign: "center",
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   card: {
@@ -548,29 +638,45 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+
+  symbolRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+
   symbol: {
     color: BRAND.text,
     fontSize: 17,
-    fontFamily: TYPO.bold,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   name: {
     color: BRAND.sub,
     fontSize: 12,
     marginTop: 2,
-    fontFamily: TYPO.medium,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  moveLabelInline: {
+    marginLeft: 7,
+    marginTop: 0,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.semibold,
+    fontStyle: "italic",
+    letterSpacing: -0.15,
   },
 
   price: {
     color: BRAND.text,
     fontSize: 18,
-    fontFamily: TYPO.extrabold,
+    fontFamily: TYPO.fontFamily.extrabold,
     fontVariant: ["tabular-nums"],
   },
 
   changePct: {
     fontSize: 12,
-    fontFamily: TYPO.semibold,
+    fontFamily: TYPO.fontFamily.semibold,
     fontVariant: ["tabular-nums"],
   },
 
@@ -579,16 +685,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 6,
   },
+
   signalBadge: {
     borderRadius: 999,
     paddingVertical: 4,
     paddingHorizontal: 10,
     marginRight: 8,
   },
+
+  signalText: {
+    color: "#000",
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
   confInline: {
     fontSize: 12,
-    fontFamily: TYPO.bold,
+    fontFamily: TYPO.fontFamily.bold,
   },
+
   cardDivider: {
     height: 1,
     backgroundColor: BRAND.border,
@@ -596,108 +711,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     opacity: 0.65,
   },
-  signalText: {
-    color: "#000",
-    fontSize: 11.5,
-    fontFamily: TYPO.bold,
-  },
 
-  cardFooterRow: {
-    marginTop: 5,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
   summary: {
     color: BRAND.sub,
     fontSize: 12.5,
     lineHeight: 18,
-    fontFamily: TYPO.medium,
-  },
-  lastUpdated: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    opacity: 0.85,
-    fontFamily: TYPO.semibold,
-  },
-  tapHint: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    fontFamily: TYPO.semibold,
-  },
-  sectorWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    fontFamily: TYPO.fontFamily.medium,
   },
 
-  sectorText: {
-    fontSize: 12,
-    color: BRAND.sub,
-    lineHeight: 17,
-    fontFamily: TYPO.semibold,
-  },
-  segmentWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-
-  segmentText: {
-    fontSize: 12,
-    color: BRAND.sub,
-    lineHeight: 17,
-    fontFamily: TYPO.semibold,
-  },
-  listHelper: {
-    color: BRAND.muted,
-    fontSize: 11,
-    textAlign: "center",
-    marginBottom: 8,
-    fontFamily: TYPO.semibold,
-  },
-
-  footerWrap: {
-    marginTop: 24,
-    marginBottom: 30,
-    paddingHorizontal: 22,
-    alignItems: "center",
-  },
-
-  footerText: {
-    color: BRAND.sub,
-    fontSize: 12,
-    marginBottom: 8,
-    fontFamily: TYPO.medium,
-  },
-
-  footerBrand: {
-    color: BRAND.text,
-    fontFamily: TYPO.semibold,
-  },
-  disclaimer: {
-    color: BRAND.muted,
-    fontSize: 11,
-    lineHeight: 16,
-    textAlign: "center",
-    fontFamily: TYPO.regular,
-  },
-  marketRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 7,
-  },
-
-  marketDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-
-  marketText: {
-    color: BRAND.sub,
-    fontSize: 12,
-    fontFamily: TYPO.semibold,
-  },
   patternRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -716,29 +737,61 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginRight: 6,
     textTransform: "uppercase",
-    fontFamily: TYPO.bold,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   patternValue: {
     color: BRAND.sub,
     fontSize: 10.5,
-    fontFamily: TYPO.semibold,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
-  symbolRow: {
+  cardFooterRow: {
+    marginTop: 5,
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    flexWrap: "wrap",
   },
 
-  moveLabelInline: {
-    marginLeft: 7,
-    marginTop: 0,
-
+  lastUpdated: {
+    color: BRAND.muted,
     fontSize: 10.5,
-    fontFamily: TYPO.semibold,
-    fontStyle: "italic",
+    opacity: 0.85,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
 
-    letterSpacing: -0.15,
+  tapHint: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  footerWrap: {
+    marginTop: 24,
+    marginBottom: 30,
+    paddingHorizontal: 22,
+    alignItems: "center",
+  },
+
+  footerText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginBottom: 8,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  footerBrand: {
+    color: BRAND.text,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.45,
+  },
+
+  disclaimer: {
+    color: BRAND.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+    fontFamily: TYPO.fontFamily.regular,
   },
 });

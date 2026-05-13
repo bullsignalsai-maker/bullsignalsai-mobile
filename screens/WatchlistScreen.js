@@ -59,7 +59,17 @@ const fmtDateTime = (ts) => {
     return "";
   }
 };
+function getMarketSession(ts) {
+  if (!ts) return null;
 
+  const d = new Date(ts);
+  const h = d.getHours();
+  const m = d.getMinutes();
+
+  if (h < 9 || (h === 9 && m < 30)) return "PRE";
+  if (h >= 16) return "AH";
+  return "LIVE";
+}
 const displayRating = (signal) => {
   if (signal === "BUY") return "Bullish";
   if (signal === "SELL") return "Bearish";
@@ -299,22 +309,40 @@ export default function WatchlistScreen({ navigation }) {
 
   /* ================= SORT ================= */
   const sortedItems = [...items].sort((a, b) => {
-    // pinned first
     const ap = pinned[a.symbol] ? 1 : 0;
     const bp = pinned[b.symbol] ? 1 : 0;
     if (ap !== bp) return bp - ap;
 
     if (sortMode === "confidence") {
-      return (b.hybridScore || 0) - (a.hybridScore || 0);
+      const ac = Number(a.bullbrain?.confidence ?? a.hybridScore ?? 0);
+      const bc = Number(b.bullbrain?.confidence ?? b.hybridScore ?? 0);
+      return bc - ac;
     }
 
     if (sortMode === "alpha") {
-      return (a.symbol || "").localeCompare(b.symbol || "");
+      return String(a.symbol || "").localeCompare(String(b.symbol || ""));
     }
 
     if (sortMode === "signal") {
       const order = { BUY: 1, HOLD: 2, SELL: 3 };
-      return (order[a.hybridSignal] || 99) - (order[b.hybridSignal] || 99);
+      return (
+        (order[a.hybridSignal || a.bullbrain?.signal] || 99) -
+        (order[b.hybridSignal || b.bullbrain?.signal] || 99)
+      );
+    }
+
+    if (sortMode === "price") {
+      return Number(b.price || 0) - Number(a.price || 0);
+    }
+
+    if (sortMode === "pct") {
+      return (
+        Math.abs(Number(b.changePct || 0)) - Math.abs(Number(a.changePct || 0))
+      );
+    }
+
+    if (sortMode === "dollar") {
+      return Math.abs(Number(b.change || 0)) - Math.abs(Number(a.change || 0));
     }
 
     return 0;
@@ -502,12 +530,7 @@ export default function WatchlistScreen({ navigation }) {
   const renderItem = ({ item, index }) => {
     if (item.__type === "header") {
       return (
-        <Text
-          style={[
-            styles.sectionHeader,
-            index === 0 && { marginTop: 6 }, // 👈 reduce top gap for first header
-          ]}
-        >
+        <Text style={[styles.sectionHeader, index === 0 && { marginTop: 4 }]}>
           {item.title}
         </Text>
       );
@@ -517,14 +540,19 @@ export default function WatchlistScreen({ navigation }) {
       return <View style={styles.sectionDivider} />;
     }
     // session comes from service (LIVE | LAST)
-    const session = item.session;
-
     // flattened quote fields
     const price = item.price;
     const change = item.change;
     const changePct = item.changePct;
 
+    // Prefer backend/session field, fallback to timestamps
+    const session =
+      item.session ||
+      item.marketSession ||
+      getMarketSession(item.lastUpdated || item.quote_updated_at);
+
     const isLive = session === "LIVE";
+    const isUp = typeof changePct === "number" ? changePct >= 0 : true;
 
     // 🔧 normalize bullbrain fields (watchlist-safe)
     const signal = item.bullbrain?.signal || "HOLD";
@@ -686,7 +714,7 @@ export default function WatchlistScreen({ navigation }) {
           {/* UPDATED */}
           <View style={styles.cardFooterRow}>
             <Text style={styles.lastUpdated}>
-              {timeAgoFrom(item.quote_updated_at)}
+              {timeAgoFrom(item.lastUpdated || item.quote_updated_at)}
             </Text>
             <Text style={styles.tapHint}>Tap for details</Text>
           </View>
@@ -697,12 +725,23 @@ export default function WatchlistScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Your Watchlist</Text>
-        <Text style={styles.headerSubtitle}>AI-Powered Watchlist Tracking</Text>
-      </View>
+      <View style={styles.topBar}>
+        <View>
+          <Text style={styles.headerTitle}>Watchlist</Text>
 
-      <Text style={styles.syncText}>Last synced: {timeAgo()}</Text>
+          <Text style={styles.syncInline}>Updated {timeAgo()}</Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={toggleSortModal}
+          style={styles.sortCompactBtn}
+          activeOpacity={0.82}
+        >
+          <Ionicons name="filter-outline" size={15} color={BRAND.sub} />
+
+          <Text style={styles.sortCompactText}>{items.length} tracked</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.addRow}>
         <Ionicons name="search-outline" size={18} color="#6B7280" />
@@ -730,7 +769,7 @@ export default function WatchlistScreen({ navigation }) {
         <View style={styles.suggestionsBox}>
           {suggestions.map((s, idx) => (
             <TouchableOpacity
-              key={`${s.symbol}-${idx}`} // ✅ avoid duplicate key warnings
+              key={`${s.symbol}-${idx}`}
               onPress={() => handleAddTicker(s.symbol)}
               style={styles.suggestionRow}
               activeOpacity={0.85}
@@ -748,18 +787,9 @@ export default function WatchlistScreen({ navigation }) {
         </View>
       )}
 
-      <View style={styles.sortRow}>
-        <TouchableOpacity onPress={toggleSortModal}>
-          <Ionicons name="filter-outline" size={20} color={BRAND.sub} />
-        </TouchableOpacity>
-        <Text style={styles.trackedText}>{items.length} tracked</Text>
-      </View>
-      <Text style={styles.helperText}>
-        Long press a stock for alerts, notes, pin, or remove.
-      </Text>
       <FlatList
         data={displayList}
-        keyExtractor={(item, index) => `${item.symbol}-${index}`} // ✅ safe, avoids duplicate key issues
+        keyExtractor={(item, index) => `${item.symbol}-${index}`}
         renderItem={renderItem}
         refreshControl={
           <RefreshControl
@@ -847,6 +877,38 @@ export default function WatchlistScreen({ navigation }) {
               >
                 AI Rating
               </Text>
+              <TouchableOpacity onPress={() => selectSort("price")}>
+                <Text
+                  style={[
+                    styles.sortOption,
+                    sortMode === "price" && styles.sortOptionActive,
+                  ]}
+                >
+                  Price High to Low
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => selectSort("pct")}>
+                <Text
+                  style={[
+                    styles.sortOption,
+                    sortMode === "pct" && styles.sortOptionActive,
+                  ]}
+                >
+                  % Change
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => selectSort("dollar")}>
+                <Text
+                  style={[
+                    styles.sortOption,
+                    sortMode === "dollar" && styles.sortOptionActive,
+                  ]}
+                >
+                  $ Change
+                </Text>
+              </TouchableOpacity>
             </TouchableOpacity>
           </Animated.View>
         </TouchableOpacity>
@@ -900,28 +962,21 @@ export default function WatchlistScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BRAND.bg },
 
-  header: { paddingTop: 56, alignItems: "center", marginBottom: 4 },
   headerTitle: {
     color: BRAND.text,
     fontSize: 26,
     fontFamily: TYPO.fontFamily.extrabold,
     letterSpacing: -0.3,
   },
-  headerSubtitle: {
-    color: BRAND.sub,
-    fontSize: 12.5,
-    marginTop: 4,
-    fontFamily: TYPO.fontFamily.medium,
-  },
-  syncText: { textAlign: "center", color: BRAND.sub, fontSize: 11 },
+
   addRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: BRAND.card2,
     borderRadius: 18,
     paddingHorizontal: 14,
-    marginHorizontal: 18,
-    marginTop: 10,
+    marginHorizontal: 10,
+    marginTop: 1,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     minHeight: 54,
@@ -971,29 +1026,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginLeft: 8,
   },
-
-  sortRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    paddingHorizontal: 18,
-    marginBottom: 4,
-  },
-
-  trackedText: {
-    color: BRAND.sub,
-    fontSize: 10,
-    marginLeft: 4,
-  },
-
-  helperText: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    textAlign: "center",
-    marginBottom: 6,
-    fontWeight: "700",
-  },
-
   card: {
     backgroundColor: BRAND.card,
     borderRadius: 18,
@@ -1169,9 +1201,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   sectionHeader: {
-    marginHorizontal: 18,
-    marginTop: 10,
-    marginBottom: 6,
+    marginHorizontal: 12,
+    marginTop: 2,
+    marginBottom: 4,
     color: "#9CA3AF",
     fontSize: 12,
     fontWeight: "900",
@@ -1322,9 +1354,10 @@ const styles = StyleSheet.create({
   },
   footerBrand: {
     color: BRAND.text,
-    fontWeight: "600",
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.45,
   },
-
   disclaimer: {
     color: BRAND.muted,
     fontSize: 11,
@@ -1344,5 +1377,42 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.semibold,
     fontStyle: "italic",
     letterSpacing: -0.15,
+  },
+  topBar: {
+    paddingTop: 54,
+    paddingHorizontal: 18,
+    marginBottom: 6,
+
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  syncInline: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 2,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  sortCompactBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+
+    backgroundColor: BRAND.card2,
+    borderRadius: 999,
+
+    borderWidth: 1,
+    borderColor: BRAND.border,
+
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+
+  sortCompactText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    marginLeft: 5,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 });

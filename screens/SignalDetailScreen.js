@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { getDecisionDetail } from "../services/decisionDetailService";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 function signalColor(signal) {
   const s = String(signal || "").toUpperCase();
@@ -403,168 +404,195 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BRAND.bg,
-    paddingHorizontal: 8,
-    paddingTop: 8,
+    paddingHorizontal: 12,
+    paddingTop: 10,
   },
-  center: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  center: { justifyContent: "center", alignItems: "center" },
   loadingText: {
     color: BRAND.sub,
     marginTop: 10,
+    fontFamily: TYPO.fontFamily.medium,
   },
+
   headerCard: {
-    backgroundColor: "#020617",
-    borderRadius: 14,
+    backgroundColor: BRAND.card,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: BRAND.border,
-    padding: 12,
+    padding: 15,
+    marginBottom: 2,
   },
   headerRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
   },
-
   symbol: {
     color: BRAND.text,
-    fontSize: 25,
-    fontWeight: "900",
+    fontSize: 28,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
   },
   company: {
     color: BRAND.sub,
-    fontSize: 13,
-    marginTop: 2,
+    fontSize: 12.5,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.medium,
   },
   price: {
     color: BRAND.text,
-    fontSize: 20,
-    fontWeight: "800",
+    fontSize: 21,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
   },
   change: {
     fontSize: 13,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.bold,
     marginTop: 2,
+    fontVariant: ["tabular-nums"],
   },
   pos: { color: BRAND.accent },
   neg: { color: BRAND.red },
 
   signalBox: {
     marginTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: BRAND.border,
     paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: BRAND.softBorder,
+    alignItems: "center",
   },
   signal: {
     fontSize: 30,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.5,
   },
   confidence: {
     color: BRAND.sub,
     fontSize: 13,
     marginTop: 2,
+    fontFamily: TYPO.fontFamily.semibold,
+    textAlign: "center",
   },
   headline: {
     color: BRAND.text,
-    fontSize: 15,
-    fontWeight: "800",
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: TYPO.fontFamily.bold,
     marginTop: 10,
+    textAlign: "center",
   },
-  summaryText: {
-    color: BRAND.sub,
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 4,
-  },
+
   card: {
     backgroundColor: BRAND.card,
-    borderRadius: 12,
-    borderWidth: 0.6,
-    borderColor: BRAND.border,
-    padding: 12,
-    marginTop: 8,
-  },
-  sectionTitle: {
-    color: BRAND.accent,
-    fontSize: 15,
-    fontWeight: "800",
-    marginBottom: 10,
-  },
-  statRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: "#020617",
-    borderRadius: 12,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: BRAND.border,
+    padding: 14,
+    marginTop: 10,
+  },
+  sectionTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.15,
+    marginBottom: 10,
+  },
+  sectionHelper: {
+    color: BRAND.muted,
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontFamily: TYPO.fontFamily.semibold,
+    marginTop: -4,
+    marginBottom: 10,
+  },
+
+  statRow: { flexDirection: "row", gap: 8 },
+  statBox: {
+    flex: 1,
+    backgroundColor: BRAND.card2,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
     padding: 10,
   },
   statValue: {
     color: BRAND.text,
-    fontSize: 18,
-    fontWeight: "900",
+    fontSize: 17,
+    fontFamily: TYPO.fontFamily.extrabold,
   },
   statLabel: {
     color: BRAND.sub,
-    fontSize: 11,
+    fontSize: 10.5,
     marginTop: 3,
+    fontFamily: TYPO.fontFamily.medium,
   },
+
   gateCard: {
-    backgroundColor: "#020617",
-    borderRadius: 10,
-    borderWidth: 0.6,
-    borderColor: BRAND.border,
-
-    paddingHorizontal: 10,
-    paddingTop: 10,
-    paddingBottom: 7,
-
-    marginBottom: 5,
+    backgroundColor: BRAND.card2,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
+    marginBottom: 8,
   },
-  gateHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  statusDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 99,
-    marginRight: 8,
-  },
+  gateHeader: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
+  statusDot: { width: 8, height: 8, borderRadius: 99, marginRight: 8 },
   gateTitle: {
     color: BRAND.text,
     fontSize: 14,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
     flex: 1,
   },
-  statusText: {
-    fontSize: 11,
-    fontWeight: "900",
-  },
+  statusText: { fontSize: 10.5, fontFamily: TYPO.fontFamily.bold },
   gateExplanation: {
+    color: BRAND.sub,
+    fontSize: 12.8,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  metricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  metricChip: {
+    backgroundColor: BRAND.card,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    borderRadius: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    minWidth: "47%",
+    flexGrow: 1,
+  },
+  metricLabel: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    marginBottom: 3,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+  metricValue: {
     color: BRAND.text,
     fontSize: 13,
-    lineHeight: 17,
+    fontFamily: TYPO.fontFamily.bold,
   },
+
   evidenceText: {
     color: BRAND.sub,
     fontSize: 12.5,
     lineHeight: 18,
-    marginTop: 2,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.medium,
   },
+
   disclaimerCard: {
-    backgroundColor: "#020617",
-    borderRadius: 12,
+    backgroundColor: BRAND.card2,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    borderColor: BRAND.softBorder,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
     marginTop: 12,
-    marginBottom: 20,
+    marginBottom: 18,
   },
   disclaimerHeader: {
     flexDirection: "row",
@@ -573,48 +601,18 @@ const styles = StyleSheet.create({
   },
   disclaimerTitle: {
     color: BRAND.amber,
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.bold,
     marginLeft: 8,
   },
   disclaimerText: {
     color: BRAND.sub,
-    fontSize: 12.5,
+    fontSize: 12.2,
     lineHeight: 18,
-  },
-  metricsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 7,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
-  metricChip: {
-    backgroundColor: "#111827",
-    borderWidth: 0.6,
-    borderColor: BRAND.border,
-    borderRadius: 9,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    minWidth: "47%",
-    flexGrow: 1,
-  },
-
-  metricLabel: {
-    color: BRAND.sub,
-    fontSize: 11,
-    marginBottom: 3,
-  },
-
-  metricValue: {
-    color: BRAND.text,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  infoBtn: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
+  infoBtn: { paddingHorizontal: 6, paddingVertical: 2 },
 
   modalOverlay: {
     flex: 1,
@@ -623,73 +621,38 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
-
   infoModalCard: {
     width: "100%",
-    backgroundColor: "#020617",
-    borderRadius: 16,
+    backgroundColor: BRAND.card,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: BRAND.border,
     padding: 16,
   },
-
   infoModalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 10,
   },
-
   infoModalTitle: {
     color: BRAND.text,
     fontSize: 16,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.extrabold,
   },
-
   infoModalText: {
     color: BRAND.sub,
     fontSize: 13.5,
     lineHeight: 20,
-  },
-  sectionHelper: {
-    color: BRAND.muted,
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: "700",
-    marginTop: -4,
-    marginBottom: 10,
-  },
-  footerWrap: {
-    alignItems: "center",
-    marginTop: 10,
-    marginBottom: 24,
-    paddingHorizontal: 12,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
-  powered: {
-    color: BRAND.sub,
-    fontSize: 12,
-    marginBottom: 8,
-  },
-
-  brandText: {
-    color: BRAND.accent,
-    fontWeight: "700",
-  },
-
-  footerDisclaimer: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    lineHeight: 16,
-    textAlign: "center",
-  },
   attentionWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
     marginTop: 2,
     marginBottom: 10,
   },
-
   attentionChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -702,10 +665,35 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-
   attentionChipText: {
     color: BRAND.amber,
     fontSize: 11,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  footerWrap: {
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 26,
+    paddingHorizontal: 14,
+  },
+  powered: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginBottom: 8,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+  brandText: {
+    color: BRAND.text,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.45,
+  },
+  footerDisclaimer: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    lineHeight: 16,
+    textAlign: "center",
+    fontFamily: TYPO.fontFamily.regular,
   },
 });

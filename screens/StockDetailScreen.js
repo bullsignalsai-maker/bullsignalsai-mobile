@@ -25,7 +25,7 @@ import { getStockDetail } from "../services/stockDetailService";
 import AstraChat from "../components/AstraChat";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import { BRAND } from "../constants/theme";
-
+import { TYPO } from "../constants/typography";
 // Grok cache TTL (frontend, extra safety on top of backend cache)
 const GROK_CACHE_TTL_HOURS = 6;
 
@@ -678,8 +678,9 @@ export default function StockDetailScreen({ route, navigation }) {
                       : "—"}
                   </Text>
                 </View>
-                <View style={styles.metaCol}>
+                <View style={[styles.metaCol, { alignItems: "flex-end" }]}>
                   <Text style={styles.headerMeta}>Previous Close</Text>
+
                   <Text style={styles.headerMetaValue}>
                     {quote?.prevClose != null
                       ? `$${quote.prevClose.toFixed(2)}`
@@ -737,7 +738,7 @@ export default function StockDetailScreen({ route, navigation }) {
               }
             >
               <Text style={styles.chartMiniButtonText}>Full Chart</Text>
-              <Ionicons name="chevron-forward" size={14} color={BRAND.accent} />
+              <Ionicons name="chevron-forward" size={14} color={BRAND.text} />
             </TouchableOpacity>
           </View>
 
@@ -1369,7 +1370,7 @@ export default function StockDetailScreen({ route, navigation }) {
           activeOpacity={0.85}
           onPress={() => setAstraVisible(true)}
         >
-          <AstraAnimatedIcon size={50} color={BRAND.accent} />
+          <AstraAnimatedIcon size={52} />
         </TouchableOpacity>
       )}
 
@@ -1446,8 +1447,10 @@ const styles = StyleSheet.create({
   },
 
   brand: {
-    color: BRAND.accent,
-    fontWeight: "700",
+    color: BRAND.text,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.45,
   },
 
   disclaimer: {
@@ -1494,14 +1497,19 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: BRAND.card,
-    borderRadius: 12,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: BRAND.border,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginTop: 8,
   },
-  cardSubText: { color: BRAND.sub, fontSize: 12, marginTop: 2 },
+  cardSubText: {
+    color: BRAND.muted,
+    fontSize: 11.5,
+    marginTop: 2,
+    fontFamily: TYPO.fontFamily.medium,
+  },
 
   sectionHeaderRow: {
     flexDirection: "row",
@@ -1509,40 +1517,39 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sectionAccent: {
-    width: 4,
-    height: 18,
-    borderRadius: 2,
-    backgroundColor: BRAND.accent,
-    marginRight: 8,
+    width: 3,
+    height: 16,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.55)",
+    marginRight: 9,
   },
   sectionTitle: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontSize: 15,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.15,
   },
-
   refreshBtn: {
     borderWidth: 1,
     borderColor: BRAND.border,
     borderRadius: 999,
     padding: 6,
   },
-
   chartMiniButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: "rgba(0,227,150,0.08)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(0,227,150,0.25)",
+    borderColor: "rgba(255,255,255,0.10)",
   },
 
   chartMiniButtonText: {
-    color: BRAND.accent,
+    color: BRAND.text,
     fontSize: 12,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.bold,
     marginRight: 3,
   },
 
@@ -1637,14 +1644,15 @@ const styles = StyleSheet.create({
   subSectionLabelRisk: {
     color: BRAND.red,
     fontSize: 14,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.bold,
     marginTop: 8,
     marginBottom: 4,
   },
+
   subSectionLabelOpportunity: {
     color: BRAND.accent,
     fontSize: 14,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.bold,
     marginTop: 8,
     marginBottom: 4,
   },
@@ -1655,7 +1663,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   bulletDot: {
-    color: BRAND.accent,
+    color: "rgba(255,255,255,0.45)",
     fontSize: 16,
     lineHeight: 20,
     marginRight: 6,
@@ -1750,34 +1758,39 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginBottom: 10,
   },
+  techButton: {
+    marginTop: 10,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  techButtonText: {
+    color: BRAND.text,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
 
   patternButton: {
-    marginTop: 6,
-    paddingVertical: 10,
-    borderRadius: 8,
+    marginTop: 10,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
-    borderColor: BRAND.accent,
+    borderColor: "rgba(255,255,255,0.10)",
     alignItems: "center",
+    justifyContent: "center",
+  },
+  patternButtonText: {
+    color: BRAND.text,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
-  patternButtonText: {
-    color: BRAND.accent,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  techButton: {
-    marginTop: 6,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: BRAND.accent,
-    alignItems: "center",
-  },
-  techButtonText: {
-    color: BRAND.accent,
-    fontSize: 14,
-    fontWeight: "700",
-  },
   sparklineWrap: {
     marginTop: 10,
     paddingHorizontal: 4,
@@ -1797,8 +1810,8 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   riskFooterCard: {
-    backgroundColor: "#020617",
-    borderRadius: 12,
+    backgroundColor: BRAND.card2,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: BRAND.border,
     paddingHorizontal: 12,
@@ -1822,16 +1835,15 @@ const styles = StyleSheet.create({
   astraFab: {
     position: "absolute",
     left: 20,
-    bottom: 32,
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: "#020617",
-    borderWidth: 1.5,
-    borderColor: BRAND.border,
+    bottom: 82,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "transparent",
+    borderWidth: 0,
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 999,
+    zIndex: 50,
     elevation: 10,
   },
   headerCompactRow: {
@@ -1924,9 +1936,9 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   scenarioStance: {
-    color: BRAND.accent,
+    color: BRAND.amber,
     fontSize: 13.5,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
     marginBottom: 6,
   },
   techGrid: {
@@ -1965,13 +1977,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     marginTop: 3,
-  },
-  sparklineSourceText: {
-    color: BRAND.muted,
-    fontSize: 10,
-    fontWeight: "700",
-    marginTop: 5,
-    textAlign: "center",
   },
   sparklineSourceText: {
     color: BRAND.muted,

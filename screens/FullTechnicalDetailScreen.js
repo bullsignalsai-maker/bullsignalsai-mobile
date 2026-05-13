@@ -24,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { buildTechnicalNarrative } from "../utils/technicalNarrative";
 import { getTechnicalDetail } from "../services/technicalDetailService";
 import { BRAND } from "../constants/theme";
+import { TYPO } from "../constants/typography";
 
 /* ================= HELPERS ================= */
 const safe = (n) => (Number.isFinite(Number(n)) ? Number(n) : null);
@@ -413,11 +414,7 @@ export default function FullTechnicalDetailScreen({ route }) {
           <SectionHeader title="MACD Momentum" onInfo={() => openTip("MACD")} />
 
           <View style={styles.row}>
-            <Metric
-              label="MACD"
-              value={derived.macd}
-              color={colorFromSigned(derived.macd)}
-            />
+            <Metric label="MACD" value={derived.macd} color={BRAND.text} />
             <Metric
               label="Signal"
               value={derived.macdSignal}
@@ -426,7 +423,7 @@ export default function FullTechnicalDetailScreen({ route }) {
             <Metric
               label="Histogram"
               value={derived.macdHist}
-              color={colorFromSigned(derived.macdHist)}
+              color={BRAND.text}
             />
           </View>
 
@@ -464,12 +461,7 @@ export default function FullTechnicalDetailScreen({ route }) {
             onInfo={() => openTip("TREND")}
           />
 
-          <Text
-            style={[
-              styles.big,
-              { color: bullBearColorFromLabel(derived.trendLabel) },
-            ]}
-          >
+          <Text style={[styles.big, { color: BRAND.text }]}>
             {derived.trendLabel || "—"}
           </Text>
 
@@ -533,22 +525,14 @@ export default function FullTechnicalDetailScreen({ route }) {
               label="Volume vs MA20"
               value={derived.volumeVsMA20}
               suffix="%"
-              color={
-                derived.volumeVsMA20 == null
-                  ? BRAND.sub
-                  : colorFromSigned(derived.volumeVsMA20)
-              }
+              color={BRAND.text}
             />
             <Metric
               label="Bias"
               value={derived.volumeVsMA20 == null ? null : derived.volumeVsMA20}
               suffix=""
               format={(v) => (v == null ? "—" : v >= 0 ? "High" : "Low")}
-              color={
-                derived.volumeVsMA20 == null
-                  ? BRAND.sub
-                  : vSignColor(derived.volumeVsMA20)
-              }
+              color={BRAND.text}
             />
           </View>
 
@@ -814,8 +798,11 @@ function vSignColor(v) {
 
 const SectionHeader = React.memo(function SectionHeader({ title, onInfo }) {
   return (
-    <View style={styles.sectionRow}>
-      <Text style={styles.section}>{title}</Text>
+    <View style={styles.sectionHeaderRow}>
+      <View style={styles.sectionAccent} />
+
+      <Text style={styles.sectionTitle}>{title}</Text>
+
       <TouchableOpacity
         onPress={onInfo}
         style={styles.infoBtn}
@@ -868,143 +855,195 @@ const Pill = React.memo(function Pill({ label, color, icon }) {
 
 /* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BRAND.bg, padding: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: BRAND.bg,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+  },
 
   headerCard: {
-    borderRadius: 16,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 14,
+    borderColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    overflow: "hidden",
   },
   headerTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  symbol: { color: BRAND.text, fontSize: 26, fontWeight: "900" },
-  name: { color: BRAND.sub, fontSize: 13, marginTop: 2 },
-  price: { color: BRAND.text, fontSize: 22, fontWeight: "800" },
-  change: { fontSize: 13, fontWeight: "700", marginTop: 2 },
+  symbol: {
+    color: BRAND.text,
+    fontSize: 28,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
+  },
+  name: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+  price: {
+    color: BRAND.text,
+    fontSize: 22,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
+  },
+  change: {
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.bold,
+    marginTop: 2,
+    fontVariant: ["tabular-nums"],
+  },
   pos: { color: BRAND.accent },
   neg: { color: BRAND.red },
 
   headerActionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
-    gap: 10,
+    marginTop: 12,
+    gap: 8,
   },
   premiumBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    backgroundColor: "#020617",
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
-  premiumBadgeText: { color: BRAND.text, fontSize: 12, fontWeight: "800" },
+  premiumBadgeText: {
+    color: BRAND.sub,
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
   summary: {
     marginTop: 10,
     color: BRAND.sub,
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   card: {
     backgroundColor: BRAND.card,
-    borderRadius: 14,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 12,
+    borderColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 9,
     marginTop: 10,
   },
 
-  sectionRow: {
+  sectionHeaderRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
   },
-  section: {
-    color: BRAND.accent,
-    fontSize: 15,
-    fontWeight: "800",
-    marginBottom: 6,
+
+  sectionAccent: {
+    width: 3,
+    height: 16,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.55)",
+    marginRight: 9,
+  },
+
+  sectionTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.15,
     flex: 1,
     paddingRight: 8,
   },
-  infoBtn: { paddingLeft: 8, paddingBottom: 6 },
+
+  infoBtn: { paddingLeft: 8, paddingTop: 1 },
 
   big: {
     color: BRAND.text,
     fontSize: 22,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
     marginBottom: 8,
+    fontVariant: ["tabular-nums"],
   },
 
   bar: {
-    height: 10,
-    backgroundColor: "#020617",
+    height: 9,
+    backgroundColor: BRAND.card2,
     borderRadius: 999,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: BRAND.softBorder,
   },
   fill: { height: "100%" },
 
-  row: { flexDirection: "row", gap: 10, marginTop: 8 },
+  row: { flexDirection: "row", gap: 8, marginTop: 8 },
 
   metric: {
     flex: 1,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    borderRadius: 10,
-    padding: 10,
-    backgroundColor: "#020617",
+    borderColor: BRAND.softBorder,
+    borderRadius: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: BRAND.card2,
     minWidth: 0,
   },
   metricLabel: {
-    color: BRAND.sub,
-    fontSize: 11,
-    fontWeight: "700",
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.bold,
     textTransform: "uppercase",
+    letterSpacing: 0.35,
   },
   metricValue: {
     marginTop: 6,
-    fontSize: 15,
-    fontWeight: "900",
+    fontSize: 15.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
   },
 
   semanticRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginTop: 10,
+    marginTop: 8,
   },
-
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 7,
     borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "rgba(2,6,23,0.75)",
+    paddingVertical: 5,
+    backgroundColor: BRAND.card2,
     maxWidth: "100%",
   },
-  pillText: { fontSize: 12, fontWeight: "800" },
+
+  pillText: {
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
 
   note: {
-    marginTop: 8,
+    marginTop: 7,
     color: BRAND.sub,
     fontSize: 12.5,
     lineHeight: 18,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
-  // Candlestick anatomy
   candleWrap: {
     flexDirection: "row",
     gap: 12,
@@ -1012,12 +1051,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   candleVisual: {
-    width: 70,
-    height: 160,
+    width: 68,
+    height: 154,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    backgroundColor: "#020617",
-    borderRadius: 12,
+    borderColor: BRAND.softBorder,
+    backgroundColor: BRAND.card2,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
@@ -1029,14 +1068,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 20,
   },
+  body: { width: 26, borderRadius: 6, backgroundColor: BRAND.accent },
 
-  body: {
-    width: 26,
-    borderRadius: 6,
-    backgroundColor: BRAND.accent,
-  },
-
-  // Tooltip modal
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
@@ -1044,67 +1077,56 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   modalCard: {
-    backgroundColor: "rgba(2, 6, 23, 0.96)",
-    borderRadius: 16,
+    backgroundColor: BRAND.card,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: BRAND.border,
     padding: 14,
   },
   modalHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
-  modalTitle: { color: BRAND.text, fontSize: 14.5, fontWeight: "900", flex: 1 },
-  modalBody: { marginTop: 10, color: BRAND.sub, fontSize: 13, lineHeight: 18 },
-  modalFoot: { marginTop: 12, color: BRAND.sub, fontSize: 11, opacity: 0.85 },
-  disclaimerCard: {
-    backgroundColor: "#020617",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginTop: 12,
-    marginBottom: 20,
+  modalTitle: {
+    color: BRAND.text,
+    fontSize: 15,
+    fontFamily: TYPO.fontFamily.extrabold,
+    flex: 1,
   },
-
-  disclaimerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-
-  disclaimerTitle: {
-    color: BRAND.amber,
-    fontSize: 14,
-    fontWeight: "800",
-    marginLeft: 8,
-  },
-
-  disclaimerText: {
+  modalBody: {
+    marginTop: 10,
     color: BRAND.sub,
-    fontSize: 12.5,
+    fontSize: 13,
     lineHeight: 18,
+    fontFamily: TYPO.fontFamily.regular,
   },
+  modalFoot: {
+    marginTop: 12,
+    color: BRAND.muted,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
   footerWrap: {
     alignItems: "center",
-    marginTop: 50,
+    marginTop: 20,
     marginBottom: 24,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
-
   powered: {
     color: BRAND.sub,
     fontSize: 12,
     marginBottom: 8,
+    fontFamily: TYPO.fontFamily.medium,
   },
-
   brandText: {
-    color: BRAND.accent,
-    fontWeight: "700",
+    color: BRAND.text,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.brand,
+    letterSpacing: -0.45,
   },
-
   footerDisclaimer: {
     color: BRAND.muted,
     fontSize: 10.5,
     lineHeight: 16,
     textAlign: "center",
+    fontFamily: TYPO.fontFamily.regular,
   },
 });
