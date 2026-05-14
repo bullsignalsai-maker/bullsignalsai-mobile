@@ -387,7 +387,7 @@ export default function WatchlistScreen({ navigation }) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     navigation.navigate("StockDetailScreen", {
       symbol: item.symbol,
-      name: item.companyName || item.symbol,
+      name: item.companyName || item.name || item.displayName || item.symbol,
       source: "watchlist",
     });
   };
@@ -546,10 +546,13 @@ export default function WatchlistScreen({ navigation }) {
     const changePct = item.changePct;
 
     // Prefer backend/session field, fallback to timestamps
-    const session =
-      item.session ||
-      item.marketSession ||
-      getMarketSession(item.lastUpdated || item.quote_updated_at);
+    const session = getMarketSession(
+      item.lastUpdated ||
+        item.quote_updated_at ||
+        item.quoteUpdatedAt ||
+        item.updated_at ||
+        item.timestamp,
+    );
 
     const isLive = session === "LIVE";
     const isUp = typeof changePct === "number" ? changePct >= 0 : true;
@@ -594,7 +597,13 @@ export default function WatchlistScreen({ navigation }) {
                 />
               </View>
 
-              <Text style={styles.name}>{item.companyName || item.symbol}</Text>
+              <Text style={styles.name} numberOfLines={1}>
+                {item.companyName ||
+                  item.name ||
+                  item.displayName ||
+                  item.description ||
+                  item.symbol}
+              </Text>
             </View>
 
             {/* {/* RIGHT — Price + Change */}
@@ -629,7 +638,7 @@ export default function WatchlistScreen({ navigation }) {
               </Animated.Text>
 
               {(() => {
-                const isLive = item.session === "LIVE";
+                const isLive = session === "LIVE";
 
                 const change =
                   typeof item.change === "number" ? item.change : null;

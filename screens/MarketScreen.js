@@ -353,8 +353,12 @@ export default function MarketScreen({ navigation }) {
       <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
 
       <View style={styles.stickyHeader}>
-        <Text style={styles.headerTitle}>Market</Text>
-        <Text style={styles.updatedTime}>Updated {lastUpdated} ET</Text>
+        <Text style={styles.headerTitle}>Market Intelligence</Text>
+
+        <View style={styles.marketHeaderPill}>
+          <View style={styles.marketHeaderDot} />
+          <Text style={styles.updatedTime}>Updated {lastUpdated} ET</Text>
+        </View>
       </View>
 
       <ScrollView
@@ -616,7 +620,7 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingTop: 118,
+    paddingTop: 96,
     paddingBottom: 170,
   },
 
@@ -625,8 +629,8 @@ const styles = StyleSheet.create({
     top: 0,
     width: "100%",
     backgroundColor: BRAND.bg,
-    paddingTop: 55,
-    paddingBottom: 8,
+    paddingTop: 54,
+    paddingBottom: 6,
     alignItems: "center",
     zIndex: 1000,
     pointerEvents: "box-none",
@@ -634,16 +638,33 @@ const styles = StyleSheet.create({
 
   headerTitle: {
     color: BRAND.text,
-    fontSize: 26,
+    fontSize: 25,
     fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.3,
+    letterSpacing: -0.45,
   },
-
   updatedTime: {
     color: BRAND.sub,
-    fontSize: 12,
-    marginTop: 2,
-    fontFamily: TYPO.fontFamily.medium,
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+  marketHeaderPill: {
+    marginTop: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: BRAND.card2,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+
+  marketHeaderDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: BRAND.accent,
+    marginRight: 6,
   },
 
   loadingContainer: {
@@ -662,7 +683,9 @@ const styles = StyleSheet.create({
   overviewCard: {
     backgroundColor: BRAND.card,
     borderRadius: 22,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingTop: 13,
+    paddingBottom: 11,
     borderWidth: 1,
     borderColor: BRAND.border,
     marginBottom: 16,
@@ -672,8 +695,8 @@ const styles = StyleSheet.create({
   overviewTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
+    alignItems: "center",
+    marginBottom: 9,
   },
 
   cardEyebrow: {
@@ -698,17 +721,17 @@ const styles = StyleSheet.create({
 
   tableHeader: {
     flexDirection: "row",
-    paddingVertical: 7,
+    paddingVertical: 0,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderTopColor: BRAND.softBorder,
     borderBottomColor: BRAND.softBorder,
-    marginBottom: 6,
+    marginBottom: 2,
   },
 
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 7,
+    paddingVertical: 6,
     paddingHorizontal: 2,
     alignItems: "center",
     borderRadius: 10,
@@ -749,8 +772,8 @@ const styles = StyleSheet.create({
   },
 
   sectionSubtle: {
-    marginTop: 10,
-    marginBottom: 4,
+    marginTop: 6,
+    marginBottom: 1,
     color: BRAND.muted,
     fontSize: 11,
     fontWeight: "900",
