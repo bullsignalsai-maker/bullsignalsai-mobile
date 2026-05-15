@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingTop: 96,
+    paddingTop: 122,
     paddingBottom: 170,
   },
 
@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
     top: 0,
     width: "100%",
     backgroundColor: BRAND.bg,
-    paddingTop: 54,
+    paddingTop: 52,
     paddingBottom: 6,
     alignItems: "center",
     zIndex: 1000,

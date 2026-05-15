@@ -68,6 +68,8 @@ export async function getHomeMovers() {
         changePct: m.changePct ?? m.quote?.changePct ?? null,
         direction: "up",
         oneLiner: m.oneLiner || null,
+        quote_updated_at: m.quote_updated_at || m.quote?.updated_at || null,
+        lastUpdated: m.quote_updated_at || m.quote?.updated_at || null,
       }));
   } catch (err) {
     console.warn("Home movers error:", err.message);
@@ -104,10 +106,12 @@ function buildHomeSignals(stocks = [], quotes = {}) {
     const change = q?.change ?? s.change ?? s.quote?.change ?? null;
     const changePct = q?.changePct ?? s.changePct ?? s.quote?.changePct ?? null;
 
-    const lastUpdated = !needsRefresh
-      ? q?.updated_at || s.lastUpdated || s.updated_at
-      : s.lastUpdated || s.updated_at || q?.updated_at || null;
-
+    const lastUpdated =
+      q?.updated_at ||
+      s.quote_updated_at ||
+      s.lastUpdated ||
+      s.updated_at ||
+      null;
     return {
       symbol: sym,
       companyName: s.companyName || s.company_name || s.name || sym,

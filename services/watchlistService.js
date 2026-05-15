@@ -83,8 +83,7 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
     const change = q?.change ?? s.quote?.change ?? null;
     const changePct = q?.changePct ?? s.quote?.changePct ?? null;
 
-    const quoteUpdatedAt =
-      q?.updated_at ?? s.quote?.updated_at ?? s.updated_at ?? null;
+    const quoteUpdatedAt = q?.updated_at || s.quote?.updated_at || null;
 
     return {
       /* ---------- identity ---------- */

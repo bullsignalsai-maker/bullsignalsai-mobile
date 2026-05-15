@@ -515,7 +515,7 @@ export default function FullChartScreen({ route, navigation }) {
           style={styles.backBtn}
           activeOpacity={0.85}
         >
-          <Ionicons name="chevron-back" size={22} color={BRAND.accent} />
+          <Ionicons name="chevron-back" size={22} color={BRAND.text} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>Chart Details</Text>
         <View style={{ width: 44 }} />
