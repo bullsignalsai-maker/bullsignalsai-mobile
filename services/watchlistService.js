@@ -5,7 +5,6 @@ import { API_BASE_URL } from "../config/apiKeys";
    RAW WATCHLIST (INTELLIGENCE ONLY)
    - Firestore snapshot
    - No quotes
-   - Useful for admin / debug
 ========================================================= */
 export async function fetchWatchlist(userId) {
   const res = await fetch(`${API_BASE_URL}/watchlist/${userId}`);
