@@ -45,7 +45,7 @@ export async function getWatchlistScreen(userId) {
 
     // 3️⃣ Fetch LIVE quotes (symbol-level, shared)
     const quotesRes = await fetch(
-      `${API_BASE_URL}/quotes-bulk?scope=watchlist&symbols=${symbols}`
+      `${API_BASE_URL}/quotes-bulk?scope=watchlist&symbols=${symbols}`,
     );
 
     let quotes = {};
@@ -104,7 +104,8 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
 
       /* ---------- intelligence ---------- */
       bullbrain: s.bullbrain || {},
-      hybridSignal: s.hybridSignal || s.bullbrain?.signal || "HOLD",
+      authoritativeSignal: s.bullbrain?.signal || s.signal || "HOLD",
+      hybridSignal: s.bullbrain?.signal || s.signal || "HOLD",
       hybridScore: s.hybridScore ?? 0,
 
       sparkline: Array.isArray(s.sparkline) ? s.sparkline : [],
@@ -122,10 +123,9 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
    MUTATIONS (UNCHANGED)
 ========================================================= */
 export async function addToWatchlist(userId, symbol) {
-  const res = await fetch(
-    `${API_BASE_URL}/watchlist/${userId}/add/${symbol}`,
-    { method: "POST" }
-  );
+  const res = await fetch(`${API_BASE_URL}/watchlist/${userId}/add/${symbol}`, {
+    method: "POST",
+  });
   if (!res.ok) throw new Error("Add failed");
   return res.json();
 }
@@ -133,7 +133,7 @@ export async function addToWatchlist(userId, symbol) {
 export async function removeFromWatchlist(userId, symbol) {
   const res = await fetch(
     `${API_BASE_URL}/watchlist/${userId}/remove/${symbol}`,
-    { method: "DELETE" }
+    { method: "DELETE" },
   );
   if (!res.ok) throw new Error("Remove failed");
   return res.json();

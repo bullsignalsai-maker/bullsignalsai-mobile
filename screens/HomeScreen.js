@@ -19,14 +19,12 @@ import { getMarketMovers } from "../services/MarketPulseService";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 import MoveLabel from "../components/MoveLabel";
+import {
+  displayRating,
+  signalColor,
+  getAuthoritativeSignal,
+} from "../utils/signalUtils";
 const LOGO = require("../assets/alpha-transparent.png");
-// % formatter (market style)
-
-const displayRating = (signal) => {
-  if (signal === "BUY") return "Bullish";
-  if (signal === "SELL") return "Bearish";
-  return "Neutral";
-};
 
 // --- Helper: human-readable timestamps
 function timeAgo(isoString) {
@@ -61,7 +59,7 @@ function getMarketSession(ts) {
   if (h >= 16) return "AH";
   return "LIVE";
 }
-const getSignal = (item) => item?.bullbrain?.signal || item?.signal || "HOLD";
+const getSignal = (item) => getAuthoritativeSignal(item);
 
 const getConfidence = (item) =>
   typeof item?.bullbrain?.confidence === "number"
@@ -121,8 +119,10 @@ export default function HomeScreen({ navigation }) {
 
         setHome(data);
         try {
-          const moversData = await getMarketMovers();
-          setTopMovers((moversData?.gainers || []).slice(0, 5));
+          const moversData = await getMarketMovers("home");
+          setTopMovers(
+            (moversData?.gainers || moversData?.movers || []).slice(0, 5),
+          );
         } catch {
           setTopMovers([]);
         }
@@ -172,8 +172,10 @@ export default function HomeScreen({ navigation }) {
     if (data) {
       setHome(data);
       try {
-        const moversData = await getMarketMovers();
-        setTopMovers((moversData?.gainers || []).slice(0, 5));
+        const moversData = await getMarketMovers("home");
+        setTopMovers(
+          (moversData?.gainers || moversData?.movers || []).slice(0, 5),
+        );
       } catch {
         setTopMovers([]);
       }
@@ -214,7 +216,8 @@ export default function HomeScreen({ navigation }) {
           price: topMovers[0].price,
           change: topMovers[0].change,
           changePct: topMovers[0].changePct,
-          signal: "BUY",
+          signal:
+            topMovers[0].signal || topMovers[0].authoritativeSignal || "BUY",
           confidence: Math.round(
             Math.min(95, 70 + Math.abs(topMovers[0].changePct || 0)),
           ),

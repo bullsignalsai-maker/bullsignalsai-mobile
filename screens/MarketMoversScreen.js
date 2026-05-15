@@ -116,7 +116,7 @@ export default function MarketMoversScreen({ navigation }) {
         setErrorMessage("");
         if (!silent) setLoading(true);
 
-        const data = await getMarketMovers();
+        const data = await getMarketMovers("all");
         if (!data) {
           setErrorMessage(
             "Market movers are temporarily unavailable. Pull to refresh.",

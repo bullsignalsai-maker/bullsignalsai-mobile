@@ -36,6 +36,11 @@ import {
 
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
+import {
+  displayRating,
+  signalColor,
+  getAuthoritativeSignal,
+} from "../utils/signalUtils";
 const fmt = (v) =>
   typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "--";
 
@@ -70,13 +75,6 @@ function getMarketSession(ts) {
   if (h >= 16) return "AH";
   return "LIVE";
 }
-const displayRating = (signal) => {
-  if (signal === "BUY") return "Bullish";
-  if (signal === "SELL") return "Bearish";
-  return "Neutral";
-};
-const signalColor = (signal) =>
-  signal === "BUY" ? BRAND.accent : signal === "SELL" ? BRAND.red : BRAND.amber;
 
 const fmtChange = (v) =>
   typeof v === "number" && !Number.isNaN(v)
@@ -326,8 +324,8 @@ export default function WatchlistScreen({ navigation }) {
     if (sortMode === "signal") {
       const order = { BUY: 1, HOLD: 2, SELL: 3 };
       return (
-        (order[a.hybridSignal || a.bullbrain?.signal] || 99) -
-        (order[b.hybridSignal || b.bullbrain?.signal] || 99)
+        (order[getAuthoritativeSignal(a)] || 99) -
+        (order[getAuthoritativeSignal(b)] || 99)
       );
     }
 
@@ -558,7 +556,7 @@ export default function WatchlistScreen({ navigation }) {
     const isUp = typeof changePct === "number" ? changePct >= 0 : true;
 
     // 🔧 normalize bullbrain fields (watchlist-safe)
-    const signal = item.bullbrain?.signal || "HOLD";
+    const signal = getAuthoritativeSignal(item);
     const confidence =
       typeof item.bullbrain?.confidence === "number"
         ? item.bullbrain.confidence
@@ -683,20 +681,13 @@ export default function WatchlistScreen({ navigation }) {
             <View
               style={[
                 styles.signalBadge,
-                { backgroundColor: signalColor(item.hybridSignal) },
+                { backgroundColor: signalColor(signal) },
               ]}
             >
-              <Text style={styles.signalText}>
-                {displayRating(item.hybridSignal || "HOLD")}
-              </Text>
+              <Text style={styles.signalText}>{displayRating(signal)}</Text>
             </View>
 
-            <Text
-              style={[
-                styles.confInline,
-                { color: signalColor(item.hybridSignal) },
-              ]}
-            >
+            <Text style={[styles.confInline, { color: signalColor(signal) }]}>
               {Math.round(item.bullbrain?.confidence ?? 0)}% confidence
             </Text>
           </View>

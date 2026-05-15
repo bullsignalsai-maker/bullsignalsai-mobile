@@ -26,6 +26,11 @@ import AstraChat from "../components/AstraChat";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
+import {
+  displayRating,
+  signalColor,
+  getAuthoritativeSignal,
+} from "../utils/signalUtils";
 // Grok cache TTL (frontend, extra safety on top of backend cache)
 const GROK_CACHE_TTL_HOURS = 6;
 
@@ -157,23 +162,6 @@ function extractPredictionLines(predictionsBody = "") {
   return { shortTerm, mediumTerm, longTerm };
 }
 
-function getSignalColor(label) {
-  if (!label) return BRAND.amber;
-  const s = label.toUpperCase();
-  if (s.includes("STRONG BUY")) return BRAND.accent;
-  if (s.includes("BUY")) return BRAND.accent;
-  if (s.includes("STRONG SELL")) return BRAND.red;
-  if (s.includes("SELL")) return BRAND.red;
-  if (s.includes("HOLD") || s.includes("NEUTRAL")) return BRAND.amber;
-  return BRAND.amber;
-}
-function displayRatingLabel(signal) {
-  const s = String(signal || "").toUpperCase();
-
-  if (s.includes("BUY")) return "Bullish";
-  if (s.includes("SELL")) return "Bearish";
-  return "Neutral";
-}
 function formatPercentFromProb(prob, digits = 1) {
   if (prob === null || prob === undefined || isNaN(prob)) return "N/A";
   return (prob * 100).toFixed(digits) + "%";
@@ -572,9 +560,10 @@ export default function StockDetailScreen({ route, navigation }) {
     detail?.explanations?.groups?.final_recommendation || null;
 
   const hybridSignal = detail?.hybridSignal;
+  const authoritativeSignal = getAuthoritativeSignal(detail);
   const hybridProbUp = detail?.hybridProbUp;
   const hybridScore = detail?.hybridScore;
-  const ratingSignal = detail?.content?.signal?.value || hybridSignal;
+  const ratingSignal = authoritativeSignal;
 
   const ratingConfidence = detail?.content?.signal?.confidence ?? hybridScore;
 
@@ -731,7 +720,7 @@ export default function StockDetailScreen({ route, navigation }) {
                   companyName: detail?.companyName || detail?.symbol,
                   quote: detail?.quote || null,
                   bullbrain: detail?.bullbrain || null,
-                  hybridSignal: detail?.hybridSignal ?? null,
+                  hybridSignal: authoritativeSignal,
                   hybridScore: detail?.hybridScore ?? null,
                   isPremium: true,
                 })
@@ -778,11 +767,11 @@ export default function StockDetailScreen({ route, navigation }) {
               <View
                 style={[
                   styles.signalPill,
-                  { backgroundColor: getSignalColor(hybridSignal) },
+                  { backgroundColor: signalColor(authoritativeSignal) },
                 ]}
               >
                 <Text style={styles.signalPillText}>
-                  {displayRatingLabel(hybridSignal)}
+                  {displayRating(authoritativeSignal)}
                 </Text>
               </View>
 
@@ -927,7 +916,7 @@ export default function StockDetailScreen({ route, navigation }) {
                   symbol: detail.symbol,
                   companyName: detail.companyName,
                   quote: detail.quote,
-                  hybridSignal: detail.hybridSignal,
+                  hybridSignal: authoritativeSignal,
                   hybridScore: detail.hybridScore,
                   bullbrain: detail.bullbrain,
                   technical: detail.technical,
@@ -1239,7 +1228,7 @@ export default function StockDetailScreen({ route, navigation }) {
             {/* Stance */}
             {tradeIdea.stance && (
               <Text style={styles.scenarioStance}>
-                {displayRatingLabel(tradeIdea.stance)} context
+                {displayRating(tradeIdea.stance)} context
               </Text>
             )}
 
@@ -1287,10 +1276,10 @@ export default function StockDetailScreen({ route, navigation }) {
                   <Text
                     style={[
                       styles.ratingSummarySignal,
-                      { color: getSignalColor(finalRecommendation.signal) },
+                      { color: signalColor(finalRecommendation.signal) },
                     ]}
                   >
-                    {displayRatingLabel(finalRecommendation.signal)}
+                    {displayRating(finalRecommendation.signal)}
                   </Text>
                 )}
 

@@ -27,6 +27,7 @@ import { getFullYearCandles } from "../services/candleService";
 import { StatusBar } from "react-native";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
+import { displayRating, signalColor } from "../utils/signalUtils";
 /* ================= HELPERS ================= */
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
@@ -36,20 +37,6 @@ const safeNum = (n) => (Number.isFinite(Number(n)) ? Number(n) : null);
 function colorFromSigned(v) {
   if (v == null) return BRAND.sub;
   return v >= 0 ? BRAND.accent : BRAND.red;
-}
-
-function signalPillColor(signal) {
-  const s = String(signal || "").toUpperCase();
-  if (s.includes("BUY")) return BRAND.accent;
-  if (s.includes("SELL")) return BRAND.red;
-  if (s.includes("HOLD")) return BRAND.amber;
-  return BRAND.sub;
-}
-function displayRatingLabel(signal) {
-  const s = String(signal || "").toUpperCase();
-  if (s.includes("BUY")) return "Bullish";
-  if (s.includes("SELL")) return "Bearish";
-  return "Neutral";
 }
 function formatDateShort(iso) {
   const ms = Date.parse(iso);
@@ -508,7 +495,11 @@ export default function FullChartScreen({ route, navigation }) {
   }, [activeIdx, chart, candles]);
   const headerPrice = quote?.current ?? derived.last ?? null;
   const headerChangePct = quote?.changePct ?? null;
-  const signal = bullbrain?.signal ?? params.hybridSignal ?? null;
+  const signal =
+    bullbrain?.signal ??
+    params.authoritativeSignal ??
+    params.hybridSignal ??
+    null;
   const confidence = bullbrain?.confidence ?? params.hybridScore ?? null;
 
   return (
@@ -575,21 +566,21 @@ export default function FullChartScreen({ route, navigation }) {
               <View
                 style={[
                   styles.signalPill,
-                  { borderColor: signalPillColor(signal) },
+                  { borderColor: signalColor(signal) },
                 ]}
               >
                 <Ionicons
                   name="sparkles-outline"
                   size={14}
-                  color={signalPillColor(signal)}
+                  color={signalColor(signal)}
                 />
                 <Text
                   style={[
                     styles.signalPillText,
-                    { color: signalPillColor(signal) },
+                    { color: signalColor(signal) },
                   ]}
                 >
-                  {displayRatingLabel(signal)}
+                  {displayRating(signal)}
                   {confidence != null
                     ? ` • ${Number(confidence).toFixed(1)}%`
                     : ""}

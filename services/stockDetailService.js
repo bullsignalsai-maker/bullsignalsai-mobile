@@ -58,11 +58,13 @@ function normalizeStockDetail(raw) {
       ? Math.max(0, Math.min(1, probability.up))
       : null;
 
-  const hybridSignal =
-    signal?.value ||
+  const authoritativeSignal =
     headerSignal?.final ||
+    signal?.value ||
     finalRecommendation?.signal ||
     "HOLD";
+
+  const hybridSignal = authoritativeSignal;
 
   const hybridScore =
     typeof signal?.confidence === "number"
@@ -187,7 +189,7 @@ function normalizeStockDetail(raw) {
     hybridSignal,
     hybridProbUp,
     hybridScore,
-
+    authoritativeSignal,
     signal,
     probability,
     technical,

@@ -49,6 +49,31 @@ export async function getHomeScreen() {
   }
 }
 
+export async function getHomeMovers() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/market-movers?mode=home`);
+    if (!res.ok) return [];
+
+    const json = await res.json();
+    const movers = Array.isArray(json.movers) ? json.movers : [];
+
+    return movers
+      .filter((m) => m.direction === "up")
+      .slice(0, 5)
+      .map((m) => ({
+        symbol: String(m.symbol || "").toUpperCase(),
+        company: m.company || m.companyName || m.symbol,
+        price: m.price ?? m.quote?.price ?? null,
+        change: m.change ?? m.quote?.change ?? null,
+        changePct: m.changePct ?? m.quote?.changePct ?? null,
+        direction: "up",
+        oneLiner: m.oneLiner || null,
+      }));
+  } catch (err) {
+    console.warn("Home movers error:", err.message);
+    return [];
+  }
+}
 /* =========================================================
    HEADER
 ========================================================= */

@@ -182,7 +182,7 @@ export default function MarketScreen({ navigation }) {
         setLoading(false);
 
         // 3) Load slower sections in background
-        Promise.allSettled([getMarketMovers(), getMarketNews()]).then(
+        Promise.allSettled([getMarketMovers("preview"), getMarketNews()]).then(
           ([moversResult, newsResult]) => {
             if (moversResult.status === "fulfilled") {
               setMovers(moversResult.value || { gainers: [], losers: [] });
@@ -481,7 +481,7 @@ export default function MarketScreen({ navigation }) {
           <Text style={styles.mutedNote}>Loading movers…</Text>
         ) : (
           <View style={styles.moverGrid}>
-            {movers.gainers.slice(0, 6).map((m) => renderMoverCard(m, "up"))}
+            {movers.gainers.slice(0, 4).map((m) => renderMoverCard(m, "up"))}
           </View>
         )}
 
@@ -493,7 +493,7 @@ export default function MarketScreen({ navigation }) {
           <Text style={styles.mutedNote}>Loading movers…</Text>
         ) : (
           <View style={styles.moverGrid}>
-            {movers.losers.slice(0, 6).map((m) => renderMoverCard(m, "down"))}
+            {movers.losers.slice(0, 4).map((m) => renderMoverCard(m, "down"))}
           </View>
         )}
 

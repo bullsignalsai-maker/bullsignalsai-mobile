@@ -13,19 +13,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { getDecisionDetail } from "../services/decisionDetailService";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
+import { displayRating, signalColor } from "../utils/signalUtils";
 
-function signalColor(signal) {
-  const s = String(signal || "").toUpperCase();
-  if (s.includes("BUY")) return BRAND.accent;
-  if (s.includes("SELL")) return BRAND.red;
-  return BRAND.amber;
-}
-function displayRatingLabel(signal) {
-  const s = String(signal || "").toUpperCase();
-  if (s.includes("BUY")) return "Bullish";
-  if (s.includes("SELL")) return "Bearish";
-  return "Neutral";
-}
 function cleanMetricLabel(label) {
   if (label === "5D Worst Return") return "5D Downside Range";
   if (label === "5D Best Return") return "5D Upside Range";
@@ -172,7 +161,7 @@ export default function SignalDetailScreen({ route, navigation }) {
                 { color: signalColor(detail.finalSignal) },
               ]}
             >
-              {displayRatingLabel(detail.finalSignal)}
+              {displayRating(detail.finalSignal)}
             </Text>
             <Text style={styles.confidence}>
               {detail.confidence == null
@@ -185,9 +174,9 @@ export default function SignalDetailScreen({ route, navigation }) {
             {detail.summary?.headline
               ? detail.summary.headline.replace(
                   detail.finalSignal,
-                  displayRatingLabel(detail.finalSignal),
+                  displayRating(detail.finalSignal),
                 )
-              : `${displayRatingLabel(detail.finalSignal)} rating context`}
+              : `${displayRating(detail.finalSignal)} rating context`}
           </Text>
         </View>
 
@@ -241,7 +230,7 @@ export default function SignalDetailScreen({ route, navigation }) {
                   { color: signalColor(detail.finalSignal) },
                 ]}
               >
-                {displayRatingLabel(detail.finalSignal)}
+                {displayRating(detail.finalSignal)}
               </Text>
               <Text style={styles.statLabel}>Final Rating</Text>
             </View>

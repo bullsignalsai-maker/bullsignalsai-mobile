@@ -106,84 +106,59 @@ export async function getMarketOverview() {
 /* ---------------------------------------------------------
    2) MARKET MOVERS (LIVE-QUOTE SAFE)
 --------------------------------------------------------- */
-export async function getMarketMovers() {
+export async function getMarketMovers(mode = "preview") {
   try {
-    const res = await fetch(`${API_BASE_URL}/market-movers`);
+    const res = await fetch(`${API_BASE_URL}/market-movers?mode=${mode}`);
     if (!res.ok) return null;
 
     const json = await res.json();
+
     const baseMovers = Array.isArray(json.movers) ? json.movers : [];
 
-    // 1) Collect mover symbols
-    const symbols = [
-      ...new Set(
-        baseMovers
-          .map((m) =>
-            String(m.symbol || "")
-              .trim()
-              .toUpperCase(),
-          )
-          .filter(Boolean),
-      ),
-    ];
-
-    // 2) Fetch latest quote repo values, same strategy as Home
-    let liveQuotes = {};
-
-    if (symbols.length) {
-      const qRes = await fetch(
-        `${API_BASE_URL}/quotes-bulk?scope=movers&symbols=${symbols.join(",")}`,
-      );
-
-      if (qRes.ok) {
-        const qJson = await qRes.json();
-        liveQuotes = qJson?.quotes || {};
-      }
-    }
-
-    // 3) Merge live quote over mover snapshot quote
     const movers = baseMovers.map((m) => {
-      const sym = String(m.symbol || "")
-        .trim()
-        .toUpperCase();
+      const q = normalizeQuote(m.quote || m);
 
-      const snapshotQuote = normalizeQuote(m.quote || {});
-      const liveQuote = normalizeQuote(liveQuotes[sym] || {});
-
-      const q = liveQuotes[sym] ? liveQuote : snapshotQuote;
-
-      const liveDirection =
+      const changePct =
         typeof q.changePct === "number"
-          ? q.changePct >= 0
+          ? q.changePct
+          : typeof m.changePct === "number"
+            ? m.changePct
+            : null;
+
+      const direction =
+        typeof changePct === "number"
+          ? changePct >= 0
             ? "up"
             : "down"
           : m.direction;
 
       return {
-        symbol: sym,
-        company: m.company || sym,
+        symbol: String(m.symbol || "")
+          .trim()
+          .toUpperCase(),
+        company: m.company || m.companyName || m.symbol,
 
-        price: q.price,
-        change: q.change,
-        changePct: q.changePct,
+        price: q.price ?? m.price ?? null,
+        change: q.change ?? m.change ?? null,
+        changePct,
         needs_refresh: q.needs_refresh,
-        quote_updated_at: q.updated_at,
+        quote_updated_at: q.updated_at || m.quote_updated_at || null,
 
-        // Recalculate direction from live quote
-        direction: liveDirection,
+        direction,
 
-        trendLabel: m.trend?.label || null,
+        trendLabel: m.trend?.label || m.trendLabel || null,
 
         pattern:
           m.pattern?.name && m.pattern.name !== "NO CLEAR PATTERN"
             ? m.pattern.name
-            : null,
+            : typeof m.pattern === "string"
+              ? m.pattern
+              : null,
 
         oneLiner: m.oneLiner || null,
       };
     });
 
-    // 4) Re-split using latest quote direction
     const gainers = movers
       .filter((m) => m.direction === "up")
       .sort((a, b) => Number(b.changePct || 0) - Number(a.changePct || 0));
@@ -195,6 +170,7 @@ export async function getMarketMovers() {
     return {
       gainers,
       losers,
+      movers,
       updated_at: json.updated_at || null,
       as_of: json.as_of || null,
       quote_refreshed: true,
