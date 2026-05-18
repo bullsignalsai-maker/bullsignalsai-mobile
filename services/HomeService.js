@@ -36,6 +36,7 @@ export async function getHomeScreen() {
 
     return {
       header: buildHeader(homeJson),
+      alphaWatch: buildAlphaWatch(homeJson.alpha_watch),
       signals: buildHomeSignals(coreSignals, quotesJson),
       meta: {
         version: homeJson.schema_version || homeJson.version || "home_v2",
@@ -58,7 +59,17 @@ export async function getHomeMovers() {
     const movers = Array.isArray(json.movers) ? json.movers : [];
 
     return movers
-      .filter((m) => m.direction === "up")
+      .filter((m) => {
+        const pct = m.changePct ?? m.quote?.changePct ?? 0;
+        const direction = String(m.direction || "").toLowerCase();
+
+        return (
+          direction === "up" ||
+          direction === "gainer" ||
+          direction === "gain" ||
+          Number(pct) > 0
+        );
+      })
       .slice(0, 5)
       .map((m) => ({
         symbol: String(m.symbol || "").toUpperCase(),
@@ -156,4 +167,58 @@ function getHomeInsight(s) {
   }
 
   return "Market signal based on trend, price action, and momentum.";
+}
+
+function buildAlphaWatch(alphaWatch = {}) {
+  const items = Array.isArray(alphaWatch.items) ? alphaWatch.items : [];
+
+  return {
+    title: alphaWatch.title || "AI Opportunity Watch",
+    subtitle:
+      alphaWatch.subtitle ||
+      "AI-ranked setups showing momentum, trend quality, pattern edge, and participation.",
+    count: Number(alphaWatch.count ?? items.length ?? 0),
+    marketRegime: alphaWatch.market_regime || alphaWatch.marketRegime || null,
+    updatedAt: alphaWatch.updated_at || null,
+    disclaimer:
+      alphaWatch.disclaimer ||
+      "AI Opportunity Watch is probabilistic and for informational purposes only.",
+    items: items
+      .filter((x) => x?.symbol)
+      .slice(0, 8)
+      .map((x, idx) => ({
+        rank: idx + 1,
+        symbol: String(x.symbol || "").toUpperCase(),
+        companyName: x.companyName || x.company_name || x.symbol,
+        price: x.price ?? null,
+        change: x.change ?? null,
+        changePct: x.changePct ?? null,
+        score: Number(x.score ?? 0),
+        opportunityScore: Number(x.opportunityScore ?? x.score ?? 0),
+        confidence: Number(x.confidence ?? 0),
+        signal: x.signal || "HOLD",
+        setupLabel: x.setupLabel || "Opportunity Watch",
+        reason: cleanAlphaText(x.reason),
+        whyNow: Array.isArray(x.whyNow) ? x.whyNow.slice(0, 3) : [],
+        riskLevel: x.riskLevel || "Controlled",
+        riskFlags: Array.isArray(x.riskFlags) ? x.riskFlags : [],
+        theme: x.theme || null,
+        pattern: x.pattern || null,
+        marketRegime: x.marketRegime || alphaWatch.market_regime || null,
+        lastUpdated:
+          x.quote_updated_at || x.computed_at || alphaWatch.updated_at || null,
+      })),
+  };
+}
+
+function cleanAlphaText(text) {
+  if (typeof text !== "string") return "";
+
+  return text
+    .replace(/\.{2,}/g, ".")
+    .replace("â", "'")
+    .replace("â", '"')
+    .replace("â", '"')
+    .replace(/\s+/g, " ")
+    .trim();
 }

@@ -696,11 +696,10 @@ export default function WatchlistScreen({ navigation }) {
 
           {/* SUMMARY */}
 
-          {!!item.watchlistSummary && (
-            <Text style={styles.summary} numberOfLines={3}>
-              {item.watchlistSummary}
-            </Text>
-          )}
+          <Text style={styles.summary} numberOfLines={3}>
+            {item.watchlistSummary ||
+              "AI analysis is preparing for this ticker."}
+          </Text>
           {/* SMART PATTERN */}
           {!!patternName && (
             <View style={styles.patternRow}>

@@ -14,8 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { getHomeScreen } from "../services/HomeService";
-import { getMarketMovers } from "../services/MarketPulseService";
+import { getHomeScreen, getHomeMovers } from "../services/HomeService";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 import MoveLabel from "../components/MoveLabel";
@@ -119,10 +118,8 @@ export default function HomeScreen({ navigation }) {
 
         setHome(data);
         try {
-          const moversData = await getMarketMovers("home");
-          setTopMovers(
-            (moversData?.gainers || moversData?.movers || []).slice(0, 5),
-          );
+          const moversData = await getHomeMovers();
+          setTopMovers(moversData.slice(0, 5));
         } catch {
           setTopMovers([]);
         }
@@ -172,10 +169,8 @@ export default function HomeScreen({ navigation }) {
     if (data) {
       setHome(data);
       try {
-        const moversData = await getMarketMovers("home");
-        setTopMovers(
-          (moversData?.gainers || moversData?.movers || []).slice(0, 5),
-        );
+        const moversData = await getHomeMovers();
+        setTopMovers(moversData.slice(0, 5));
       } catch {
         setTopMovers([]);
       }
@@ -199,10 +194,12 @@ export default function HomeScreen({ navigation }) {
 
   if (!home) {
     return (
-      <View style={styles.container}>
-        <Text style={{ color: BRAND.sub, textAlign: "center", marginTop: 100 }}>
-          Loading market intelligence…
-        </Text>
+      <View style={styles.loadingContainer}>
+        <Image
+          source={LOGO}
+          style={styles.loadingLogoLarge}
+          resizeMode="contain"
+        />
       </View>
     );
   }
@@ -225,23 +222,44 @@ export default function HomeScreen({ navigation }) {
           pattern: topMovers[0].pattern,
         }
       : getTopSignal(signals || []);
-  const remainingSignals = (signals || []).filter(
-    (s) => s.symbol !== topSignal?.symbol,
-  );
-  const pulseItems = (topMovers || []).slice(0, 5).map((m) => ({
-    id: m.symbol,
-    icon: "trending-up-outline",
-    title: m.symbol,
-    symbol: m.symbol,
-    companyName: m.company || m.symbol,
-    price: m.price,
-    change: m.change,
-    changePct: m.changePct,
-    value: `$${Number(m.price || 0).toFixed(2)} · +${Math.abs(
-      m.changePct || 0,
-    ).toFixed(2)}%\n${m.company || "Rising mover"}`,
-  }));
+  const alphaWatchItems = home?.alphaWatch?.items || [];
+  const alphaHero = alphaWatchItems[0] || null;
+  const alphaCarousel = alphaWatchItems.slice(1, 5);
+  const hasAlphaWatch = alphaWatchItems.length > 0;
 
+  const heroItem = hasAlphaWatch ? alphaHero : topSignal;
+  const remainingSignals = (signals || []).filter(
+    (s) => s.symbol !== heroItem?.symbol,
+  );
+  const pulseItems = (topMovers || [])
+    .filter((m) => m?.symbol)
+    .slice(0, 5)
+    .map((m) => {
+      const symbol = String(m.symbol || "").toUpperCase();
+      const companyName = m.companyName || m.company || m.name || symbol;
+      const price = m.price ?? m.quote?.price ?? null;
+      const change = m.change ?? m.quote?.change ?? null;
+      const changePct = m.changePct ?? m.quote?.changePct ?? null;
+
+      return {
+        id: symbol,
+        icon: "trending-up-outline",
+        title: symbol,
+        symbol,
+        companyName,
+        price,
+        change,
+        changePct,
+        value:
+          price != null
+            ? `$${Number(price).toFixed(2)} · ${
+                changePct != null
+                  ? `${changePct >= 0 ? "+" : ""}${Number(changePct).toFixed(2)}%`
+                  : "--"
+              }\n${companyName}`
+            : `${companyName}\nMarket mover`,
+      };
+    });
   return (
     <View style={styles.container}>
       {/* HEADER */}
@@ -277,48 +295,55 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
 
-      {/* TOP ALPHA IDEA */}
-      {topSignal && (
+      {/* AI OPPORTUNITY WATCH / TOP ALPHA IDEA */}
+      {heroItem && (
         <TouchableOpacity
           style={styles.heroCard}
           activeOpacity={0.88}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             navigation.navigate("StockDetailScreen", {
-              symbol: topSignal.symbol,
-              name: topSignal.companyName || topSignal.name || topSignal.symbol,
-              source: "ui",
+              symbol: heroItem.symbol,
+              name: heroItem.companyName || heroItem.name || heroItem.symbol,
+              source: hasAlphaWatch ? "alpha_watch" : "ui",
+              alphaWatchItem: hasAlphaWatch ? heroItem : null,
             });
           }}
         >
           <View style={styles.heroTopRow}>
             <View style={styles.heroBadge}>
               <Ionicons
-                name="trending-up-outline"
+                name={
+                  hasAlphaWatch ? "analytics-outline" : "trending-up-outline"
+                }
                 size={15}
                 color={BRAND.accent}
               />
-              <Text style={styles.heroBadgeText}>Top Alpha Idea</Text>
+              <Text style={styles.heroBadgeText}>
+                {hasAlphaWatch ? "Top Alpha Opportunity" : "Top Market Mover"}
+              </Text>
             </View>
 
             <Text style={styles.heroConfidence}>
-              {Math.round(getConfidence(topSignal))}% confidence
+              {hasAlphaWatch
+                ? `Score ${Math.round(heroItem.score || 0)}`
+                : `${Math.round(getConfidence(heroItem))}% confidence`}
             </Text>
           </View>
 
           <View style={styles.heroMainRow}>
             <View style={{ flex: 1, paddingRight: 10 }}>
               <View style={styles.heroSymbolRow}>
-                <Text style={styles.heroSymbol}>{topSignal.symbol}</Text>
+                <Text style={styles.heroSymbol}>{heroItem.symbol}</Text>
                 <MoveLabel
-                  changePct={topSignal.changePct}
-                  price={topSignal.price}
+                  changePct={heroItem.changePct}
+                  price={heroItem.price}
                   style={styles.heroMoveLabel}
                 />
               </View>
 
               <Text style={styles.heroName} numberOfLines={1}>
-                {topSignal.companyName || topSignal.name || topSignal.symbol}
+                {heroItem.companyName || heroItem.name || heroItem.symbol}
               </Text>
             </View>
 
@@ -327,11 +352,11 @@ export default function HomeScreen({ navigation }) {
                 style={[
                   styles.heroPrice,
                   {
-                    backgroundColor: priceFlash[topSignal.symbol]?.interpolate({
+                    backgroundColor: priceFlash[heroItem.symbol]?.interpolate({
                       inputRange: [0, 1],
                       outputRange: [
                         "transparent",
-                        (topSignal.changePct || 0) >= 0
+                        (heroItem.changePct || 0) >= 0
                           ? "rgba(0,227,150,0.24)"
                           : "rgba(239,68,68,0.24)",
                       ],
@@ -339,8 +364,8 @@ export default function HomeScreen({ navigation }) {
                   },
                 ]}
               >
-                {topSignal.price != null
-                  ? `$${topSignal.price.toFixed(2)}`
+                {heroItem.price != null
+                  ? `$${heroItem.price.toFixed(2)}`
                   : "--"}
               </Animated.Text>
 
@@ -349,14 +374,12 @@ export default function HomeScreen({ navigation }) {
                   styles.heroChange,
                   {
                     color:
-                      (topSignal.changePct || 0) >= 0
-                        ? BRAND.accent
-                        : BRAND.red,
+                      (heroItem.changePct || 0) >= 0 ? BRAND.accent : BRAND.red,
                   },
                 ]}
               >
-                {(topSignal.changePct || 0) >= 0 ? "▲" : "▼"}{" "}
-                {Math.abs(topSignal.changePct || 0).toFixed(2)}%
+                {(heroItem.changePct || 0) >= 0 ? "▲" : "▼"}{" "}
+                {Math.abs(heroItem.changePct || 0).toFixed(2)}%
               </Text>
             </View>
           </View>
@@ -367,75 +390,186 @@ export default function HomeScreen({ navigation }) {
                 styles.signalBadge,
                 {
                   backgroundColor:
-                    getSignal(topSignal) === "BUY"
+                    getSignal(heroItem) === "BUY"
                       ? BRAND.accent
-                      : getSignal(topSignal) === "SELL"
+                      : getSignal(heroItem) === "SELL"
                         ? BRAND.red
                         : BRAND.amber,
                 },
               ]}
             >
               <Text style={styles.signalText}>
-                {displayRating(getSignal(topSignal))}
+                {displayRating(getSignal(heroItem))}
               </Text>
             </View>
-
-            {!!getPatternName(topSignal) && (
-              <View style={styles.heroPatternPill}>
-                <Text style={styles.heroPatternText} numberOfLines={1}>
-                  {formatPatternLabel(
-                    getPatternName(topSignal),
-                    getPatternWinRate(topSignal),
-                  )}
-                </Text>
-              </View>
-            )}
           </View>
 
-          {!!getSummary(topSignal) && (
-            <Text style={styles.heroSummary} numberOfLines={2}>
-              {getSummary(topSignal)}
+          {hasAlphaWatch && heroItem.setupLabel && (
+            <Text style={styles.heroSetupLine} numberOfLines={1}>
+              {heroItem.setupLabel}
             </Text>
           )}
 
-          <Text style={styles.heroCta}>View full analysis →</Text>
+          {!!(hasAlphaWatch ? heroItem.reason : getSummary(heroItem)) && (
+            <Text style={styles.heroSummary} numberOfLines={2}>
+              {hasAlphaWatch ? heroItem.reason : getSummary(heroItem)}
+            </Text>
+          )}
+
+          <Text style={styles.heroCta}>See AI analysis →</Text>
         </TouchableOpacity>
       )}
+      {alphaCarousel.length > 0 && (
+        <View style={styles.alphaCarouselWrap}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>More Alpha Setups</Text>
+            <Text style={styles.sectionMeta}>{alphaCarousel.length} more</Text>
+          </View>
 
-      {/* MARKET PULSE */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.pulseScroll}
-        contentContainerStyle={styles.pulseStrip}
-      >
-        {pulseItems.map((c, i) => (
-          <TouchableOpacity
-            key={`${c.id || c.title}-${i}`}
-            style={styles.pulseChip}
-            activeOpacity={0.85}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              navigation.navigate("StockDetailScreen", {
-                symbol: c.symbol,
-                name: c.companyName || c.symbol,
-                source: "home_movers",
-              });
-            }}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.alphaCarouselStrip}
           >
-            <View style={styles.pulseChipHeader}>
-              <Ionicons name={c.icon} size={13} color={BRAND.accent} />
-              <Text style={styles.pulseTitle} numberOfLines={1}>
-                {c.title}
-              </Text>
-            </View>
-            <Text style={styles.pulseValue} numberOfLines={2}>
-              {c.value}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            {alphaCarousel.map((item) => (
+              <TouchableOpacity
+                key={`alpha-${item.symbol}`}
+                style={styles.alphaMiniCard}
+                activeOpacity={0.86}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("StockDetailScreen", {
+                    symbol: item.symbol,
+                    name: item.companyName || item.symbol,
+                    source: "alpha_watch",
+                    alphaWatchItem: item,
+                  });
+                }}
+              >
+                <View style={styles.alphaMiniTop}>
+                  <View style={styles.alphaMiniLeft}>
+                    <Text style={styles.alphaRank}>#{item.rank}</Text>
 
+                    <Ionicons
+                      name={
+                        (item.changePct || 0) >= 0
+                          ? "trending-up-outline"
+                          : "trending-down-outline"
+                      }
+                      size={13}
+                      color={
+                        (item.changePct || 0) >= 0 ? BRAND.accent : BRAND.red
+                      }
+                    />
+
+                    <Text style={styles.alphaSymbol}>{item.symbol}</Text>
+                  </View>
+
+                  <Text style={styles.alphaScore}>
+                    Score {Math.round(item.score || 0)}
+                  </Text>
+                </View>
+
+                <View style={styles.alphaPriceInlineRow}>
+                  <Text style={styles.alphaMiniPrice}>
+                    {item.price != null
+                      ? `$${Number(item.price).toFixed(2)}`
+                      : "--"}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.alphaMove,
+                      {
+                        color:
+                          (item.changePct || 0) >= 0 ? BRAND.accent : BRAND.red,
+                      },
+                    ]}
+                  >
+                    {item.changePct != null
+                      ? `${Number(item.changePct) >= 0 ? "+" : ""}${Number(item.changePct).toFixed(2)}%`
+                      : "--"}
+                  </Text>
+                </View>
+
+                <Text style={styles.alphaSetup} numberOfLines={1}>
+                  {item.setupLabel}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+      {/* MARKET MOVERS */}
+      {topMovers.length > 0 && (
+        <View style={styles.moversWrap}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Market Movers</Text>
+            <Text style={styles.sectionMeta}>Rising now</Text>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.moversStrip}
+          >
+            {topMovers.slice(0, 5).map((m, i) => {
+              const symbol = String(m.symbol || "").toUpperCase();
+              const companyName =
+                m.companyName || m.company || m.name || symbol;
+              const price = m.price ?? m.quote?.price ?? null;
+              const changePct = m.changePct ?? m.quote?.changePct ?? null;
+
+              return (
+                <TouchableOpacity
+                  key={`mover-${symbol}-${i}`}
+                  style={styles.moverCard}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    navigation.navigate("StockDetailScreen", {
+                      symbol,
+                      name: companyName,
+                      source: "home_movers",
+                    });
+                  }}
+                >
+                  <View style={styles.moverTopRow}>
+                    <Ionicons
+                      name="trending-up-outline"
+                      size={13}
+                      color={BRAND.accent}
+                    />
+                    <Text style={styles.moverSymbol}>{symbol}</Text>
+                  </View>
+
+                  <View style={styles.moverPriceRow}>
+                    <Text style={styles.moverPrice}>
+                      {price != null ? `$${Number(price).toFixed(2)}` : "--"}
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.moverChange,
+                        {
+                          color:
+                            Number(changePct || 0) >= 0
+                              ? BRAND.accent
+                              : BRAND.red,
+                        },
+                      ]}
+                    >
+                      {changePct != null
+                        ? `${Number(changePct) >= 0 ? "+" : ""}${Number(changePct).toFixed(2)}%`
+                        : "--"}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
       {/* MAIN LIST */}
       <ScrollView
         scrollEventThrottle={16}
@@ -638,93 +772,103 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-/* === Styles UNCHANGED === */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BRAND.bg },
 
   header: {
-    paddingTop: 54,
+    paddingTop: 50,
     paddingHorizontal: 14,
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 5,
   },
   headerBrandRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
   },
-  logo: { width: 28, height: 28, marginRight: 7 },
+  logo: { width: 27, height: 27, marginRight: 7 },
   titleBrand: {
     color: BRAND.text,
-    fontSize: 28,
+    fontSize: 27,
     fontFamily: TYPO.fontFamily.brand,
     letterSpacing: -0.9,
   },
   subtitle: {
     color: BRAND.sub,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 11.5,
+    marginTop: 1,
     marginBottom: 1,
     fontFamily: TYPO.fontFamily.medium,
   },
   marketPill: {
-    marginTop: 3,
-    marginBottom: 1,
+    marginTop: 2,
+    marginBottom: 0,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: BRAND.card2,
-    borderWidth: 1,
-    borderColor: BRAND.softBorder,
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-  },
-  marketDot: { width: 7, height: 7, borderRadius: 999, marginRight: 6 },
-  marketText: {
-    color: BRAND.sub,
-    fontSize: 11.5,
-    fontFamily: TYPO.fontFamily.bold,
-  },
-
-  heroCard: {
-    backgroundColor: BRAND.card,
-    borderRadius: 20,
-    paddingHorizontal: 13,
-    paddingTop: 8,
-    paddingBottom: 9,
-    marginHorizontal: 10,
-    marginBottom: 5,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.09)",
-  },
-  heroTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 2,
-  },
-  heroBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
     backgroundColor: BRAND.card2,
     borderWidth: 1,
     borderColor: BRAND.softBorder,
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
+  },
+  marketDot: { width: 7, height: 7, borderRadius: 999, marginRight: 6 },
+  marketText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  heroCard: {
+    backgroundColor: BRAND.card,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 13,
+    paddingBottom: 13,
+    marginHorizontal: 10,
+    marginBottom: 7,
+    borderWidth: 1,
+    borderColor: "rgba(0,227,150,0.14)",
+
+    shadowColor: BRAND.accent,
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    elevation: 3,
+  },
+
+  heroTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 4,
+  },
+  heroBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(0,227,150,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(0,227,150,0.18)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   heroBadgeText: {
     color: BRAND.text,
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: TYPO.fontFamily.bold,
     textTransform: "uppercase",
-    letterSpacing: 0.35,
+    letterSpacing: 0.45,
   },
   heroConfidence: {
-    color: BRAND.sub,
-    fontSize: 11.5,
-    fontFamily: TYPO.fontFamily.bold,
+    color: BRAND.muted,
+    fontSize: 10,
+    fontFamily: TYPO.fontFamily.semibold,
+    marginTop: 2,
   },
   heroMainRow: {
     flexDirection: "row",
@@ -738,23 +882,23 @@ const styles = StyleSheet.create({
   },
   heroSymbol: {
     color: BRAND.text,
-    fontSize: 23,
+    fontSize: 24,
     fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   heroMoveLabel: {
     marginLeft: 8,
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: TYPO.fontFamily.semibold,
     fontStyle: "italic",
   },
   heroName: {
     color: BRAND.sub,
-    fontSize: 12.5,
-    marginTop: 2,
+    fontSize: 12,
+    marginTop: 1,
     fontFamily: TYPO.fontFamily.medium,
   },
-  heroPriceBlock: { alignItems: "flex-end", minWidth: 96 },
+  heroPriceBlock: { alignItems: "flex-end", minWidth: 94 },
   heroPrice: {
     color: BRAND.text,
     fontSize: 21,
@@ -764,8 +908,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   heroChange: {
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 11.5,
+    marginTop: 1,
     fontFamily: TYPO.fontFamily.bold,
     fontVariant: ["tabular-nums"],
   },
@@ -773,7 +917,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 5,
-    gap: 8,
   },
   heroPatternPill: {
     flex: 1,
@@ -782,92 +925,177 @@ const styles = StyleSheet.create({
     borderColor: BRAND.softBorder,
     borderRadius: 999,
     paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingVertical: 3,
   },
   heroPatternText: {
     color: BRAND.sub,
-    fontSize: 10.5,
+    fontSize: 10.3,
     fontFamily: TYPO.fontFamily.semibold,
   },
   heroSummary: {
     color: BRAND.sub,
-    fontSize: 12,
+    fontSize: 11.7,
     lineHeight: 16,
-    marginTop: 5,
+    marginTop: 3,
     fontFamily: TYPO.fontFamily.medium,
   },
+
   heroCta: {
-    color: BRAND.text,
+    color: BRAND.accent,
     fontSize: 11.5,
-    marginTop: 2,
+    marginTop: 5,
     textAlign: "right",
     fontFamily: TYPO.fontFamily.bold,
   },
-  pulseScroll: {
-    height: 112,
+
+  alphaCarouselWrap: {
+    marginTop: 2,
     marginBottom: 6,
   },
-
-  pulseStrip: {
-    paddingHorizontal: 10,
-    paddingBottom: 10,
+  sectionHeaderRow: {
+    marginHorizontal: 12,
+    marginBottom: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-
-  pulseChip: {
-    width: 119,
-    backgroundColor: BRAND.card,
+  sectionTitle: {
+    color: BRAND.text,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+  sectionMeta: {
+    color: BRAND.muted,
+    fontSize: 10,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+  alphaCarouselStrip: {
+    paddingHorizontal: 10,
+    paddingBottom: 1,
+  },
+  alphaMiniCard: {
+    width: 190,
+    minHeight: 82,
+    backgroundColor: "rgba(0,227,150,0.045)",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 11,
-    paddingTop: 7,
-    paddingBottom: 16,
+    borderColor: "rgba(0,227,150,0.14)",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     marginRight: 8,
   },
-  pulseChipHeader: {
+  alphaMiniTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 3,
+  },
+  alphaRank: {
+    color: BRAND.accent,
+    fontSize: 10,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+  alphaScore: {
+    color: BRAND.text,
+    fontSize: 9.8,
+    fontFamily: TYPO.fontFamily.semibold,
+    opacity: 0.9,
+  },
+  alphaSymbol: {
+    color: BRAND.text,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  alphaMiniPrice: {
+    color: BRAND.text,
+    fontSize: 15,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
+  },
+  alphaMove: {
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
+  },
+  alphaSetup: {
+    color: BRAND.sub,
+    fontSize: 9.8,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+  moversWrap: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  moversStrip: {
+    paddingHorizontal: 10,
+    paddingBottom: 3,
+  },
+  moverCard: {
+    minHeight: 43,
+    backgroundColor: BRAND.card,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    marginRight: 8,
+  },
+  moverTopRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginBottom: 3,
+    marginBottom: 2,
   },
-
-  pulseTitle: {
+  moverSymbol: {
     color: BRAND.text,
-    fontSize: 11,
+    fontSize: 12.5,
     fontFamily: TYPO.fontFamily.bold,
-    flex: 1,
+  },
+  moverPrice: {
+    color: BRAND.text,
+    fontSize: 14,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
+  },
+  moverChange: {
+    color: BRAND.accent,
+    fontSize: 10.5,
+    marginTop: 0,
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
+  },
+  moverCompany: {
+    color: BRAND.sub,
+    fontSize: 9.5,
+    marginTop: 1,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
-  pulseValue: {
-    color: BRAND.sub,
-    fontSize: 10.2,
-    lineHeight: 13,
-    fontFamily: TYPO.fontFamily.semibold,
-    paddingBottom: 2,
-  },
   listIntroRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -3,
+    marginTop: 4,
     marginBottom: 6,
     gap: 5,
   },
   listHelper: {
     color: BRAND.muted,
-    fontSize: 10.5,
+    fontSize: 10.2,
     textAlign: "center",
     fontFamily: TYPO.fontFamily.semibold,
   },
 
   card: {
     backgroundColor: BRAND.card,
-    borderRadius: 18,
-    padding: 12,
+    borderRadius: 17,
+    padding: 11,
     marginHorizontal: 10,
-    marginBottom: 9,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: "rgba(255,255,255,0.07)",
   },
   cardHeader: {
     flexDirection: "row",
@@ -877,48 +1105,48 @@ const styles = StyleSheet.create({
   symbolRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
   symbol: {
     color: BRAND.text,
-    fontSize: 17,
+    fontSize: 16.5,
     fontFamily: TYPO.fontFamily.bold,
   },
   name: {
     color: BRAND.sub,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 11.5,
+    marginTop: 1,
     fontFamily: TYPO.fontFamily.medium,
   },
   moveLabelInline: {
     marginLeft: 7,
     marginTop: 0,
-    fontSize: 10.5,
+    fontSize: 10.2,
     fontFamily: TYPO.fontFamily.semibold,
     fontStyle: "italic",
     letterSpacing: -0.15,
   },
   price: {
     color: BRAND.text,
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: TYPO.fontFamily.extrabold,
     fontVariant: ["tabular-nums"],
   },
   changePct: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontFamily: TYPO.fontFamily.semibold,
     fontVariant: ["tabular-nums"],
   },
-  signalRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
+  signalRow: { flexDirection: "row", alignItems: "center", marginTop: 5 },
   signalBadge: {
     borderRadius: 999,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    paddingVertical: 3.5,
+    paddingHorizontal: 9,
     marginRight: 8,
   },
   signalText: {
     color: "#000",
-    fontSize: 11.5,
+    fontSize: 11,
     fontFamily: TYPO.fontFamily.bold,
   },
   confInline: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontFamily: TYPO.fontFamily.bold,
   },
   cardDivider: {
@@ -930,17 +1158,17 @@ const styles = StyleSheet.create({
   },
   summary: {
     color: BRAND.sub,
-    fontSize: 12.5,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: TYPO.fontFamily.medium,
   },
   patternRow: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    marginTop: 5,
-    paddingVertical: 4,
-    paddingHorizontal: 9,
+    marginTop: 4,
+    paddingVertical: 3.5,
+    paddingHorizontal: 8,
     borderRadius: 999,
     backgroundColor: BRAND.card2,
     borderWidth: 1,
@@ -948,44 +1176,44 @@ const styles = StyleSheet.create({
   },
   patternLabel: {
     color: BRAND.muted,
-    fontSize: 10,
+    fontSize: 9.6,
     marginRight: 6,
     textTransform: "uppercase",
     fontFamily: TYPO.fontFamily.bold,
   },
   patternValue: {
     color: BRAND.sub,
-    fontSize: 10.5,
+    fontSize: 10.2,
     fontFamily: TYPO.fontFamily.semibold,
   },
   cardFooterRow: {
-    marginTop: 4,
+    marginTop: 3,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   lastUpdated: {
     color: BRAND.muted,
-    fontSize: 10.5,
+    fontSize: 10,
     opacity: 0.85,
     fontFamily: TYPO.fontFamily.semibold,
   },
   tapHint: {
     color: BRAND.muted,
-    fontSize: 10.5,
+    fontSize: 10,
     fontFamily: TYPO.fontFamily.semibold,
   },
 
   footerWrap: {
-    marginTop: 24,
-    marginBottom: 30,
+    marginTop: 18,
+    marginBottom: 26,
     paddingHorizontal: 22,
     alignItems: "center",
   },
   footerText: {
     color: BRAND.sub,
     fontSize: 12,
-    marginBottom: 8,
+    marginBottom: 7,
     fontFamily: TYPO.fontFamily.medium,
   },
   footerBrand: {
@@ -996,9 +1224,47 @@ const styles = StyleSheet.create({
   },
   disclaimer: {
     color: BRAND.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 10.7,
+    lineHeight: 15,
     textAlign: "center",
     fontFamily: TYPO.fontFamily.regular,
+  },
+
+  alphaPriceInlineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
+  },
+  moverPriceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
+  },
+  alphaMiniLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    flexShrink: 1,
+  },
+  heroSetupLine: {
+    color: BRAND.text,
+    fontSize: 10.8,
+    marginTop: 6,
+    marginBottom: 1,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: BRAND.bg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loadingLogoLarge: {
+    width: 100,
+    height: 100,
+    opacity: 0.96,
   },
 });

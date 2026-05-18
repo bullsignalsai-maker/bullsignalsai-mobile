@@ -88,7 +88,7 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
     return {
       /* ---------- identity ---------- */
       symbol: sym,
-      companyName: s.company_name,
+      companyName: s.companyName || s.company_name || s.name || sym,
 
       /* ---------- quote (flattened) ---------- */
       price,
@@ -98,7 +98,7 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
       needs_refresh: needsRefresh,
 
       // explicit session for UI
-      session: needsRefresh ? "LAST" : "LIVE",
+      session: price ? (needsRefresh ? "LAST" : "LIVE") : "PENDING",
 
       /* ---------- intelligence ---------- */
       bullbrain: s.bullbrain || {},
