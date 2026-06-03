@@ -33,7 +33,7 @@ function normalizeStockDetail(raw) {
   const risksOpportunities = content?.risksOpportunities || {};
   const finalRecommendation = content?.finalRecommendation || {};
   const sparkline = content?.sparkline || null;
-
+  const displayIntelligence = content?.displayIntelligence || null;
   const currentPrice = quoteSrc.price ?? null;
   const prevClose = quoteSrc.prevClose ?? null;
 
@@ -59,6 +59,8 @@ function normalizeStockDetail(raw) {
       : null;
 
   const authoritativeSignal =
+    displayIntelligence?.displaySignal ||
+    displayIntelligence?.signal ||
     headerSignal?.final ||
     signal?.value ||
     finalRecommendation?.signal ||
@@ -67,12 +69,13 @@ function normalizeStockDetail(raw) {
   const hybridSignal = authoritativeSignal;
 
   const hybridScore =
-    typeof signal?.confidence === "number"
-      ? signal.confidence
-      : typeof headerSignal?.confidence === "number"
-        ? headerSignal.confidence
-        : null;
-
+    typeof displayIntelligence?.score === "number"
+      ? displayIntelligence.score
+      : typeof signal?.confidence === "number"
+        ? signal.confidence
+        : typeof headerSignal?.confidence === "number"
+          ? headerSignal.confidence
+          : null;
   const patternInsight =
     pattern && pattern.name
       ? {
@@ -163,7 +166,7 @@ function normalizeStockDetail(raw) {
   return {
     symbol: header?.symbol || null,
     companyName: header?.companyName || null,
-
+    logoUrl: header?.logoUrl || header?.profile?.logoUrl || null,
     quote: {
       symbol: header?.symbol || null,
       name: header?.companyName || null,
@@ -193,7 +196,7 @@ function normalizeStockDetail(raw) {
     signal,
     probability,
     technical,
-
+    displayIntelligence,
     featureInsight,
     outlook,
     tradeIdea,

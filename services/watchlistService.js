@@ -2,9 +2,9 @@
 import { API_BASE_URL } from "../config/apiKeys";
 
 /* =========================================================
-   RAW WATCHLIST (INTELLIGENCE ONLY)
-   - Firestore snapshot
-   - No quotes
+  RAW WATCHLIST (INTELLIGENCE ONLY)
+  - Firestore snapshot
+  - No quotes
 ========================================================= */
 export async function fetchWatchlist(userId) {
   const res = await fetch(`${API_BASE_URL}/watchlist/${userId}`);
@@ -13,10 +13,10 @@ export async function fetchWatchlist(userId) {
 }
 
 /* =========================================================
-   WATCHLIST SCREEN DATA (INTELLIGENCE + LIVE QUOTES)
-   - Read-only
-   - Safe to poll every 30s
-   - Quotes shared across users
+  WATCHLIST SCREEN DATA (INTELLIGENCE + LIVE QUOTES)
+  - Read-only
+  - Safe to poll every 30s
+  - Quotes shared across users
 ========================================================= */
 export async function getWatchlistScreen(userId) {
   try {
@@ -68,9 +68,9 @@ export async function getWatchlistScreen(userId) {
 }
 
 /* =========================================================
-   MERGE LOGIC
-   - Normalizes quote fields
-   - Exposes freshness explicitly
+  MERGE LOGIC
+  - Normalizes quote fields
+  - Exposes freshness explicitly
 ========================================================= */
 function mergeWatchlistQuotes(items = [], quotes = {}) {
   return items.map((s) => {
@@ -81,44 +81,93 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
 
     const price = q?.price ?? s.quote?.price ?? null;
     const change = q?.change ?? s.quote?.change ?? null;
-    const changePct = q?.changePct ?? s.quote?.changePct ?? null;
+    const rawChangePct = q?.changePct ?? s.quote?.changePct ?? null;
+    const changePct =
+      rawChangePct !== null && rawChangePct !== undefined
+        ? Number(rawChangePct)
+        : null;
 
-    const quoteUpdatedAt = q?.updated_at || s.quote?.updated_at || null;
+    const quoteUpdatedAt =
+      q?.updated_at || s.quote_updated_at || s.quote?.updated_at || null;
 
+    const displayIntelligence = s.displayIntelligence || null;
+
+    const signal =
+      displayIntelligence?.signal ||
+      displayIntelligence?.displaySignal ||
+      s.signal ||
+      s.bullbrain?.signal ||
+      "HOLD";
+
+    const confidence =
+      typeof displayIntelligence?.score === "number"
+        ? displayIntelligence.score
+        : typeof s.displayScore === "number"
+          ? s.displayScore
+          : typeof s.bullbrain?.confidence === "number"
+            ? s.bullbrain.confidence
+            : 0;
+    const baseSummary =
+      displayIntelligence?.headline ||
+      s.displayHeadline ||
+      s.watchlistSummary ||
+      "";
+
+    const contradictsLiveMove =
+      typeof changePct === "number" &&
+      ((changePct > 0 &&
+        /down|under pressure|pulling back|bearish/i.test(baseSummary)) ||
+        (changePct < 0 &&
+          /up|moving higher|gaining traction|rallying|bullish/i.test(
+            baseSummary,
+          )));
+
+    const watchlistSummary = contradictsLiveMove
+      ? `${sym} is ${
+          changePct >= 0 ? "moving higher" : "under pressure"
+        } today, ${changePct >= 0 ? "up" : "down"} ${Math.abs(
+          changePct,
+        ).toFixed(2)}%.`
+      : baseSummary;
     return {
-      /* ---------- identity ---------- */
       symbol: sym,
-      companyName: s.companyName || s.company_name || s.name || sym,
+      companyName: s.companyName || sym,
+      logoUrl: s.logoUrl || null,
 
-      /* ---------- quote (flattened) ---------- */
       price,
       change,
       changePct,
       quote_updated_at: quoteUpdatedAt,
       needs_refresh: needsRefresh,
 
-      // explicit session for UI
       session: price ? (needsRefresh ? "LAST" : "LIVE") : "PENDING",
 
-      /* ---------- intelligence ---------- */
-      bullbrain: s.bullbrain || {},
-      authoritativeSignal: s.bullbrain?.signal || s.signal || "HOLD",
-      hybridSignal: s.bullbrain?.signal || s.signal || "HOLD",
-      hybridScore: s.hybridScore ?? 0,
+      displayIntelligence,
+      displayLabel: displayIntelligence?.label || s.displayLabel || null,
+      displayHeadline:
+        displayIntelligence?.headline || s.displayHeadline || null,
 
-      sparkline: Array.isArray(s.sparkline) ? s.sparkline : [],
+      bullbrain: {
+        signal,
+        confidence,
+      },
 
-      pattern: s.pattern || null,
-      watchlistSummary: s.watchlistSummary || s.insight || "",
+      hybridSignal: signal,
+      hybridScore: confidence,
 
-      /* ---------- timestamps ---------- */
+      pattern: {
+        name: s.pattern?.name || null,
+        winRate: s.pattern?.winRate ?? null,
+      },
+
+      watchlistSummary,
+
       lastUpdated: quoteUpdatedAt,
     };
   });
 }
-
 /* =========================================================
-   MUTATIONS (UNCHANGED)
+  MUTATIONS (UNCHANGED)
 ========================================================= */
 export async function addToWatchlist(userId, symbol) {
   const res = await fetch(`${API_BASE_URL}/watchlist/${userId}/add/${symbol}`, {

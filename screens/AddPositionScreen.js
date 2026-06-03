@@ -28,14 +28,14 @@ export default function AddPositionScreen({ navigation }) {
   const [avgCost, setAvgCost] = useState("");
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
-
+  const [selectedAsset, setSelectedAsset] = useState(null);
   const sharesRef = useRef(null);
   const costRef = useRef(null);
 
   const handleSymbolChange = async (text) => {
     const up = text.toUpperCase().trimStart();
     setSymbol(up);
-
+    setSelectedAsset(null);
     if (!up.trim()) {
       setSuggestions([]);
       return;
@@ -60,6 +60,7 @@ export default function AddPositionScreen({ navigation }) {
         .map((i) => ({
           symbol: String(i.symbol).toUpperCase(),
           desc: i.description,
+          logoUrl: i.logoUrl || null,
         }));
       setSuggestions(list);
     } catch {
@@ -68,6 +69,7 @@ export default function AddPositionScreen({ navigation }) {
   };
 
   const handleSelectSuggestion = (item) => {
+    setSelectedAsset(item);
     setSymbol(item.symbol);
     setSuggestions([]);
     Keyboard.dismiss();
@@ -106,7 +108,13 @@ export default function AddPositionScreen({ navigation }) {
         return;
       }
 
-      await addPosition(userId, cleanSymbol, shareNumber, avgCostNumber);
+      await addPosition(
+        userId,
+        cleanSymbol,
+        shareNumber,
+        avgCostNumber,
+        selectedAsset?.logoUrl || null,
+      );
 
       navigation.goBack();
     } catch (err) {

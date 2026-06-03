@@ -14,6 +14,7 @@ import {
   Modal,
   Pressable,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -336,6 +337,7 @@ export default function FullPatternDetailScreen({ route, navigation }) {
   const {
     symbol,
     companyName,
+    logoUrl,
     quote,
     patternInsight,
     smartPattern,
@@ -594,9 +596,27 @@ export default function FullPatternDetailScreen({ route, navigation }) {
           style={styles.headerCard}
         >
           <View style={styles.headerRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.symbol}>{headerSymbol}</Text>
-              <Text style={styles.name}>{headerName}</Text>
+            <View style={styles.headerIdentity}>
+              <View style={styles.logoWrap}>
+                {logoUrl ? (
+                  <Image
+                    source={{ uri: logoUrl }}
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Text style={styles.logoText}>
+                    {String(headerSymbol || "A").slice(0, 1)}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.symbol}>{headerSymbol}</Text>
+                <Text style={styles.name} numberOfLines={1}>
+                  {headerName}
+                </Text>
+              </View>
             </View>
 
             <View style={styles.priceBlock}>
@@ -1817,5 +1837,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: TYPO.fontFamily.semibold,
     color: BRAND.accent,
+  },
+  headerIdentity: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
+    paddingRight: 12,
+  },
+
+  logoWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 11,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+  },
+
+  logoImage: {
+    width: 32,
+    height: 32,
+  },
+
+  logoText: {
+    color: BRAND.text,
+    fontSize: 20,
+    fontFamily: TYPO.fontFamily.extrabold,
   },
 });

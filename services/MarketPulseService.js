@@ -73,10 +73,12 @@ export async function getMarketOverview() {
       items: (card.items || []).map((it) => {
         const sym = extractSymbol(it.label);
         const live = liveQuotes[sym];
+        const logoUrl = it.logoUrl || null;
 
         return {
           ...it,
           symbol: sym,
+          logoUrl,
           quote: live ? normalizeQuote(live) : normalizeQuote(it.quote),
         };
       }),
@@ -98,7 +100,7 @@ export async function getMarketOverview() {
       },
     };
   } catch (e) {
-    console.warn("❌ getMarketOverview error:", e.message);
+    console.warn("getMarketOverview error:", e.message);
     return null;
   }
 }
@@ -137,7 +139,7 @@ export async function getMarketMovers(mode = "preview") {
           .trim()
           .toUpperCase(),
         company: m.company || m.companyName || m.symbol,
-
+        logoUrl: m.logoUrl || m.profile?.logoUrl || null,
         price: q.price ?? m.price ?? null,
         change: q.change ?? m.change ?? null,
         changePct,
@@ -156,6 +158,13 @@ export async function getMarketMovers(mode = "preview") {
               : null,
 
         oneLiner: m.oneLiner || null,
+        reason: m.reason || null,
+        primaryCatalysts: m.primaryCatalysts || null,
+        candidateType: m.candidateType || null,
+        riskLevel: m.riskLevel || null,
+        sessionType: m.sessionType || null,
+        marketSentiment: m.marketSentiment || null,
+        dominantTheme: m.dominantTheme || null,
       };
     });
 
@@ -176,7 +185,7 @@ export async function getMarketMovers(mode = "preview") {
       quote_refreshed: true,
     };
   } catch (e) {
-    console.warn("❌ getMarketMovers error:", e.message);
+    console.warn("getMarketMovers error:", e.message);
     return null;
   }
 }
@@ -211,7 +220,7 @@ export async function getMarketNews() {
       source: "market-news",
     };
   } catch (e) {
-    console.warn("❌ getMarketNews error:", e.message);
+    console.warn("getMarketNews error:", e.message);
     return null;
   }
 }

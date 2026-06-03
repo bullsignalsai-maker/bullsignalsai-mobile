@@ -11,6 +11,7 @@ import {
   Animated,
   Pressable,
   StatusBar,
+  Image,
 } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
@@ -183,6 +184,7 @@ export default function PortfolioScreen({ navigation }) {
 
     return {
       ...pos,
+      logoUrl: pos.profile?.logoUrl || null,
       price,
       prev,
       currValue,
@@ -321,6 +323,45 @@ export default function PortfolioScreen({ navigation }) {
       today: p.today,
     })),
   };
+  const winnersCount = enrichedSorted.filter(
+    (p) => Number(p.gain || 0) >= 0,
+  ).length;
+  const winnerPct =
+    enrichedSorted.length > 0
+      ? Math.round((winnersCount / enrichedSorted.length) * 100)
+      : 0;
+
+  const diversificationScore =
+    topHolding?.allocationPct > 40
+      ? 58
+      : topHolding?.allocationPct > 25
+        ? 74
+        : 88;
+
+  const hasHoldings = enrichedSorted.length > 0;
+
+  const portfolioHealthScore = hasHoldings
+    ? Math.round(
+        Math.min(
+          95,
+          Math.max(45, winnerPct * 0.45 + diversificationScore * 0.55),
+        ),
+      )
+    : 0;
+
+  const healthLabel = !hasHoldings
+    ? "No Data"
+    : portfolioHealthScore >= 80
+      ? "Excellent"
+      : portfolioHealthScore >= 65
+        ? "Healthy"
+        : portfolioHealthScore >= 50
+          ? "Watch"
+          : "High Risk";
+
+  const allocationLeaders = [...enrichedSorted]
+    .sort((a, b) => b.allocationPct - a.allocationPct)
+    .slice(0, 5);
 
   if (loading) {
     return (
@@ -372,7 +413,10 @@ export default function PortfolioScreen({ navigation }) {
         renderLeftActions={renderLeftActions}
       >
         <TouchableOpacity
-          style={styles.positionCard}
+          style={[
+            styles.holdingRow,
+            p.gain >= 0 ? styles.holdingRowUp : styles.holdingRowDown,
+          ]}
           activeOpacity={0.88}
           onPress={() =>
             navigation.navigate("StockDetailScreen", {
@@ -380,123 +424,49 @@ export default function PortfolioScreen({ navigation }) {
             })
           }
         >
-          <View style={styles.positionTopRow}>
-            <View style={{ flex: 1 }}>
-              <View style={styles.symbolLine}>
-                <Text style={styles.symbol}>{p.symbol}</Text>
+          <View style={styles.holdingTopRow}>
+            <View style={styles.holdingAssetCol}>
+              <View style={styles.holdingLogo}>
+                {p.logoUrl ? (
+                  <Image
+                    source={{ uri: p.logoUrl }}
+                    style={styles.holdingLogoImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Text style={styles.holdingLogoText}>
+                    {String(p.symbol || "").slice(0, 2)}
+                  </Text>
+                )}
               </View>
 
-              <Text style={styles.companyMeta}>
-                {fmt(p.allocationPct)}% allocation · {p.shares} shares
-              </Text>
-            </View>
-
-            <View style={styles.positionRight}>
-              <Text style={styles.currentValue}>{money(p.currValue)}</Text>
-              <Text
-                style={[styles.todayText, { color: getGainColor(p.today) }]}
-              >
-                Day P&L {signedMoney(p.today)}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.positionMiddle}>
-            <Text style={[styles.plValue, { color: getGainColor(p.gain) }]}>
-              Total Gain {signedMoney(p.gain)} ({fmt(p.gainPct)}%)
-            </Text>
-
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation();
-                handleToggleAIInsight(p.symbol, p, totalValue);
-              }}
-              style={({ pressed }) => [
-                styles.aiInlineBtn,
-                pressed && { opacity: 0.6 },
-              ]}
-            >
-              <Text style={styles.aiInlineText}>
-                {insight.expanded ? "Hide AI View" : "AI View →"}
-              </Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.priceRow}>
-            <Text style={styles.priceMeta}>Current {money(p.price)}</Text>
-            <Text style={styles.priceMeta}>Avg {money(p.avgCost)}</Text>
-          </View>
-
-          {insight.expanded && (
-            <View style={styles.aiBox}>
-              <Text style={styles.aiTitle}>AI Portfolio View</Text>
-
-              {insight.loading ? (
-                <Text style={styles.aiLoading}>Fetching AI insight…</Text>
-              ) : insight.error ? (
-                <Text style={styles.aiError}>{insight.error}</Text>
-              ) : insight.ai ? (
-                <>
-                  <View style={styles.aiGrid}>
-                    <View style={styles.aiMiniCard}>
-                      <Text style={styles.aiLabel}>Trend</Text>
-                      <Text style={styles.aiValue}>
-                        {insight.ai.trend || "—"}
-                      </Text>
-                    </View>
-
-                    <View style={styles.aiMiniCard}>
-                      <Text style={styles.aiLabel}>Risk</Text>
-                      <Text style={styles.aiValue}>
-                        {insight.ai.risk || "—"}
-                      </Text>
-                    </View>
-
-                    <View style={styles.aiMiniCard}>
-                      <Text style={styles.aiLabel}>Move</Text>
-                      <Text style={styles.aiValue}>
-                        {insight.ai.expected_move || "—"}
-                      </Text>
-                    </View>
-
-                    <View style={styles.aiMiniCard}>
-                      <Text style={styles.aiLabel}>Confidence</Text>
-                      <Text style={styles.aiValue}>
-                        {insight.ai.confidence || "—"}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {!!insight.ai.pattern && (
-                    <Text style={styles.aiParagraph}>
-                      Pattern: {insight.ai.pattern}
-                    </Text>
-                  )}
-
-                  {!!insight.ai.five_day_prob && (
-                    <Text style={styles.aiParagraph}>
-                      5-Day Outlook: {insight.ai.five_day_prob}
-                    </Text>
-                  )}
-
-                  {!!insight.ai.rebalancing && (
-                    <>
-                      <Text style={styles.aiRebalancingTitle}>
-                        Rebalancing Context
-                      </Text>
-                      <Text style={styles.aiRebalancingText}>
-                        {insight.ai.rebalancing}
-                      </Text>
-                    </>
-                  )}
-                </>
-              ) : (
-                <Text style={styles.aiLoading}>
-                  AI view is not available right now.
+              <View>
+                <Text style={styles.holdingSymbol}>{p.symbol}</Text>
+                <Text style={styles.holdingName}>
+                  {p.shares} shares · {fmt(p.allocationPct)}% allocation
                 </Text>
-              )}
+              </View>
             </View>
-          )}
+
+            <View style={styles.holdingValueCol}>
+              <Text style={styles.holdingValue}>{money(p.currValue)}</Text>
+              <Text
+                style={[styles.holdingGain, { color: getGainColor(p.gain) }]}
+              >
+                {signedMoney(p.gain)} · {fmt(p.gainPct)}%
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.holdingMetaRow}>
+            <Text style={styles.holdingMeta}>Avg {money(p.avgCost)}</Text>
+            <Text style={styles.holdingMeta}>Current {money(p.price)}</Text>
+            <Text
+              style={[styles.holdingMeta, { color: getGainColor(p.today) }]}
+            >
+              Day {signedMoney(p.today)}
+            </Text>
+          </View>
         </TouchableOpacity>
       </Swipeable>
     );
@@ -517,115 +487,197 @@ export default function PortfolioScreen({ navigation }) {
           />
         }
       >
-        <View style={styles.heroCard}>
-          <View style={styles.portfolioHeaderRow}>
+        <View style={styles.overviewCard}>
+          <View style={styles.overviewHeaderRow}>
             <View>
-              <Text style={styles.headerTitle}>Portfolio</Text>
-              <Text style={styles.headerSub}>Total value</Text>
+              <Text style={styles.overviewTitle}>Portfolio Overview</Text>
+              <Text style={styles.overviewSub}>
+                Track performance and allocation
+              </Text>
             </View>
 
-            <View style={styles.livePill}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveText}>Live</Text>
+            <View style={styles.datePill}>
+              <Ionicons name="calendar-outline" size={13} color={BRAND.sub} />
+              <Text style={styles.datePillText}>Today</Text>
             </View>
           </View>
 
-          <View style={styles.valueRow}>
-            <Text style={styles.totalValue}>{money(totalValue)}</Text>
+          <View style={styles.overviewStatsGrid}>
+            <View style={styles.overviewStat}>
+              <Text style={styles.overviewLabel}>Total Value</Text>
+              <Text style={styles.overviewValue}>{money(totalValue)}</Text>
+              <Text
+                style={[
+                  styles.overviewChange,
+                  { color: getGainColor(totalGain) },
+                ]}
+              >
+                {fmt(totalGainPct)}%
+              </Text>
+            </View>
 
-            <Text
-              style={[styles.totalGain, { color: getGainColor(totalGain) }]}
-            >
-              {signedMoney(totalGain)} · {fmt(totalGainPct)}%
-            </Text>
+            <View style={styles.overviewDivider} />
+
+            <View style={styles.overviewStat}>
+              <Text style={styles.overviewLabel}>Day Gain</Text>
+              <Text
+                style={[
+                  styles.overviewValue,
+                  { color: getGainColor(todayGain) },
+                ]}
+              >
+                {signedMoney(todayGain)}
+              </Text>
+              <Text
+                style={[
+                  styles.overviewChange,
+                  { color: getGainColor(todayGain) },
+                ]}
+              >
+                Today
+              </Text>
+            </View>
+
+            <View style={styles.overviewDivider} />
+
+            <View style={styles.overviewStat}>
+              <Text style={styles.overviewLabel}>Total Gain</Text>
+              <Text
+                style={[
+                  styles.overviewValue,
+                  { color: getGainColor(totalGain) },
+                ]}
+              >
+                {signedMoney(totalGain)}
+              </Text>
+              <Text
+                style={[
+                  styles.overviewChange,
+                  { color: getGainColor(totalGain) },
+                ]}
+              >
+                {fmt(totalGainPct)}%
+              </Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.healthCard}>
+          <View style={styles.healthHeaderRow}>
+            <View style={styles.healthTitleRow}>
+              <Text style={styles.healthTitle}>AI Portfolio Health</Text>
+            </View>
+          </View>
+
+          <View style={styles.healthContentRow}>
+            <View style={styles.healthRing}>
+              <Text style={styles.healthScore}>{portfolioHealthScore}%</Text>
+              <Text style={styles.healthLabel}>{healthLabel}</Text>
+            </View>
+
+            <View style={styles.healthColumn}>
+              <View style={styles.healthColumnTitleRow}>
+                <Ionicons name="sparkles" size={14} color={BRAND.green} />
+                <Text
+                  style={[styles.healthColumnTitle, { color: BRAND.green }]}
+                >
+                  Strengths
+                </Text>
+              </View>
+
+              <Text style={styles.healthBullet}>
+                {hasHoldings
+                  ? `✓ ${winnersCount} positive holdings`
+                  : "Add holdings to analyze"}
+              </Text>
+              <Text style={styles.healthBullet}>
+                ✓ {riskExposure.label} exposure profile
+              </Text>
+              <Text style={styles.healthBullet}>
+                ✓ Top holding: {topHolding?.symbol || "--"}
+              </Text>
+            </View>
+
+            <View style={styles.healthColumn}>
+              <View style={styles.healthColumnTitleRow}>
+                <Ionicons name="shield-outline" size={14} color={BRAND.red} />
+                <Text style={[styles.healthColumnTitle, { color: BRAND.red }]}>
+                  Risks
+                </Text>
+              </View>
+
+              <Text style={styles.healthBullet}>
+                • Largest allocation{" "}
+                {topHolding ? fmt(topHolding.allocationPct) : "--"}%
+              </Text>
+              <Text style={styles.healthBullet}>
+                • Weakest: {worstPerformer?.symbol || "--"}
+              </Text>
+              <Text style={styles.healthBullet}>• Market volatility risk</Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.insightChipsRow}>
-          <View style={styles.insightChip}>
-            <Text style={styles.insightChipLabel}>Today</Text>
-            <Text
-              style={[
-                styles.insightChipValue,
-                { color: getGainColor(todayGain) },
-              ]}
-            >
-              {signedMoney(todayGain)}
-            </Text>
-            <Text style={styles.insightChipSub}>P&L</Text>
+        <View style={styles.allocationCard}>
+          <View style={styles.allocationHeader}>
+            <Text style={styles.allocationTitle}>Portfolio Allocation</Text>
+            <Text style={styles.allocationMeta}>Top holdings</Text>
           </View>
 
-          <View style={styles.insightChip}>
-            <Text style={styles.insightChipLabel}>Holdings</Text>
-            <Text style={styles.insightChipValue}>{portfolio.length}</Text>
-            <Text style={styles.insightChipSub}>Positions</Text>
-          </View>
+          {allocationLeaders.length === 0 ? (
+            <Text style={styles.allocationEmpty}>No allocation data yet.</Text>
+          ) : (
+            allocationLeaders.map((p) => (
+              <View key={`alloc-${p.symbol}`} style={styles.allocationRow}>
+                <Text style={styles.allocationSymbol}>{p.symbol}</Text>
 
-          <View style={styles.insightChip}>
-            <Text style={styles.insightChipLabel}>Largest</Text>
-            <Text style={styles.insightChipValue}>
-              {topHolding?.symbol || "--"}
-            </Text>
-            <Text style={styles.insightChipSub}>
-              {topHolding ? `${fmt(topHolding.allocationPct)}%` : "Allocation"}
-            </Text>
-          </View>
+                <View style={styles.allocationBarTrack}>
+                  <View
+                    style={[
+                      styles.allocationBarFill,
+                      {
+                        width: `${Math.min(100, Math.max(4, p.allocationPct))}%`,
+                      },
+                    ]}
+                  />
+                </View>
+
+                <Text style={styles.allocationPct}>
+                  {fmt(p.allocationPct)}%
+                </Text>
+              </View>
+            ))
+          )}
         </View>
 
-        <View style={styles.insightChipsRow}>
-          <View style={styles.insightChip}>
-            <Text style={styles.insightChipLabel}>Best</Text>
-            <Text style={[styles.insightChipValue, { color: BRAND.green }]}>
-              {topPerformer?.symbol || "--"}
-            </Text>
-            <Text style={styles.insightChipSub}>
-              {topPerformer ? signedMoney(topPerformer.gain) : "Performer"}
-            </Text>
-          </View>
-
-          <View style={styles.insightChip}>
-            <Text style={styles.insightChipLabel}>Weakest</Text>
-            <Text style={[styles.insightChipValue, { color: BRAND.red }]}>
-              {worstPerformer?.symbol || "--"}
-            </Text>
-            <Text style={styles.insightChipSub}>
-              {worstPerformer ? signedMoney(worstPerformer.gain) : "Performer"}
-            </Text>
-          </View>
-
-          <View style={styles.insightChip}>
-            <Text style={styles.insightChipLabel}>Risk</Text>
-            <Text
-              style={[styles.insightChipValue, { color: riskExposure.color }]}
-            >
-              {riskExposure.label}
-            </Text>
-            <Text style={styles.insightChipSub}>Exposure</Text>
-          </View>
-        </View>
-
-        <View style={styles.sectionHeader}>
+        <View style={styles.holdingsHeader}>
           <View>
-            <Text style={styles.sectionTitle}>Your Holdings</Text>
-            <Text style={styles.sectionSub}>
-              {portfolio.length} holdings · Sorted by{" "}
-              {sortMode === "gain"
-                ? "gain"
-                : sortMode === "shares"
-                  ? "shares"
-                  : sortMode === "allocation"
-                    ? "allocation"
-                    : "A-Z"}
+            <Text style={styles.holdingsTitle}>
+              Holdings{" "}
+              <Text style={styles.holdingsCount}>({portfolio.length})</Text>
             </Text>
           </View>
 
           <TouchableOpacity
-            style={styles.filterBtn}
+            style={styles.groupBtn}
             onPress={() => setMenuVisible(!menuVisible)}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
-            <Ionicons name="filter-outline" size={18} color={BRAND.sub} />
+            <Text style={styles.groupBtnText}>
+              Sort:{" "}
+              {sortMode === "gain"
+                ? "Gain"
+                : sortMode === "shares"
+                  ? "Shares"
+                  : sortMode === "allocation"
+                    ? "Allocation"
+                    : "A-Z"}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color={BRAND.sub} />
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.tableHeader}>
+          <Text style={styles.tableHeaderText}>Holdings Detail</Text>
         </View>
 
         {enrichedSorted.length === 0 ? (
@@ -716,7 +768,7 @@ export default function PortfolioScreen({ navigation }) {
 const styles = StyleSheet.create({
   wrapper: { flex: 1, backgroundColor: BRAND.bg },
   container: { flex: 1, paddingHorizontal: 14 },
-  scrollContent: { paddingTop: 56, paddingBottom: 170 },
+  scrollContent: { paddingTop: 4, paddingBottom: 170 },
   loading: {
     flex: 1,
     justifyContent: "center",
@@ -725,17 +777,92 @@ const styles = StyleSheet.create({
   },
   loadingText: { color: BRAND.sub, fontSize: 13 },
 
-  heroCard: {
-    backgroundColor: BRAND.card,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    padding: 14,
-    marginBottom: 10,
-    shadowColor: "#000",
+  overviewCard: {
+    backgroundColor: "#0B1220",
+    borderRadius: 22,
+    borderWidth: 1.3,
+    borderColor: "rgba(0,227,150,0.24)",
+    padding: 15,
+    marginBottom: 8,
+    shadowColor: "#00E396",
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+
+  overviewHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  overviewTitle: {
+    color: BRAND.text,
+    fontSize: 18,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
+  },
+
+  overviewSub: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  datePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+
+  datePillText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    marginLeft: 5,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  overviewStatsGrid: {
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+
+  overviewStat: {
+    flex: 1,
+  },
+
+  overviewLabel: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.medium,
+    marginBottom: 6,
+  },
+
+  overviewValue: {
+    color: BRAND.text,
+    fontSize: 15,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
+  },
+
+  overviewChange: {
+    fontSize: 11,
+    marginTop: 4,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  overviewDivider: {
+    width: 1,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    marginHorizontal: 10,
   },
   portfolioHeaderRow: {
     flexDirection: "row",
@@ -793,142 +920,6 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.semibold,
   },
 
-  insightChipsRow: { flexDirection: "row", columnGap: 8, marginBottom: 8 },
-  insightChip: {
-    flex: 1,
-    backgroundColor: BRAND.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-  },
-  insightChipLabel: {
-    color: BRAND.muted,
-    fontSize: 10,
-    fontFamily: TYPO.fontFamily.bold,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginBottom: 5,
-  },
-  insightChipValue: {
-    color: BRAND.text,
-    fontSize: 14,
-    fontFamily: TYPO.fontFamily.extrabold,
-  },
-  insightChipSub: {
-    color: BRAND.sub,
-    fontSize: 10.5,
-    fontFamily: TYPO.fontFamily.medium,
-    marginTop: 3,
-  },
-
-  sectionHeader: {
-    marginTop: 2,
-    marginBottom: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  sectionTitle: {
-    color: BRAND.text,
-    fontSize: 17,
-    fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.2,
-  },
-  sectionSub: {
-    color: BRAND.muted,
-    fontSize: 11,
-    marginTop: 3,
-    fontFamily: TYPO.fontFamily.semibold,
-  },
-  filterBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: BRAND.card2,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  positionCard: {
-    backgroundColor: BRAND.card,
-    padding: 14,
-    borderRadius: 20,
-    borderColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-  },
-  positionTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  symbolLine: { flexDirection: "row", alignItems: "center" },
-  symbol: {
-    color: BRAND.text,
-    fontSize: 18,
-    fontFamily: TYPO.fontFamily.extrabold,
-    marginRight: 8,
-  },
-  companyMeta: {
-    color: BRAND.muted,
-    fontSize: 11,
-    marginTop: 4,
-    fontFamily: TYPO.fontFamily.semibold,
-  },
-  positionRight: { alignItems: "flex-end" },
-  currentValue: {
-    color: BRAND.text,
-    fontSize: 14,
-    fontFamily: TYPO.fontFamily.extrabold,
-    fontVariant: ["tabular-nums"],
-  },
-  todayText: {
-    fontSize: 11.5,
-    fontFamily: TYPO.fontFamily.bold,
-    marginTop: 4,
-    fontVariant: ["tabular-nums"],
-  },
-  positionMiddle: {
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: BRAND.softBorder,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  plValue: {
-    fontSize: 14,
-    fontFamily: TYPO.fontFamily.extrabold,
-    flex: 1,
-    fontVariant: ["tabular-nums"],
-  },
-  aiInlineBtn: { paddingLeft: 10 },
-  aiInlineText: {
-    color: BRAND.sub,
-    fontSize: 12,
-    fontFamily: TYPO.fontFamily.semibold,
-  },
-  priceRow: {
-    marginTop: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  priceMeta: {
-    color: BRAND.sub,
-    fontSize: 11.5,
-    fontFamily: TYPO.fontFamily.medium,
-    fontVariant: ["tabular-nums"],
-  },
-
   editBtn: {
     backgroundColor: BRAND.blue,
     width: 78,
@@ -946,53 +937,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   actionText: { color: BRAND.text, fontWeight: "900" },
-
-  aiBox: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: BRAND.softBorder,
-    backgroundColor: BRAND.card2,
-  },
-  aiTitle: {
-    color: BRAND.amber,
-    fontSize: 13,
-    fontWeight: "900",
-    marginBottom: 10,
-  },
-  aiGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 8,
-  },
-  aiMiniCard: {
-    width: "48%",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BRAND.softBorder,
-    padding: 9,
-    backgroundColor: "rgba(15,23,42,0.75)",
-  },
-  aiLabel: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    fontWeight: "800",
-    marginBottom: 3,
-  },
-  aiValue: { color: BRAND.text, fontSize: 11.5, fontWeight: "900" },
-  aiParagraph: { color: BRAND.sub, fontSize: 12, lineHeight: 17, marginTop: 9 },
-  aiLoading: { color: BRAND.sub, fontSize: 12 },
-  aiError: { color: BRAND.amber, fontSize: 12 },
-  aiRebalancingTitle: {
-    color: BRAND.amber,
-    fontSize: 12,
-    fontWeight: "900",
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  aiRebalancingText: { color: BRAND.sub, fontSize: 12, lineHeight: 17 },
 
   emptyBox: {
     backgroundColor: BRAND.card,
@@ -1085,5 +1029,316 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     alignItems: "center",
     justifyContent: "center",
+  },
+  healthCard: {
+    backgroundColor: "#0B1220",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(0,227,150,0.22)",
+    shadowColor: "#00E396",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+    padding: 12,
+    marginBottom: 10,
+  },
+
+  healthHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+
+  healthTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  healthTitle: {
+    color: BRAND.text,
+    fontSize: 15.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.2,
+  },
+
+  healthContentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  healthRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 5,
+    borderColor: BRAND.green,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+    backgroundColor: "rgba(34,197,94,0.06)",
+  },
+
+  healthScore: {
+    color: BRAND.text,
+    fontSize: 18,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  healthLabel: {
+    color: BRAND.green,
+    fontSize: 9,
+    marginTop: 0,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  healthColumn: {
+    flex: 1,
+  },
+
+  healthColumnTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+
+  healthColumnTitle: {
+    fontSize: 10.5,
+    marginLeft: 4,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  healthBullet: {
+    color: BRAND.sub,
+    fontSize: 9.7,
+    lineHeight: 14.5,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+  holdingsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  holdingsTitle: {
+    color: BRAND.text,
+    fontSize: 19,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.3,
+  },
+
+  holdingsCount: {
+    color: BRAND.sub,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  groupBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 13,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  groupBtnText: {
+    color: BRAND.sub,
+    fontSize: 11.5,
+    marginRight: 5,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  tableHeader: {
+    paddingHorizontal: 4,
+    marginTop: 2,
+    marginBottom: 8,
+  },
+
+  tableHeaderText: {
+    color: BRAND.muted,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+
+  holdingRow: {
+    backgroundColor: "#0B1220",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.075)",
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  holdingTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  holdingAssetCol: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    paddingRight: 8,
+  },
+
+  holdingValueCol: {
+    minWidth: 112,
+    alignItems: "flex-end",
+  },
+
+  holdingLogo: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 9,
+  },
+
+  holdingLogoText: {
+    color: BRAND.text,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+  holdingLogoImage: {
+    width: 22,
+    height: 22,
+  },
+
+  holdingSymbol: {
+    color: BRAND.text,
+    fontSize: 14,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  holdingName: {
+    color: BRAND.muted,
+    fontSize: 10,
+    marginTop: 2,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  holdingValue: {
+    color: BRAND.text,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
+  },
+
+  holdingGain: {
+    fontSize: 11,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+  holdingMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.065)",
+    gap: 8,
+  },
+
+  holdingMeta: {
+    flex: 1,
+    color: BRAND.sub,
+    fontSize: 10.8,
+    fontFamily: TYPO.fontFamily.semibold,
+    fontVariant: ["tabular-nums"],
+  },
+  allocationCard: {
+    backgroundColor: "#0B1220",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(212,166,58,0.24)",
+    shadowColor: "#D4A63A",
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.09,
+    shadowRadius: 14,
+    elevation: 5,
+    padding: 12,
+    marginBottom: 10,
+  },
+
+  allocationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+
+  allocationTitle: {
+    color: BRAND.text,
+    fontSize: 16.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  allocationMeta: {
+    color: BRAND.muted,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  allocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  allocationSymbol: {
+    width: 48,
+    color: BRAND.text,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  allocationBarTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    overflow: "hidden",
+  },
+
+  allocationBarFill: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: "#D4A63A",
+  },
+
+  allocationPct: {
+    width: 48,
+    textAlign: "right",
+    color: BRAND.sub,
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  allocationEmpty: {
+    color: BRAND.muted,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+  holdingRowUp: {
+    borderColor: "rgba(0,227,150,0.18)",
+  },
+
+  holdingRowDown: {
+    borderColor: "rgba(255,69,96,0.18)",
   },
 });

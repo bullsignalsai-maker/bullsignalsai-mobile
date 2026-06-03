@@ -22,17 +22,24 @@ export default function MarketTicker() {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(blinkAnim, { toValue: 0.2, duration: 700, useNativeDriver: true }),
-        Animated.timing(blinkAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
-      ])
+        Animated.timing(blinkAnim, {
+          toValue: 0.2,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blinkAnim, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]),
     ).start();
   }, []);
 
   // 🔹 New backend-only load function
   const loadData = async () => {
     try {
-      const symbols =
-        "GSPC,DJI,IXIC,AAPL,MSFT,NVDA,TSLA,AMZN,META";
+      const symbols = "GSPC,DJI,IXIC,AAPL,MSFT,NVDA,TSLA,AMZN,META";
 
       const url = `https://bullbrain-api.onrender.com/quotes?symbols=${symbols}`;
       const res = await fetch(url);
@@ -57,7 +64,7 @@ export default function MarketTicker() {
 
       throw new Error("Backend returned empty");
     } catch (err) {
-      console.warn("⚠️ Ticker backend API failed:", err.message);
+      console.warn("Ticker backend API failed:", err.message);
 
       // Fallback static
       setTickers([
@@ -81,7 +88,7 @@ export default function MarketTicker() {
         duration: 25000,
         easing: Easing.linear,
         useNativeDriver: true,
-      })
+      }),
     );
     animationRef.current.start();
   };
@@ -121,8 +128,14 @@ export default function MarketTicker() {
 
   return (
     <View style={styles.container}>
-      <Animated.Text style={[styles.liveDot, { opacity: blinkAnim }]}>●</Animated.Text>
-      <Pressable onPressIn={handlePause} onPressOut={handleResume} style={{ flex: 1 }}>
+      <Animated.Text style={[styles.liveDot, { opacity: blinkAnim }]}>
+        ●
+      </Animated.Text>
+      <Pressable
+        onPressIn={handlePause}
+        onPressOut={handleResume}
+        style={{ flex: 1 }}
+      >
         <Animated.Text
           style={[styles.tickerText, { transform: [{ translateX }] }]}
           numberOfLines={1}

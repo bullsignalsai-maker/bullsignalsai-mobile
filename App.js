@@ -41,6 +41,8 @@ import { auth } from "./firebaseConfig";
 import FullChartScreen from "./screens/FullChartScreen";
 import AddAlertScreen from "./screens/AddAlertScreen";
 import SupportScreen from "./screens/SupportScreen";
+import MarketNewsScreen from "./screens/MarketNewsScreen";
+import MomentumMoversScreen from "./screens/MomentumMoversScreen";
 import { BRAND } from "./constants/theme";
 import { TYPO } from "./constants/typography";
 import {
@@ -65,8 +67,8 @@ function MainTabs() {
         tabBarIcon: ({ color, size }) => {
           const icons = {
             Home: "home-outline",
-            Watchlist: "star-outline",
-            Portfolio: "wallet-outline", // ⭐ NEW TAB ICON
+            Assets: "briefcase-outline",
+            Momentum: "trending-up-outline",
             Market: "analytics-outline",
             Profile: "person-outline",
           };
@@ -77,13 +79,17 @@ function MainTabs() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Watchlist" component={WatchlistScreen} />
-
-      {/* ⭐ RENAMED NEWS → PORTFOLIO (placeholder for now) */}
       <Tab.Screen
-        name="Portfolio"
-        component={PortfolioScreen}
-        options={{ title: "Portfolio" }}
+        name="Assets"
+        component={WatchlistScreen}
+        options={{ title: "Assets" }}
+      />
+
+      {/* ⭐ RENAMED NEWS → MOMENTUM (placeholder for now) */}
+      <Tab.Screen
+        name="Momentum"
+        component={MomentumMoversScreen}
+        options={{ title: "Momentum" }}
       />
 
       {/* ⭐ Market (Insights Screen) stays same */}
@@ -420,6 +426,11 @@ export default function App() {
             ),
           }}
         />
+        <Stack.Screen
+          name="MomentumMovers"
+          component={MomentumMoversScreen}
+          options={{ headerShown: false }}
+        />
         {/* ALERT SCREEN */}
         <Stack.Screen
           name="AlertScreen"
@@ -450,10 +461,22 @@ export default function App() {
           component={EditPositionScreen}
           options={{ headerShown: false }}
         />
+        <Stack.Screen
+          name="PortfolioScreen"
+          component={PortfolioScreen}
+          options={{ headerShown: false }}
+        />
+
         {/* AddPositionScreen (new) */}
         <Stack.Screen
           name="AddPositionScreen"
           component={AddPositionScreen}
+          options={{ headerShown: false }}
+        />
+
+        <Stack.Screen
+          name="MarketNewsScreen"
+          component={MarketNewsScreen}
           options={{ headerShown: false }}
         />
         {/* NOTIFICATIONS SCREEN (new) */}

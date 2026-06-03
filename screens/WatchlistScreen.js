@@ -17,6 +17,7 @@ import {
   LayoutAnimation,
   UIManager,
   FlatList,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -36,6 +37,7 @@ import {
 
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
+import PortfolioScreen from "./PortfolioScreen";
 import {
   displayRating,
   signalColor,
@@ -101,7 +103,7 @@ export default function WatchlistScreen({ navigation }) {
   const user = auth.currentUser;
   const priceFlash = useRef({}).current;
   const prevPrices = useRef({}).current;
-
+  const [viewMode, setViewMode] = useState("watchlist");
   const [items, setItems] = useState([]);
   const [newSymbol, setNewSymbol] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -137,7 +139,7 @@ export default function WatchlistScreen({ navigation }) {
 
     const t = setInterval(() => {
       loadWatchlist({ silent: true }); // snapshot-aware, TTL-safe
-    }, 30000); // align with snapshot TTL
+    }, 15000); // align with snapshot TTL
 
     return () => clearInterval(t);
   }, [user]);
@@ -266,14 +268,14 @@ export default function WatchlistScreen({ navigation }) {
     const s = (sym || newSymbol || "").split(" ")[0].toUpperCase().trim();
     if (!s || !user) return;
 
-    Keyboard.dismiss(); // ✅ hide keyboard immediately
+    Keyboard.dismiss();
     setSuggestions([]);
+    setNewSymbol("");
 
     try {
       await addToWatchlist(user.uid, s);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       showToast(`${s} added`);
-      setNewSymbol("");
       await loadWatchlist();
     } catch {
       showToast("Failed to add ticker");
@@ -386,7 +388,7 @@ export default function WatchlistScreen({ navigation }) {
     navigation.navigate("StockDetailScreen", {
       symbol: item.symbol,
       name: item.companyName || item.name || item.displayName || item.symbol,
-      source: "watchlist",
+      source: "ui",
     });
   };
 
@@ -537,8 +539,7 @@ export default function WatchlistScreen({ navigation }) {
     if (item.__type === "divider") {
       return <View style={styles.sectionDivider} />;
     }
-    // session comes from service (LIVE | LAST)
-    // flattened quote fields
+
     const price = item.price;
     const change = item.change;
     const changePct = item.changePct;
@@ -553,21 +554,23 @@ export default function WatchlistScreen({ navigation }) {
     );
 
     const isLive = session === "LIVE";
-    const isUp = typeof changePct === "number" ? changePct >= 0 : true;
+
+    const pct = typeof item.changePct === "number" ? item.changePct : 0;
+
+    const isUp = pct >= 0;
 
     // 🔧 normalize bullbrain fields (watchlist-safe)
     const signal = getAuthoritativeSignal(item);
-    const confidence =
-      typeof item.bullbrain?.confidence === "number"
-        ? item.bullbrain.confidence
-        : null;
 
-    const confidenceBadge = item.bullbrain?.confidenceBadge || null;
-    const isMarketClosed = session !== "LIVE";
-    const score = item.hybridScore || 0;
-    const color = signalColor(signal);
     const patternName = item.pattern?.name;
     const patternWinRate = item.pattern?.winRate;
+
+    const sessionDotColor =
+      session === "LIVE"
+        ? BRAND.accent
+        : session === "PRE"
+          ? BRAND.amber
+          : BRAND.sub;
 
     return (
       <Swipeable
@@ -577,14 +580,32 @@ export default function WatchlistScreen({ navigation }) {
       >
         <TouchableOpacity
           activeOpacity={0.85}
-          style={styles.card}
+          style={[styles.card, isUp ? styles.cardUp : styles.cardDown]}
           onPress={() => openDetails(item)}
           onLongPress={() => onLongPressItem(item)}
         >
           {/* HEADER */}
           <View style={styles.cardHeader}>
             {/* LEFT — Symbol + Company */}
-            <View style={{ flex: 1 }}>
+            <View
+              style={[
+                styles.symbolAvatar,
+                isUp ? styles.avatarUp : styles.avatarDown,
+              ]}
+            >
+              {item.logoUrl ? (
+                <Image
+                  source={{ uri: item.logoUrl }}
+                  style={styles.tickerLogoImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text style={styles.symbolAvatarText}>
+                  {String(item.symbol || "").slice(0, 2)}
+                </Text>
+              )}
+            </View>
+            <View style={styles.cardMiddle}>
               <View style={styles.symbolRow}>
                 <Text style={styles.symbol}>{item.symbol}</Text>
 
@@ -602,227 +623,373 @@ export default function WatchlistScreen({ navigation }) {
                   item.description ||
                   item.symbol}
               </Text>
+              <View style={styles.inlineSignalRow}>
+                <View
+                  style={[
+                    styles.inlineSignalBadge,
+                    { backgroundColor: signalColor(signal) },
+                  ]}
+                >
+                  <Text style={styles.inlineSignalText}>
+                    {displayRating(signal)}
+                  </Text>
+                </View>
+
+                <Text
+                  style={[
+                    styles.inlineConfidence,
+                    { color: signalColor(signal) },
+                  ]}
+                >
+                  {Math.round(item.bullbrain?.confidence ?? 0)}%
+                </Text>
+              </View>
             </View>
 
             {/* {/* RIGHT — Price + Change */}
+
             <View style={styles.priceBlock}>
               <Animated.Text
                 style={[
                   styles.price,
                   {
-                    color:
-                      session === "LIVE"
-                        ? changePct >= 0
-                          ? BRAND.accent
-                          : BRAND.red
-                        : BRAND.sub,
-
                     backgroundColor: priceFlash[item.symbol]?.interpolate({
                       inputRange: [0, 1],
                       outputRange: [
                         "transparent",
-                        changePct >= 0
-                          ? "rgba(0,227,150,0.30)"
-                          : "rgba(255,69,96,0.30)",
+                        isUp ? "rgba(0,227,150,0.30)" : "rgba(255,69,96,0.30)",
                       ],
                     }),
-                    paddingHorizontal: 8,
+                    paddingHorizontal: 6,
                     paddingVertical: 2,
-                    borderRadius: 8,
+                    borderRadius: 7,
+                    overflow: "hidden",
                   },
                 ]}
               >
                 ${fmt(price)}
               </Animated.Text>
 
-              {(() => {
-                const isLive = session === "LIVE";
+              <View style={styles.changeStack}>
+                <Text
+                  style={[
+                    styles.changePct,
+                    {
+                      color: isLive
+                        ? isUp
+                          ? BRAND.accent
+                          : BRAND.red
+                        : BRAND.sub,
+                      opacity: isLive ? 1 : 0.75,
+                    },
+                  ]}
+                >
+                  {isUp ? "▲" : "▼"} {Math.abs(pct).toFixed(2)}%
+                </Text>
 
-                const change =
-                  typeof item.change === "number" ? item.change : null;
-                const pct =
-                  typeof item.changePct === "number" ? item.changePct : null;
-
-                if (change == null || pct == null) {
-                  return (
-                    <Text style={[styles.changePct, { color: BRAND.sub }]}>
-                      -- {session || ""}
-                    </Text>
-                  );
-                }
-
-                const isUp = pct >= 0;
-
-                return (
-                  <Text
-                    style={[
-                      styles.changePct,
-                      {
-                        color: isLive
-                          ? isUp
-                            ? BRAND.accent
-                            : BRAND.red
-                          : BRAND.sub,
-                        opacity: isLive ? 1 : 0.75,
-                      },
-                    ]}
-                  >
-                    {isUp ? "▲" : "▼"} ${Math.abs(change).toFixed(2)} (
-                    {isUp ? "+" : "-"}
-                    {Math.abs(pct).toFixed(2)}%) {session}
-                  </Text>
-                );
-              })()}
+                <Text
+                  style={[
+                    styles.changeDollar,
+                    {
+                      color: isLive
+                        ? isUp
+                          ? BRAND.accent
+                          : BRAND.red
+                        : BRAND.sub,
+                      opacity: isLive ? 0.9 : 0.65,
+                    },
+                  ]}
+                >
+                  {fmtChange(change)}
+                </Text>
+              </View>
+              <View style={styles.sessionRow}>
+                <View
+                  style={[
+                    styles.sessionDot,
+                    { backgroundColor: sessionDotColor },
+                  ]}
+                />
+                <Text style={styles.sessionText}>{session || "LAST"}</Text>
+              </View>
             </View>
           </View>
-
-          {/* SIGNAL ROW */}
-          <View style={styles.signalRow}>
-            <View
-              style={[
-                styles.signalBadge,
-                { backgroundColor: signalColor(signal) },
-              ]}
-            >
-              <Text style={styles.signalText}>{displayRating(signal)}</Text>
-            </View>
-
-            <Text style={[styles.confInline, { color: signalColor(signal) }]}>
-              {Math.round(item.bullbrain?.confidence ?? 0)}% confidence
-            </Text>
-          </View>
-
-          <View style={styles.cardDivider} />
 
           {/* SUMMARY */}
 
-          <Text style={styles.summary} numberOfLines={3}>
+          <Text style={styles.summary} numberOfLines={2}>
             {item.watchlistSummary ||
               "AI analysis is preparing for this ticker."}
           </Text>
           {/* SMART PATTERN */}
           {!!patternName && (
             <View style={styles.patternRow}>
-              <Text style={styles.patternLabel}>Pattern</Text>
-              <Text style={styles.patternValue}>
-                {formatPatternLabel(patternName, patternWinRate)}
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text style={styles.patternLabel}>Pattern</Text>
+                <Text style={styles.patternValue}>
+                  {formatPatternLabel(patternName, patternWinRate)}
+                </Text>
+              </View>
+
+              <Text style={styles.patternTime}>
+                {timeAgoFrom(item.lastUpdated || item.quote_updated_at)}
               </Text>
             </View>
           )}
 
           {/* UPDATED */}
-          <View style={styles.cardFooterRow}>
-            <Text style={styles.lastUpdated}>
-              {timeAgoFrom(item.lastUpdated || item.quote_updated_at)}
-            </Text>
-            <Text style={styles.tapHint}>Tap for details</Text>
-          </View>
         </TouchableOpacity>
       </Swipeable>
     );
   };
+  const bullishSignals = new Set([
+    "BUY",
+    "STRONG_BULLISH",
+    "BULLISH_WATCH",
+    "MOMENTUM_WATCH",
+  ]);
 
+  const neutralSignals = new Set(["HOLD", "HIGH_RISK_MOMENTUM", "CAUTION"]);
+
+  const bearishSignals = new Set(["SELL", "BEARISH_WATCH"]);
+
+  const buyCount = items.filter((x) =>
+    bullishSignals.has(getAuthoritativeSignal(x)),
+  ).length;
+
+  const holdCount = items.filter((x) =>
+    neutralSignals.has(getAuthoritativeSignal(x)),
+  ).length;
+
+  const sellCount = items.filter((x) =>
+    bearishSignals.has(getAuthoritativeSignal(x)),
+  ).length;
+  const avgConfidence =
+    items.length > 0
+      ? Math.round(
+          items.reduce(
+            (sum, x) =>
+              sum + Number(x.bullbrain?.confidence ?? x.hybridScore ?? 0),
+            0,
+          ) / items.length,
+        )
+      : 0;
   return (
     <View style={styles.container}>
-      <View style={styles.topBar}>
-        <View>
-          <Text style={styles.headerTitle}>Watchlist</Text>
+      <View style={styles.assetsHero}>
+        <View style={styles.assetsTitleRow}>
+          <View style={styles.assetsSparkle}>
+            <Ionicons name="sparkles" size={22} color="#D4A63A" />
+          </View>
 
-          <Text style={styles.syncInline}>Updated {timeAgo()}</Text>
+          <View>
+            <Text style={styles.assetsTitle}>My Assets</Text>
+            <Text style={styles.assetsSubtitle}>Track. Analyze. Grow.</Text>
+          </View>
         </View>
 
-        <TouchableOpacity
-          onPress={toggleSortModal}
-          style={styles.sortCompactBtn}
-          activeOpacity={0.82}
-        >
-          <Ionicons name="filter-outline" size={15} color={BRAND.sub} />
-
-          <Text style={styles.sortCompactText}>{items.length} tracked</Text>
-        </TouchableOpacity>
+        {viewMode === "watchlist" ? (
+          <TouchableOpacity
+            onPress={toggleSortModal}
+            style={styles.assetsIconBtn}
+            activeOpacity={0.82}
+          >
+            <Ionicons name="options-outline" size={18} color={BRAND.text} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.assetsIconPlaceholder} />
+        )}
       </View>
 
-      <View style={styles.addRow}>
-        <Ionicons name="search-outline" size={18} color="#6B7280" />
-        <TextInput
-          style={styles.input}
-          value={newSymbol}
-          placeholder="Search or add ticker (e.g., AAPL)"
-          placeholderTextColor="#6B7280"
-          onChangeText={handleInputChange}
-          autoCapitalize="characters"
-          returnKeyType="done"
-          onSubmitEditing={() => handleAddTicker()}
-          blurOnSubmit={true}
-        />
+      <View style={styles.modeSwitch}>
         <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => handleAddTicker()}
           activeOpacity={0.85}
+          style={
+            viewMode === "watchlist" ? styles.modePillActive : styles.modePill
+          }
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setViewMode("watchlist");
+          }}
         >
-          <Ionicons name="add" size={20} color="#000" />
+          <Ionicons
+            name="star-outline"
+            size={14}
+            color={viewMode === "watchlist" ? "#D4A63A" : BRAND.sub}
+          />
+          <Text
+            style={
+              viewMode === "watchlist"
+                ? styles.modePillActiveText
+                : styles.modePillText
+            }
+          >
+            Watchlist
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={
+            viewMode === "portfolio" ? styles.modePillActive : styles.modePill
+          }
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setViewMode("portfolio");
+          }}
+        >
+          <Ionicons
+            name="wallet-outline"
+            size={14}
+            color={viewMode === "portfolio" ? "#D4A63A" : BRAND.sub}
+          />
+          <Text
+            style={
+              viewMode === "portfolio"
+                ? styles.modePillActiveText
+                : styles.modePillText
+            }
+          >
+            Portfolio
+          </Text>
         </TouchableOpacity>
       </View>
-
-      {suggestions.length > 0 && (
-        <View style={styles.suggestionsBox}>
-          {suggestions.map((s, idx) => (
-            <TouchableOpacity
-              key={`${s.symbol}-${idx}`}
-              onPress={() => handleAddTicker(s.symbol)}
-              style={styles.suggestionRow}
-              activeOpacity={0.85}
-            >
-              <Ionicons
-                name="trending-up-outline"
-                size={16}
-                color={BRAND.sub}
-              />
-              <Text style={styles.suggestionText}>
-                {s.symbol} – {s.desc}
+      {viewMode === "watchlist" && (
+        <View style={styles.intelligenceCard}>
+          <View style={styles.intelligenceTopRow}>
+            <View>
+              <Text style={styles.intelligenceTitle}>
+                Watchlist Intelligence
               </Text>
-            </TouchableOpacity>
-          ))}
+              <Text style={styles.intelligenceSub}>
+                AI signal health across tracked assets
+              </Text>
+            </View>
+
+            <View style={styles.intelligenceScore}>
+              <Text style={styles.intelligenceScoreText}>{avgConfidence}%</Text>
+              <Text style={styles.intelligenceScoreLabel}>
+                {avgConfidence >= 70
+                  ? "Bullish"
+                  : avgConfidence >= 50
+                    ? "Neutral"
+                    : "Cautious"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.signalStatsCompactRow}>
+            <Text style={styles.signalCompactText}>
+              Bullish <Text style={styles.signalCompactValue}>{buyCount}</Text>
+            </Text>
+
+            <View style={styles.signalCompactDot} />
+
+            <Text style={styles.signalCompactText}>
+              Neutral <Text style={styles.signalCompactValue}>{holdCount}</Text>
+            </Text>
+
+            <View style={styles.signalCompactDot} />
+
+            <Text style={styles.signalCompactText}>
+              Bearish <Text style={styles.signalCompactValue}>{sellCount}</Text>
+            </Text>
+
+            <View style={styles.signalCompactDot} />
+
+            <Text style={styles.signalCompactText}>
+              Tracked{" "}
+              <Text style={styles.signalCompactValue}>{items.length}</Text>
+            </Text>
+          </View>
         </View>
       )}
+      {viewMode === "portfolio" ? (
+        <PortfolioScreen navigation={navigation} embedded />
+      ) : (
+        <>
+          <View style={styles.addRow}>
+            <Ionicons name="search-outline" size={18} color="#6B7280" />
+            <TextInput
+              style={styles.input}
+              value={newSymbol}
+              placeholder="Search or add ticker (e.g., AAPL)"
+              placeholderTextColor="#6B7280"
+              onChangeText={handleInputChange}
+              autoCapitalize="characters"
+              returnKeyType="done"
+              onSubmitEditing={() => handleAddTicker()}
+              blurOnSubmit={true}
+            />
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => handleAddTicker()}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add" size={20} color="#000" />
+            </TouchableOpacity>
+          </View>
 
-      <FlatList
-        data={displayList}
-        keyExtractor={(item, index) => `${item.symbol}-${index}`}
-        renderItem={renderItem}
-        refreshControl={
-          <RefreshControl
-            tintColor={BRAND.accent}
-            refreshing={refreshing}
-            onRefresh={() => loadWatchlist({ silent: false })}
+          {suggestions.length > 0 && (
+            <View style={styles.suggestionsBox}>
+              {suggestions.map((s, idx) => (
+                <TouchableOpacity
+                  key={`${s.symbol}-${idx}`}
+                  onPress={() => handleAddTicker(s.symbol)}
+                  style={styles.suggestionRow}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons
+                    name="trending-up-outline"
+                    size={16}
+                    color={BRAND.sub}
+                  />
+                  <Text style={styles.suggestionText}>
+                    {s.symbol} – {s.desc}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          <FlatList
+            data={displayList}
+            keyExtractor={(item, index) => `${item.symbol}-${index}`}
+            renderItem={renderItem}
+            refreshControl={
+              <RefreshControl
+                tintColor={BRAND.accent}
+                refreshing={refreshing}
+                onRefresh={() => loadWatchlist({ silent: false })}
+              />
+            }
+            contentContainerStyle={{ paddingBottom: 110 }}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Ionicons name="bookmark-outline" size={56} color="#333" />
+                <Text style={styles.emptyTitle}>Your watchlist is empty</Text>
+                <Text style={styles.emptyText}>
+                  Search for a stock and tap + to track it.
+                </Text>
+              </View>
+            }
+            ListFooterComponent={
+              <View style={styles.footerWrap}>
+                <Text style={styles.footerText}>
+                  Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
+                </Text>
+
+                <Text style={styles.disclaimer}>
+                  Watchlist prices, AI ratings, alerts, and market context are
+                  provided for informational and educational purposes only and
+                  are not financial, investment, trading, or tax advice.
+                </Text>
+              </View>
+            }
           />
-        }
-        contentContainerStyle={{ paddingBottom: 110 }}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="bookmark-outline" size={56} color="#333" />
-            <Text style={styles.emptyTitle}>Your watchlist is empty</Text>
-            <Text style={styles.emptyText}>
-              Search for a stock and tap + to track it.
-            </Text>
-          </View>
-        }
-        ListFooterComponent={
-          <View style={styles.footerWrap}>
-            <Text style={styles.footerText}>
-              Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
-            </Text>
-
-            <Text style={styles.disclaimer}>
-              Watchlist prices, AI ratings, alerts, and market context are
-              provided for informational and educational purposes only and are
-              not financial, investment, trading, or tax advice.
-            </Text>
-          </View>
-        }
-      />
-
+        </>
+      )}
       <Modal transparent visible={sortVisible} animationType="none">
         <TouchableOpacity
           style={styles.modalOverlay}
@@ -956,253 +1123,288 @@ export default function WatchlistScreen({ navigation }) {
     </View>
   );
 }
+const PREMIUM = {
+  cardSoft: "#0B1220",
+  border: "rgba(255,255,255,0.065)",
+  borderStrong: "rgba(255,255,255,0.095)",
+  glass: "rgba(255,255,255,0.038)",
+  textSoft: "rgba(255,255,255,0.92)",
+};
 
-/* ================= STYLES ================= */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BRAND.bg },
 
+  topBar: {
+    paddingTop: 52,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
   headerTitle: {
-    color: BRAND.text,
-    fontSize: 26,
+    color: PREMIUM.textSoft,
+    fontSize: 29,
     fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.3,
+    letterSpacing: -0.9,
+  },
+
+  syncInline: {
+    color: BRAND.sub,
+    fontSize: 11.5,
+    marginTop: 2,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  sortCompactBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: PREMIUM.glass,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: PREMIUM.border,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+
+  sortCompactText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    marginLeft: 5,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   addRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: BRAND.card2,
-    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderRadius: 22,
     paddingHorizontal: 14,
-    marginHorizontal: 10,
-    marginTop: 1,
+    marginHorizontal: 6,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    minHeight: 54,
+    borderColor: "rgba(255, 255, 255, 0.18)",
+    minHeight: 40,
   },
 
   input: {
     flex: 1,
     color: BRAND.text,
-    fontSize: 15,
-    paddingVertical: 12,
+    fontSize: 14,
+    paddingVertical: 11,
     marginLeft: 10,
     fontFamily: TYPO.fontFamily.medium,
   },
 
   addBtn: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    width: 36,
-    height: 36,
+    borderRadius: 15,
+    width: 32,
+    height: 32,
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 8,
   },
 
-  suggestionsBox: {
-    marginHorizontal: 18,
-    backgroundColor: BRAND.card,
-    borderRadius: 10,
+  card: {
+    backgroundColor: PREMIUM.cardSoft,
+    borderRadius: 18,
+
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+
+    marginHorizontal: 6,
+    marginBottom: 9,
+
     borderWidth: 1,
-    borderColor: BRAND.border,
-    marginTop: 6,
-    marginBottom: 8,
+    borderColor: "rgba(0,227,150,0.16)",
+
+    shadowColor: "#00E396",
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 5,
+
     overflow: "hidden",
   },
 
-  suggestionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#0B1220",
-  },
+  cardUp: {
+    borderLeftWidth: 3,
+    borderLeftColor: BRAND.accent,
 
-  suggestionText: {
-    color: "#D1D5DB",
-    fontSize: 13,
-    marginLeft: 8,
+    borderColor: "rgba(0,227,150,0.18)",
   },
-  card: {
-    backgroundColor: BRAND.card,
-    borderRadius: 18,
-    padding: 12,
-    marginHorizontal: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: BRAND.border,
-  },
+  cardDown: {
+    borderLeftWidth: 3,
+    borderLeftColor: BRAND.red,
 
+    borderColor: "rgba(255,69,96,0.18)",
+  },
   cardHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  symbolAvatar: {
+    width: 38,
+    height: 38,
+    marginRight: 11,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  avatarUp: {
+    backgroundColor: "rgba(0,227,150,0.10)",
+    borderColor: "rgba(0,227,150,0.22)",
+  },
+
+  avatarDown: {
+    backgroundColor: "rgba(255,69,96,0.10)",
+    borderColor: "rgba(255,69,96,0.22)",
+  },
+
+  symbolAvatarText: {
+    color: PREMIUM.textSoft,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  cardMiddle: {
+    flex: 1,
+    paddingRight: 8,
+  },
+
+  symbolRow: {
+    flexDirection: "row",
     alignItems: "center",
   },
 
   symbol: {
-    color: BRAND.text,
-    fontSize: 17,
+    color: PREMIUM.textSoft,
+    fontSize: 18,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.4,
+  },
+
+  moveLabelInline: {
+    marginLeft: 7,
+    fontSize: 10,
     fontFamily: TYPO.fontFamily.bold,
   },
 
   name: {
     color: BRAND.sub,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 12.3,
+    lineHeight: 15,
+    marginTop: 1,
     fontFamily: TYPO.fontFamily.medium,
   },
+
   priceBlock: {
+    width: 96,
     alignItems: "flex-end",
-    minWidth: 90,
+    paddingTop: 1,
   },
 
   price: {
-    color: BRAND.text,
-    fontSize: 18,
+    color: PREMIUM.textSoft,
+    fontSize: 15.8,
     fontFamily: TYPO.fontFamily.extrabold,
     fontVariant: ["tabular-nums"],
   },
+
+  changeStack: {
+    alignItems: "flex-end",
+    marginTop: 3,
+  },
+
   changePct: {
     fontSize: 12,
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
+  },
+
+  changeDollar: {
+    fontSize: 11,
+    marginTop: 1,
     fontFamily: TYPO.fontFamily.semibold,
     fontVariant: ["tabular-nums"],
   },
 
-  summary: {
-    color: BRAND.sub,
-    fontSize: 12.5,
-    lineHeight: 18,
-    fontFamily: TYPO.fontFamily.medium,
-  },
-
-  signalText: {
-    color: "#000",
-    fontSize: 11.5,
-    fontFamily: TYPO.fontFamily.bold,
-  },
-
-  confInline: {
-    fontSize: 12,
-    fontFamily: TYPO.fontFamily.bold,
-  },
-
-  lastUpdated: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    opacity: 0.85,
-    fontFamily: TYPO.fontFamily.semibold,
-  },
-
-  tapHint: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    fontFamily: TYPO.fontFamily.semibold,
-  },
   signalRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 6,
+    marginTop: 4,
   },
 
   signalBadge: {
     borderRadius: 999,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    marginRight: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 7,
   },
 
   signalText: {
     color: "#000",
-    fontSize: 11.5,
-    fontWeight: "900",
+    fontSize: 9.8,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   confInline: {
+    fontSize: 10.4,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  summary: {
+    color: PREMIUM.textSoft,
     fontSize: 12,
-    fontWeight: "800",
+    lineHeight: 16,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.medium,
+    opacity: 0.92,
   },
-
-  cardDivider: {
-    height: 1,
-    backgroundColor: BRAND.border,
-    marginTop: 6,
-    marginBottom: 6,
-    opacity: 0.65,
-  },
-
-  confLabel: {
-    color: BRAND.sub,
-    fontSize: 12,
-    marginRight: 4,
-  },
-
-  confValue: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
   patternRow: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    marginTop: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 9,
+    justifyContent: "space-between",
+    marginTop: 2,
+    paddingVertical: 2,
+    paddingHorizontal: 7,
     borderRadius: 999,
-    backgroundColor: BRAND.card2,
+    backgroundColor: "rgba(99,102,241,0.08)",
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: "rgba(129,140,248,0.18)",
+  },
+  patternTime: {
+    color: BRAND.muted,
+    fontSize: 9,
+    fontFamily: TYPO.fontFamily.medium,
   },
   patternLabel: {
-    color: BRAND.muted,
-    fontSize: 10,
+    color: "#A5B4FC",
+    fontSize: 8.5,
     fontWeight: "900",
-    marginRight: 6,
+    marginRight: 5,
     textTransform: "uppercase",
-  },
-  cardFooterRow: {
-    marginTop: 5,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    letterSpacing: 0.45,
   },
 
   patternValue: {
-    color: BRAND.sub,
-    fontSize: 10.5,
+    color: "#D1D5DB",
+    fontSize: 9.4,
     fontWeight: "800",
   },
-  patternBadge: {
-    alignSelf: "flex-start",
-    marginTop: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-  },
 
-  patternText: {
-    color: "#000",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-  },
-  lastUpdated: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    fontWeight: "700",
-    opacity: 0.85,
-  },
-  tapHint: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    fontWeight: "700",
-  },
   sectionHeader: {
     marginHorizontal: 12,
     marginTop: 2,
-    marginBottom: 4,
+    marginBottom: 5,
     color: "#9CA3AF",
     fontSize: 12,
     fontWeight: "900",
@@ -1212,9 +1414,36 @@ const styles = StyleSheet.create({
 
   sectionDivider: {
     height: 1,
-    backgroundColor: "#0B1220",
+    backgroundColor: "rgba(255,255,255,0.05)",
     marginHorizontal: 18,
-    marginVertical: 10,
+    marginVertical: 8,
+  },
+
+  suggestionsBox: {
+    marginHorizontal: 10,
+    backgroundColor: BRAND.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: PREMIUM.border,
+    marginTop: 4,
+    marginBottom: 8,
+    overflow: "hidden",
+  },
+
+  suggestionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.045)",
+  },
+
+  suggestionText: {
+    color: "#D1D5DB",
+    fontSize: 12,
+    marginLeft: 8,
+    flex: 1,
   },
 
   emptyState: {
@@ -1238,10 +1467,10 @@ const styles = StyleSheet.create({
   },
 
   swipeDelete: {
-    width: 96,
-    marginRight: 18,
-    marginBottom: 10,
-    borderRadius: 14,
+    width: 90,
+    marginRight: 10,
+    marginBottom: 9,
+    borderRadius: 18,
     backgroundColor: BRAND.red,
     alignItems: "center",
     justifyContent: "center",
@@ -1258,25 +1487,25 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-start",
     alignItems: "flex-end",
-    paddingTop: 160,
-    paddingRight: 20,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    paddingTop: 150,
+    paddingRight: 18,
+    backgroundColor: "rgba(0,0,0,0.45)",
   },
 
   sortBox: {
     backgroundColor: BRAND.card,
-    borderRadius: 10,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: PREMIUM.borderStrong,
     width: 230,
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
 
   sortOption: {
     color: "#E5E7EB",
     fontSize: 13,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
   },
 
   sortOptionActive: {
@@ -1296,9 +1525,9 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 520,
     backgroundColor: BRAND.card,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: PREMIUM.borderStrong,
     padding: 14,
   },
 
@@ -1311,9 +1540,9 @@ const styles = StyleSheet.create({
 
   noteInput: {
     minHeight: 120,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: PREMIUM.border,
     padding: 12,
     color: "#E5E7EB",
     backgroundColor: "#0B1220",
@@ -1339,7 +1568,7 @@ const styles = StyleSheet.create({
   },
 
   footerWrap: {
-    marginTop: 24,
+    marginTop: 22,
     marginBottom: 30,
     paddingHorizontal: 22,
     alignItems: "center",
@@ -1351,67 +1580,270 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontFamily: TYPO.fontFamily.medium,
   },
+
   footerBrand: {
-    color: BRAND.text,
+    color: PREMIUM.textSoft,
     fontSize: 13.5,
     fontFamily: TYPO.fontFamily.brand,
     letterSpacing: -0.45,
   },
+
   disclaimer: {
     color: BRAND.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 10.5,
+    lineHeight: 15.5,
     textAlign: "center",
   },
-  symbolRow: {
+  sessionRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-  },
-
-  moveLabelInline: {
-    marginLeft: 7,
-    marginTop: 0,
-    fontSize: 10.5,
-    fontFamily: TYPO.fontFamily.semibold,
-    fontStyle: "italic",
-    letterSpacing: -0.15,
-  },
-  topBar: {
-    paddingTop: 54,
-    paddingHorizontal: 18,
-    marginBottom: 6,
-
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  syncInline: {
-    color: BRAND.muted,
-    fontSize: 11,
+    justifyContent: "flex-end",
     marginTop: 2,
+  },
+
+  sessionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    marginRight: 4,
+  },
+
+  sessionText: {
+    color: BRAND.muted,
+    fontSize: 9.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+  inlineSignalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+
+  inlineSignalBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginRight: 6,
+  },
+
+  inlineSignalText: {
+    color: "#000",
+    fontSize: 8.8,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  inlineConfidence: {
+    fontSize: 10.2,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+  tickerLogoImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  modeSwitch: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.075)",
+    borderRadius: 999,
+    padding: 4,
+    marginHorizontal: 6,
+    marginBottom: 6,
+  },
+
+  modePillActive: {
+    flex: 1,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: "rgba(212,166,58,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(212,166,58,0.30)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+
+  modePillActiveText: {
+    color: "#D4A63A",
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  modePill: {
+    flex: 1,
+    height: 34,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+
+  modePillText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+  assetsHero: {
+    paddingTop: 54,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  assetsTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  assetsSparkle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+    backgroundColor: "rgba(212,166,58,0.10)",
+  },
+
+  assetsTitle: {
+    color: PREMIUM.textSoft,
+    fontSize: 24,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.8,
+  },
+
+  assetsSubtitle: {
+    color: BRAND.sub,
+    fontSize: 11,
+    marginTop: 1,
     fontFamily: TYPO.fontFamily.medium,
   },
 
-  sortCompactBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-
-    backgroundColor: BRAND.card2,
-    borderRadius: 999,
-
+  assetsIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.055)",
     borderWidth: 1,
-    borderColor: BRAND.border,
-
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  sortCompactText: {
+  intelligenceCard: {
+    backgroundColor: PREMIUM.cardSoft,
+    borderRadius: 22,
+    marginHorizontal: 6,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "rgba(0,227,150,0.22)",
+    shadowColor: "#00E396",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
+    padding: 10,
+  },
+
+  intelligenceTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+
+  intelligenceTitle: {
+    color: PREMIUM.textSoft,
+    fontSize: 17,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.25,
+  },
+
+  intelligenceSub: {
     color: BRAND.sub,
     fontSize: 11,
-    marginLeft: 5,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  intelligenceScore: {
+    alignItems: "flex-end",
+  },
+
+  intelligenceScoreText: {
+    color: BRAND.accent,
+    fontSize: 21,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  intelligenceScoreLabel: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  signalStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  signalStat: {
+    flex: 1,
+  },
+
+  signalStatLabel: {
+    color: BRAND.sub,
+    fontSize: 9,
+    marginTop: 4,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  signalStatValue: {
+    color: PREMIUM.textSoft,
+    fontSize: 13,
+    marginTop: 5,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  signalDivider: {
+    width: 1,
+    height: 42,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    marginHorizontal: 8,
+  },
+  signalStatsCompactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginTop: 2,
+  },
+
+  signalCompactText: {
+    color: BRAND.sub,
+    fontSize: 10.5,
     fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  signalCompactValue: {
+    color: PREMIUM.textSoft,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  signalCompactDot: {
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    marginHorizontal: 7,
+  },
+  assetsIconPlaceholder: {
+    width: 44,
+    height: 44,
   },
 });

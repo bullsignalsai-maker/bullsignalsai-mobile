@@ -19,6 +19,7 @@ import {
   PanResponder,
   ActivityIndicator,
   Platform,
+  Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -123,6 +124,7 @@ export default function FullChartScreen({ route, navigation }) {
   const params = route?.params || {};
   const symbol = String(params.symbol || "").toUpperCase();
   const companyName = params.companyName || params.name || symbol || "—";
+  const logoUrl = params.logoUrl || params.profile?.logoUrl || null;
   const quote = params.quote || null;
   const bullbrain = params.bullbrain || null;
 
@@ -530,11 +532,27 @@ export default function FullChartScreen({ route, navigation }) {
           style={styles.headerCard}
         >
           <View style={styles.headerTopRow}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={styles.symbol}>{symbol || "—"}</Text>
-              <Text style={styles.name} numberOfLines={1}>
-                {companyName || "—"}
-              </Text>
+            <View style={styles.headerIdentity}>
+              <View style={styles.headerLogoWrap}>
+                {logoUrl ? (
+                  <Image
+                    source={{ uri: logoUrl }}
+                    style={styles.headerLogo}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Text style={styles.headerLogoText}>
+                    {String(symbol || "A").slice(0, 1)}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.symbol}>{symbol || "—"}</Text>
+                <Text style={styles.name} numberOfLines={1}>
+                  {companyName || "—"}
+                </Text>
+              </View>
             </View>
 
             <View style={{ alignItems: "flex-end" }}>
@@ -1555,5 +1573,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 6,
+  },
+  headerIdentity: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: 10,
+  },
+
+  headerLogoWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 11,
+  },
+
+  headerLogo: {
+    width: 28,
+    height: 28,
+  },
+
+  headerLogoText: {
+    color: BRAND.accent,
+    fontSize: 18,
+    fontFamily: TYPO.fontFamily.extrabold,
   },
 });

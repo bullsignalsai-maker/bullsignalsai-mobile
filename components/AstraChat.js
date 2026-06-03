@@ -32,7 +32,18 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
   const buildAllChips = () => {
     const isMarketMode = portfolioData?.contextType === "market";
     const isStockDetailMode = portfolioData?.contextType === "stock_detail";
+    const isMomentumMode = portfolioData?.contextType === "momentum_movers";
+    if (isMomentumMode) {
+      const sym = portfolioData?.selectedMover?.symbol || "this mover";
 
+      return [
+        { id: "mover_why", label: `Why is ${sym} moving?` },
+        { id: "mover_quality", label: "Is this move real?" },
+        { id: "mover_risk", label: "What are the risks?" },
+        { id: "momentum_summary", label: "Summarize momentum movers" },
+        { id: "mover_compare", label: "Compare top movers" },
+      ];
+    }
     if (isMarketMode) {
       return [
         { id: "market_pulse", label: "Explain today’s market pulse" },
@@ -108,33 +119,42 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
   };
 
   useEffect(() => {
-    if (visible) {
-      setMessages([
-        {
-          id: "welcome",
-          from: "astra",
-          text:
-            portfolioData?.contextType === "market"
-              ? "Ask Astra about market context, risk sentiment, movers, news, crypto, and major indexes."
-              : portfolioData?.contextType === "stock_detail"
-                ? `Ask Astra about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
-                : "Ask Astra about your portfolio, holdings, risk exposure, and performance context.",
-        },
-      ]);
+    if (!visible) return;
 
-      setInput("");
-      setAskedIds([]);
-      setSuggestedFollowups([]);
-    }
-  }, [visible]);
+    setMessages([
+      {
+        id: "welcome",
+        from: "astra",
+        text:
+          portfolioData?.contextType === "momentum_movers"
+            ? "Ask Clara why movers are running, whether the move looks real, key risks, and which momentum setups stand out."
+            : portfolioData?.contextType === "market"
+              ? "Ask Clara about market context, risk sentiment, movers, news, crypto, and major indexes."
+              : portfolioData?.contextType === "stock_detail"
+                ? `Ask Clara about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
+                : "Ask Clara about your portfolio, holdings, risk exposure, and performance context.",
+      },
+    ]);
+
+    setInput("");
+    setLoading(false);
+    setAskedIds([]);
+    setSuggestedFollowups([]);
+  }, [
+    visible,
+    portfolioData?.contextType,
+    portfolioData?.selectedMover?.symbol,
+  ]);
 
   const askAstra = async ({ question_id = null, question_text = null }) => {
     const isStockDetailMode = portfolioData?.contextType === "stock_detail";
     const isMarketMode = portfolioData?.contextType === "market";
+    const isMomentumMode = portfolioData?.contextType === "momentum_movers";
 
     if (
       !isStockDetailMode &&
       !isMarketMode &&
+      !isMomentumMode &&
       (!portfolioData ||
         !portfolioData.positions ||
         portfolioData.positions.length === 0)
@@ -144,7 +164,7 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
         {
           id: makeId("err"),
           from: "astra",
-          text: "Add at least one stock to your portfolio so Astra can explain performance and risk context.",
+          text: "Add at least one stock to your portfolio so Clara can explain performance and risk context.",
         },
       ]);
       scrollToEnd();
@@ -187,12 +207,14 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
           text: m.text,
         }));
 
-      const result = await askAstraService({
+      const astraPayload = {
         ...portfolioData,
         question_id,
         question: question_text || label,
         chat_history: chatHistory,
-      });
+      };
+
+      const result = await askAstraService(astraPayload);
 
       setMessages((prev) => [
         ...prev.filter((m) => m.from !== "typing"),
@@ -201,7 +223,7 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
           from: "astra",
           text:
             result?.answer?.trim() ||
-            "Astra could not generate a response right now. Please try again.",
+            "Clara could not generate a response right now. Please try again.",
           cards: result?.cards || [],
         },
       ]);
@@ -209,14 +231,14 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
       setSuggestedFollowups(result.suggestedFollowups || []);
       scrollToEnd();
     } catch (err) {
-      console.warn("AstraChat error:", err);
+      console.warn("ClaraChat error:", err);
 
       setMessages((prev) => [
         ...prev.filter((m) => m.from !== "typing"),
         {
           id: makeId("err"),
           from: "astra",
-          text: "Astra is temporarily unavailable. Please try again shortly.",
+          text: "Clara is temporarily unavailable. Please try again shortly.",
         },
       ]);
 
@@ -239,11 +261,13 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
         id: "welcome",
         from: "astra",
         text:
-          portfolioData?.contextType === "market"
-            ? "Ask Astra about market context, risk sentiment, movers, news, crypto, and major indexes."
-            : portfolioData?.contextType === "stock_detail"
-              ? `Ask Astra about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
-              : "Ask Astra about your portfolio, holdings, risk exposure, and performance context.",
+          portfolioData?.contextType === "momentum_movers"
+            ? "Ask Clara why movers are running, whether the move looks real, key risks, and which momentum setups stand out."
+            : portfolioData?.contextType === "market"
+              ? "Ask Clara about market context, risk sentiment, movers, news, crypto, and major indexes."
+              : portfolioData?.contextType === "stock_detail"
+                ? `Ask Clara about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
+                : "Ask Clara about your portfolio, holdings, risk exposure, and performance context.",
       },
     ]);
 
@@ -270,7 +294,7 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
                 </View>
 
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.astraTitle}>Astra</Text>
+                  <Text style={styles.astraTitle}>Clara</Text>
                   <Text style={styles.astraTagline}>
                     AI Market & Portfolio Assistant
                   </Text>
@@ -429,7 +453,7 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
             <View style={styles.inputRow}>
               <TextInput
                 style={styles.input}
-                placeholder="Ask Astra anything..."
+                placeholder="Ask Clara anything..."
                 placeholderTextColor={BRAND.muted}
                 value={input}
                 onChangeText={setInput}

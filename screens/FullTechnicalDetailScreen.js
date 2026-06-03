@@ -18,6 +18,7 @@ import {
   Pressable,
   Platform,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -114,7 +115,7 @@ const TOOLTIP = {
 
 /* ================= COMPONENT ================= */
 export default function FullTechnicalDetailScreen({ route }) {
-  const { symbol, companyName, quote, technical, featuresMeta } =
+  const { symbol, companyName, quote, logoUrl, technical, featuresMeta } =
     route.params || {};
   const [technicalDetail, setTechnicalDetail] = useState(null);
   const [loadingTechnical, setLoadingTechnical] = useState(true);
@@ -326,11 +327,28 @@ export default function FullTechnicalDetailScreen({ route }) {
           style={styles.headerCard}
         >
           <View style={styles.headerTopRow}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={styles.symbol}>{sourceSymbol || "—"}</Text>
-              <Text style={styles.name} numberOfLines={1}>
-                {sourceCompanyName || "—"}
-              </Text>
+            <View style={styles.headerIdentity}>
+              <View style={styles.logoWrap}>
+                {logoUrl ? (
+                  <Image
+                    source={{ uri: logoUrl }}
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Text style={styles.logoText}>
+                    {String(sourceSymbol || "A").slice(0, 1)}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.symbol}>{sourceSymbol || "—"}</Text>
+
+                <Text style={styles.name} numberOfLines={1}>
+                  {sourceCompanyName || "—"}
+                </Text>
+              </View>
             </View>
 
             <View style={{ alignItems: "flex-end" }}>
@@ -1128,5 +1146,35 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: "center",
     fontFamily: TYPO.fontFamily.regular,
+  },
+  headerIdentity: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
+    paddingRight: 12,
+  },
+
+  logoWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 11,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+  },
+
+  logoImage: {
+    width: 32,
+    height: 32,
+  },
+
+  logoText: {
+    color: BRAND.text,
+    fontSize: 20,
+    fontFamily: TYPO.fontFamily.extrabold,
   },
 });

@@ -277,7 +277,7 @@ export default function MarketMoversScreen({ navigation }) {
           navigation.navigate("StockDetailScreen", {
             symbol: item.symbol,
             name: item.company || item.symbol,
-            source: "market_movers",
+            source: "ui",
           });
         }}
       >
@@ -290,6 +290,16 @@ export default function MarketMoversScreen({ navigation }) {
           <View style={styles.rowTop}>
             <View style={styles.symbolBlock}>
               <View style={styles.symbolLine}>
+                {item.logoUrl ? (
+                  <View style={styles.marketMoverLogoWrap}>
+                    <Image
+                      source={{ uri: item.logoUrl }}
+                      style={styles.marketMoverLogo}
+                      resizeMode="contain"
+                    />
+                  </View>
+                ) : null}
+
                 <Text style={styles.symbol}>{item.symbol}</Text>
 
                 <MoveLabel
@@ -314,11 +324,24 @@ export default function MarketMoversScreen({ navigation }) {
             </View>
           </View>
 
-          {!!item.oneLiner && (
-            <Text style={styles.oneLiner} numberOfLines={2}>
-              {item.oneLiner}
-            </Text>
-          )}
+          {(() => {
+            const catalystText = Array.isArray(item.primaryCatalysts)
+              ? item.primaryCatalysts.join(" • ")
+              : typeof item.primaryCatalysts === "string"
+                ? item.primaryCatalysts.replace(/,/g, " • ")
+                : "";
+
+            const contextText =
+              item.reason || catalystText || item.oneLiner || "";
+
+            if (!contextText) return null;
+
+            return (
+              <Text style={styles.oneLiner} numberOfLines={2}>
+                {contextText}
+              </Text>
+            );
+          })()}
 
           <View style={styles.rowBottom}>
             <View style={styles.trendWrap}>
@@ -1341,5 +1364,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 10,
     fontFamily: TYPO.fontFamily.medium,
+  },
+  marketMoverLogoWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+
+  marketMoverLogo: {
+    width: 18,
+    height: 18,
   },
 });

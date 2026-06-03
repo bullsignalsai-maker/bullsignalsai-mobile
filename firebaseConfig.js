@@ -138,7 +138,7 @@ function applyFifoSell(lots, sharesToSell) {
 }
 
 // 🔹 BUY helper — append FIFO lot & recalc totals
-export async function buyShares(userId, symbol, shares, price) {
+export async function buyShares(userId, symbol, shares, price, logoUrl = null) {
   try {
     const sym = symbol.toUpperCase();
     const ref = doc(db, "users", userId, "portfolio", sym);
@@ -159,6 +159,11 @@ export async function buyShares(userId, symbol, shares, price) {
       ref,
       {
         symbol: sym,
+
+        profile: {
+          logoUrl,
+        },
+
         lots,
         shares: totalShares,
         avgCost,
@@ -166,8 +171,6 @@ export async function buyShares(userId, symbol, shares, price) {
       },
       { merge: true },
     );
-
-    console.log("💹 BUY applied for", sym, "lots:", lots.length);
   } catch (err) {
     console.warn("buyShares error:", err.message || err);
     throw err;
@@ -206,7 +209,7 @@ export async function sellShares(userId, symbol, sharesToSell) {
     if (newShares <= 0) {
       // fully closed position
       await deleteDoc(ref);
-      console.log("✅ Position closed:", sym);
+
       return;
     }
 
@@ -221,8 +224,6 @@ export async function sellShares(userId, symbol, sharesToSell) {
       },
       { merge: true },
     );
-
-    console.log("💹 SELL applied for", sym, "lots now:", lots.length);
   } catch (err) {
     console.warn("sellShares error:", err.message || err);
     throw err;
@@ -230,8 +231,14 @@ export async function sellShares(userId, symbol, sharesToSell) {
 }
 
 // 🔸 Keep existing API used by screens — alias addPosition → BUY
-export async function addPosition(userId, symbol, shares, avgCost) {
-  return buyShares(userId, symbol, shares, avgCost);
+export async function addPosition(
+  userId,
+  symbol,
+  shares,
+  avgCost,
+  logoUrl = null,
+) {
+  return buyShares(userId, symbol, shares, avgCost, logoUrl);
 }
 
 // UPDATE PARTIAL FIELDS (if you still use it anywhere)
@@ -275,6 +282,7 @@ export async function getPortfolio(userId) {
 
       list.push({
         symbol: data.symbol || d.id,
+        profile: data.profile || {},
         lots,
         shares: totalShares,
         avgCost,
@@ -302,7 +310,6 @@ export async function saveToFirestoreCache(docId, data) {
       data,
       updated_at: new Date().toISOString(),
     });
-    console.log(`✅ AI Pulse saved to Firestore: ${docId}`);
   } catch (err) {
     console.warn("saveToFirestoreCache error:", err.message);
   }
@@ -324,11 +331,9 @@ export async function getFromFirestoreCache(docId, maxAgeHours = 3) {
     const ageHours = (Date.now() - new Date(updated_at).getTime()) / 3600000;
 
     if (ageHours > maxAgeHours) {
-      console.log(`⏰ AI Pulse cache expired (${ageHours.toFixed(1)}h)`);
       return null;
     }
 
-    console.log(`💾 Using AI Pulse cache (${ageHours.toFixed(2)}h old)`);
     return data;
   } catch (err) {
     console.warn("getFromFirestoreCache error:", err.message);
@@ -350,7 +355,6 @@ export async function saveHotlistCache(data) {
       },
       { merge: true },
     );
-    console.log("🔥 Hotlist cached (client write)");
   } catch (err) {
     console.warn("saveHotlistCache error:", err.message);
   }
@@ -371,11 +375,9 @@ export async function getHotlistCache(maxAgeMinutes = 5) {
     const ageMinutes = (Date.now() - new Date(updated_at).getTime()) / 60000;
 
     if (ageMinutes > maxAgeMinutes) {
-      console.log("⏰ Hotlist cache expired");
       return null;
     }
 
-    console.log(`💾 Using Hotlist cache (${ageMinutes.toFixed(1)}m old)`);
     return data;
   } catch (err) {
     console.warn("getHotlistCache error:", err.message);
@@ -397,7 +399,6 @@ export async function saveBearwatchCache(data) {
       },
       { merge: true },
     );
-    console.log("🔥 BearWatch cached (client write)");
   } catch (err) {
     console.warn("saveBearwatchCache error:", err.message);
   }
@@ -418,11 +419,9 @@ export async function getBearwatchCache(maxAgeMinutes = 5) {
     const ageMinutes = (Date.now() - new Date(updated_at).getTime()) / 60000;
 
     if (ageMinutes > maxAgeMinutes) {
-      console.log("⏰ BearWatch cache expired");
       return null;
     }
 
-    console.log(`💾 Using BearWatch cache (${ageMinutes.toFixed(1)}m old)`);
     return data;
   } catch (err) {
     console.warn("getBearwatchCache error:", err.message);

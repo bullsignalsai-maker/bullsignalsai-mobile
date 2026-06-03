@@ -23,7 +23,10 @@ export default {
       bundleIdentifier: "ai.alphaclara.app",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
-        NSPhotoLibraryUsageDescription: "Allow access to your photos to upload profile picture.",
+        NSPhotoLibraryUsageDescription:
+          "Alphaclara uses photo library access only when you choose to upload a profile picture.",
+        NSUserNotificationUsageDescription:
+          "Alphaclara sends optional market alerts, watchlist updates, and account notifications when you enable notifications.",
       },
     },
 
@@ -33,18 +36,14 @@ export default {
         backgroundColor: "#ffffff",
       },
       edgeToEdgeEnabled: true,
-      package: "ai.alphaclara.app",           
+      package: "ai.alphaclara.app",
     },
 
     web: {
       favicon: "./assets/favicon.png",
     },
 
-    plugins: [
-      "expo-secure-store",
-      "expo-asset",
-      "expo-notifications",
-    ],
+    plugins: ["expo-secure-store", "expo-asset", "expo-notifications"],
 
     updates: {
       url: "https://u.expo.dev/2bfff8b1-676c-461b-a991-ed884e800110",

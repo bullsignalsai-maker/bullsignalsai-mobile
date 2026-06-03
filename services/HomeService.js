@@ -74,6 +74,7 @@ export async function getHomeMovers() {
       .map((m) => ({
         symbol: String(m.symbol || "").toUpperCase(),
         company: m.company || m.companyName || m.symbol,
+        logoUrl: m.logoUrl || m.profile?.logoUrl || null,
         price: m.price ?? m.quote?.price ?? null,
         change: m.change ?? m.quote?.change ?? null,
         changePct: m.changePct ?? m.quote?.changePct ?? null,
@@ -81,11 +82,144 @@ export async function getHomeMovers() {
         oneLiner: m.oneLiner || null,
         quote_updated_at: m.quote_updated_at || m.quote?.updated_at || null,
         lastUpdated: m.quote_updated_at || m.quote?.updated_at || null,
+        reason: m.reason || null,
+        primaryCatalysts: m.primaryCatalysts || null,
+        primaryCatalystFirst:
+          typeof m.primaryCatalysts === "string"
+            ? m.primaryCatalysts.split(",")[0]?.trim()
+            : Array.isArray(m.primaryCatalysts)
+              ? m.primaryCatalysts[0]
+              : null,
+        candidateType: m.candidateType || null,
+        riskLevel: m.riskLevel || null,
+        sessionType: m.sessionType || null,
       }));
   } catch (err) {
     console.warn("Home movers error:", err.message);
     return [];
   }
+}
+
+export async function getVerifiedAlpha() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/verified-alpha`);
+    if (!res.ok) return emptyVerifiedAlpha();
+
+    const json = await res.json();
+
+    return {
+      status: json.status || "empty",
+      source: json.source || null,
+      updatedAt: json.updated_at || null,
+      sessionType: json.session_type || null,
+      marketSummary: json.market_summary || {},
+      fallbackUsed: json.fallback_used === true,
+
+      opportunities: normalizeVerifiedItems(json.alpha_opportunities || []),
+      gainers: [],
+      losers: [],
+    };
+  } catch (err) {
+    console.warn("Verified alpha error:", err.message);
+    return emptyVerifiedAlpha();
+  }
+}
+
+function emptyVerifiedAlpha() {
+  return {
+    status: "empty",
+    source: null,
+    updatedAt: null,
+    sessionType: null,
+    marketSummary: {},
+    fallbackUsed: true,
+    opportunities: [],
+    gainers: [],
+    losers: [],
+  };
+}
+
+function normalizeVerifiedItems(items = []) {
+  const seen = new Set();
+
+  return items
+    .filter((x) => x?.symbol)
+    .filter((x) => {
+      const symbol = String(x.symbol || "").toUpperCase();
+      if (seen.has(symbol)) return false;
+      seen.add(symbol);
+      return true;
+    })
+    .slice(0, 10)
+    .map((x, idx) => {
+      const quote = x.quote || {};
+
+      const rawPrice = x.price ?? quote.price ?? null;
+      const rawChange = x.change ?? quote.change ?? null;
+      const rawChangePct = x.changePct ?? quote.changePct ?? null;
+
+      const price = rawPrice != null ? Number(rawPrice) : null;
+      const change = rawChange != null ? Number(rawChange) : null;
+      const changePct = rawChangePct != null ? Number(rawChangePct) : null;
+
+      return {
+        rank: idx + 1,
+        symbol: String(x.symbol || "").toUpperCase(),
+        companyName: x.companyName || x.company || x.symbol,
+        logoUrl: x.logoUrl || x.profile?.logoUrl || null,
+        sector: x.sector || null,
+
+        price: Number.isFinite(price) ? price : null,
+        change: Number.isFinite(change) ? change : null,
+        changePct: Number.isFinite(changePct) ? changePct : null,
+
+        score: Number(x.score ?? x.opportunityScore ?? x.confidence ?? 0),
+        opportunityScore: Number(x.opportunityScore ?? x.score ?? 0),
+        marketMomentumBonus: Number(x.marketMomentumBonus ?? 0),
+        probUp: Number(x.probUp ?? 0),
+        confidence: Number(x.confidence ?? 0),
+
+        signal: x.signal || "HOLD",
+
+        setupLabel: x.setupLabel || x.pattern || "AI Opportunity",
+        reason: cleanAlphaText(
+          x.reason || "Verified catalyst-backed opportunity.",
+        ),
+        primaryCatalysts: x.primaryCatalysts || null,
+        primaryCatalystFirst:
+          typeof x.primaryCatalysts === "string"
+            ? x.primaryCatalysts.split(",")[0]?.trim()
+            : Array.isArray(x.primaryCatalysts)
+              ? x.primaryCatalysts[0]
+              : null,
+        whyNow: Array.isArray(x.whyNow)
+          ? x.whyNow.map(cleanAlphaText).filter(Boolean).slice(0, 3)
+          : Array.isArray(x.primaryCatalysts)
+            ? x.primaryCatalysts.map(cleanAlphaText).filter(Boolean).slice(0, 3)
+            : typeof x.primaryCatalysts === "string"
+              ? x.primaryCatalysts
+                  .split(",")
+                  .map((s) => cleanAlphaText(s))
+                  .filter(Boolean)
+                  .slice(0, 3)
+              : [],
+        riskLevel: x.riskLevel || "Medium",
+        riskFlags: Array.isArray(x.riskFlags) ? x.riskFlags : [],
+        theme: x.theme || x.sector || null,
+        pattern: x.pattern || null,
+        marketRegime: x.marketRegime || null,
+        factorScores: x.factorScores || {},
+        quoteVerified: x.quoteVerified === true,
+        source: x.source || "verified_alpha",
+        lastUpdated:
+          x.quote_updated_at ||
+          x.computed_at ||
+          x.generatedAt ||
+          x.generated_at ||
+          x.updated_at ||
+          null,
+      };
+    });
 }
 /* =========================================================
    HEADER
@@ -126,7 +260,7 @@ function buildHomeSignals(stocks = [], quotes = {}) {
     return {
       symbol: sym,
       companyName: s.companyName || s.company_name || s.name || sym,
-
+      logoUrl: s.logoUrl || s.profile?.logoUrl || null,
       price,
       change,
       changePct,
@@ -190,6 +324,7 @@ function buildAlphaWatch(alphaWatch = {}) {
         rank: idx + 1,
         symbol: String(x.symbol || "").toUpperCase(),
         companyName: x.companyName || x.company_name || x.symbol,
+        logoUrl: x.logoUrl || x.profile?.logoUrl || null,
         price: x.price ?? null,
         change: x.change ?? null,
         changePct: x.changePct ?? null,
@@ -204,6 +339,9 @@ function buildAlphaWatch(alphaWatch = {}) {
         riskFlags: Array.isArray(x.riskFlags) ? x.riskFlags : [],
         theme: x.theme || null,
         pattern: x.pattern || null,
+        marketMomentumBonus: Number(x.marketMomentumBonus ?? 0),
+        probUp: Number(x.probUp ?? 0),
+        factorScores: x.factorScores || {},
         marketRegime: x.marketRegime || alphaWatch.market_regime || null,
         lastUpdated:
           x.quote_updated_at || x.computed_at || alphaWatch.updated_at || null,

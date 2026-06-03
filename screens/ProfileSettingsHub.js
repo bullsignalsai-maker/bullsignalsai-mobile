@@ -15,9 +15,11 @@ import {
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Path, Circle } from "react-native-svg";
 import { useFocusEffect } from "@react-navigation/native";
-import { registerForPushNotifications } from "../services/pushNotificationService";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth, db } from "../firebaseConfig";
 import { deleteUser } from "firebase/auth";
@@ -52,9 +54,6 @@ export default function ProfileSettingsHub({ navigation }) {
         const email = (await AsyncStorage.getItem("userToken")) || "";
         const userId = auth.currentUser?.uid;
 
-        if (userId) {
-          registerForPushNotifications(userId);
-        }
         let saved = {};
 
         if (userId) {
@@ -242,6 +241,8 @@ export default function ProfileSettingsHub({ navigation }) {
               await deleteDoc(
                 doc(db, "users", userId, "preferences", "notifications"),
               );
+              await deleteCollectionDocs(["users", userId, "alert_state"]);
+              await deleteCollectionDocs(["users", userId, "news_ai"]);
               await deleteDoc(doc(db, "users", userId));
 
               await AsyncStorage.multiRemove(["userToken", "profile_" + email]);
@@ -282,80 +283,117 @@ export default function ProfileSettingsHub({ navigation }) {
   const SettingsRow = ({
     icon,
     label,
+    subtitle,
     onPress,
     right,
     danger = false,
     style,
   }) => (
     <TouchableOpacity
-      activeOpacity={0.8}
+      activeOpacity={0.82}
       onPress={onPress}
       style={[styles.row, style]}
     >
       <View style={styles.rowLeft}>
-        <Ionicons
-          name={icon}
-          size={18}
-          color={danger ? BRAND.red : BRAND.accent}
-        />
-        <Text style={[styles.rowLabel, danger && { color: BRAND.red }]}>
-          {label}
-        </Text>
+        <View style={[styles.iconBubble, danger && styles.dangerBubble]}>
+          <Ionicons
+            name={icon}
+            size={20}
+            color={danger ? BRAND.red : BRAND.accent}
+          />
+        </View>
+
+        <View>
+          <Text style={[styles.rowLabel, danger && { color: BRAND.red }]}>
+            {label}
+          </Text>
+
+          {!!subtitle && <Text style={styles.rowSubtitle}>{subtitle}</Text>}
+        </View>
       </View>
 
       {right ? (
         right
       ) : (
-        <Ionicons name="chevron-forward" size={18} color={BRAND.muted} />
+        <Ionicons name="chevron-forward" size={20} color={BRAND.muted} />
       )}
     </TouchableOpacity>
   );
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND.bg }}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Account</Text>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={styles.headerSubtitle}>
+            Manage your account and preferences
+          </Text>
         </View>
         {/* PROFILE CARD */}
         <View style={styles.profileCard}>
+          <LinearGradient
+            colors={["#07111F", "#07111F", "rgba(0,227,150,0.34)"]}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+
+          <Svg style={styles.meshSvg} viewBox="0 0 220 150">
+            <Path
+              d="M0 115 C55 70 95 135 150 70 C180 35 205 45 220 25"
+              stroke="rgba(80,255,190,0.18)"
+              strokeWidth="1"
+              fill="none"
+            />
+            <Path
+              d="M0 130 C60 82 105 142 160 82 C188 52 205 58 220 42"
+              stroke="rgba(80,255,190,0.13)"
+              strokeWidth="1"
+              fill="none"
+            />
+            <Path
+              d="M0 145 C68 94 112 150 170 96 C195 72 210 74 220 62"
+              stroke="rgba(80,255,190,0.10)"
+              strokeWidth="1"
+              fill="none"
+            />
+            <Circle cx="172" cy="38" r="2" fill="rgba(80,255,190,0.45)" />
+            <Circle cx="194" cy="58" r="2" fill="rgba(80,255,190,0.35)" />
+          </Svg>
+
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={handleAvatarChange}
-            style={styles.avatarTopRight}
+            style={styles.avatarWrap}
           >
             {user.avatar ? (
               <Image source={{ uri: user.avatar }} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Ionicons name="person" size={32} color={BRAND.sub} />
+                <Ionicons name="person" size={34} color={BRAND.sub} />
               </View>
             )}
 
             <View style={styles.avatarEditBadge}>
-              <Ionicons name="pencil" size={12} color="#0A0A0A" />
+              <Ionicons name="pencil" size={13} color={BRAND.accent} />
             </View>
           </TouchableOpacity>
 
-          <View style={styles.nameRow}>
-            <Text style={styles.name}>{fullName}</Text>
+          <View style={styles.profileMain}>
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>
+                {fullName}
+              </Text>
+              <Ionicons name="checkmark-circle" size={18} color="#FACC15" />
+            </View>
 
-            {!editable && (
-              <TouchableOpacity
-                style={styles.nameEditBtn}
-                onPress={() => setEditable(true)}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="pencil" size={13} color={BRAND.sub} />
-              </TouchableOpacity>
-            )}
+            <Text style={styles.email} numberOfLines={1}>
+              {user.email || "No email available"}
+            </Text>
+
+            <View style={styles.rolePill}>
+              <Text style={styles.roleText}>{user.bio || "Founder"}</Text>
+            </View>
           </View>
-
-          <Text style={styles.email}>{user.email || "No email available"}</Text>
-
-          {!!user.bio ? (
-            <Text style={styles.profileBio}>{user.bio}</Text>
-          ) : null}
         </View>
 
         {editable && (
@@ -440,28 +478,35 @@ export default function ProfileSettingsHub({ navigation }) {
           <SettingsRow
             icon="notifications-outline"
             label="Notification Preferences"
+            subtitle="Manage how you receive updates"
             onPress={() => navigation.navigate("Notifications")}
           />
 
           <SettingsRow
             icon="information-circle-outline"
             label="About Alphaclara"
+            subtitle="Learn more about our platform"
             onPress={() => navigation.navigate("About")}
           />
+
           <SettingsRow
-            icon="help-circle-outline"
+            icon="headset-outline"
             label="Support & Help"
+            subtitle="Get help and contact support"
             onPress={() => navigation.navigate("Support")}
           />
+
           <SettingsRow
             icon="shield-outline"
             label="Privacy Policy"
+            subtitle="How we protect your data"
             onPress={() => navigation.navigate("PrivacyPolicy")}
           />
 
           <SettingsRow
             icon="document-text-outline"
             label="Terms of Use"
+            subtitle="Read our terms and conditions"
             onPress={() => navigation.navigate("TermsOfUseScreen")}
           />
         </View>
@@ -473,12 +518,14 @@ export default function ProfileSettingsHub({ navigation }) {
           <SettingsRow
             icon="log-out-outline"
             label="Logout"
+            subtitle="Sign out of your account"
             onPress={handleLogout}
           />
 
           <SettingsRow
             icon="trash-outline"
             label="Delete Account"
+            subtitle="Permanently delete your account"
             onPress={handleDeleteAccount}
             danger
           />
@@ -515,39 +562,81 @@ export default function ProfileSettingsHub({ navigation }) {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BRAND.bg,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 4,
   },
 
   header: {
-    marginBottom: 6,
+    marginTop: 2,
+    marginBottom: 14,
   },
 
   headerTitle: {
     color: BRAND.text,
-    fontSize: 26,
+    fontSize: 28,
     fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.3,
+    letterSpacing: -0.7,
+  },
+
+  headerSubtitle: {
+    color: BRAND.sub,
+    fontSize: 14,
+    marginTop: 4,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   profileCard: {
-    backgroundColor: "rgba(17,24,39,0.82)",
-
+    position: "relative",
+    overflow: "hidden",
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 24,
-
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 18,
-
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-
-    marginTop: 8,
+    borderColor: "rgba(80,255,190,0.22)",
+    marginTop: 2,
+    minHeight: 130,
+    shadowColor: BRAND.accent,
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 9 },
+    elevation: 9,
   },
+
+  meshSvg: {
+    position: "absolute",
+    right: -2,
+    bottom: -12,
+    width: 245,
+    height: 158,
+    opacity: 1,
+  },
+
+  shieldMark: {
+    position: "absolute",
+    right: 34,
+    top: 25,
+    opacity: 1,
+  },
+
+  avatarWrap: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    marginRight: 16,
+    backgroundColor: "rgba(0,227,150,0.08)",
+    borderWidth: 1.6,
+    borderColor: "rgba(0,227,150,0.42)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 3,
+  },
+
   avatar: {
     width: 82,
     height: 82,
@@ -558,57 +647,107 @@ const styles = StyleSheet.create({
     width: 82,
     height: 82,
     borderRadius: 41,
-    backgroundColor: BRAND.card2,
+    backgroundColor: "rgba(255,255,255,0.06)",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  avatarEditBadge: {
+    position: "absolute",
+    right: -3,
+    bottom: -3,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#102033",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(80,255,190,0.58)",
+  },
+
+  profileMain: {
+    flex: 1,
+    zIndex: 3,
+    paddingRight: 36,
+  },
+
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 
   name: {
     color: BRAND.text,
-    fontSize: 22,
+    fontSize: 20,
     fontFamily: TYPO.fontFamily.extrabold,
     flexShrink: 1,
+    letterSpacing: -0.35,
   },
 
   email: {
     color: BRAND.sub,
     fontSize: 13,
-    marginTop: 4,
+    marginTop: 5,
     fontFamily: TYPO.fontFamily.medium,
-    paddingRight: 90,
   },
-  editCard: {
-    backgroundColor: "rgba(17,24,39,0.82)",
 
-    borderRadius: 22,
-
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
-
-    paddingHorizontal: 15,
-    paddingTop: 15,
-    paddingBottom: 14,
-
+  rolePill: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,227,150,0.13)",
+    borderWidth: 1,
+    borderColor: "rgba(0,227,150,0.24)",
+  },
+
+  roleText: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  editCard: {
+    backgroundColor: "rgba(15,23,42,0.92)",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    marginTop: 8,
   },
 
   editHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
+    marginBottom: 12,
   },
 
   sectionTitle: {
     color: BRAND.text,
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: TYPO.fontFamily.extrabold,
   },
 
+  nameFieldsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  nameFieldCol: {
+    flex: 1,
+  },
+
   fieldBlock: {
-    marginBottom: 9,
+    marginBottom: 10,
   },
 
   fieldLabel: {
@@ -619,10 +758,10 @@ const styles = StyleSheet.create({
   },
 
   input: {
-    backgroundColor: BRAND.card2,
-    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 15,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 12,
     color: BRAND.text,
     fontSize: 15,
     fontFamily: TYPO.fontFamily.semibold,
@@ -631,19 +770,19 @@ const styles = StyleSheet.create({
   },
 
   bioInput: {
-    height: 72,
+    height: 76,
     textAlignVertical: "top",
   },
 
   lockedInputWrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: BRAND.card2,
-    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 15,
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    opacity: 0.65,
+    opacity: 0.68,
   },
 
   lockedInput: {
@@ -662,24 +801,24 @@ const styles = StyleSheet.create({
 
   saveBtn: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
-    paddingVertical: 11,
-    borderRadius: 14,
+    backgroundColor: BRAND.accent,
+    paddingVertical: 12,
+    borderRadius: 15,
     alignItems: "center",
   },
 
   saveText: {
-    color: "#0A0A0A",
+    color: "#03110C",
     fontFamily: TYPO.fontFamily.bold,
   },
 
   cancelBtn: {
     flex: 1,
-    backgroundColor: BRAND.card2,
+    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
-    paddingVertical: 11,
-    borderRadius: 14,
+    paddingVertical: 12,
+    borderRadius: 15,
     alignItems: "center",
   },
 
@@ -690,54 +829,85 @@ const styles = StyleSheet.create({
 
   groupTitle: {
     color: BRAND.muted,
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: TYPO.fontFamily.bold,
-    marginTop: 16,
-    marginBottom: 8,
+
+    marginTop: 12,
+    marginBottom: 6,
+
+    marginLeft: 2,
+
     textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.9,
   },
 
   card: {
-    backgroundColor: "rgba(17,24,39,0.82)",
-    borderRadius: 18,
+    backgroundColor: "rgba(15,23,42,0.90)",
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.08)",
     paddingHorizontal: 14,
-    paddingVertical: 4,
+    paddingVertical: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
 
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
+    borderBottomColor: "rgba(255,255,255,0.07)",
   },
 
   rowLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 14,
+    flex: 1,
+  },
+
+  iconBubble: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(0,227,150,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  dangerBubble: {
+    backgroundColor: "rgba(239,68,68,0.10)",
   },
 
   rowLabel: {
     color: BRAND.text,
     fontSize: 15,
-    fontFamily: TYPO.fontFamily.medium,
+    fontFamily: TYPO.fontFamily.semibold,
+    letterSpacing: -0.2,
+  },
+
+  rowSubtitle: {
+    color: BRAND.sub,
+    fontSize: 12,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   toast: {
     position: "absolute",
     bottom: 90,
     alignSelf: "center",
-    backgroundColor: BRAND.card,
+    backgroundColor: "rgba(15,23,42,0.96)",
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(0,227,150,0.18)",
   },
 
   toastText: {
@@ -745,85 +915,22 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.bold,
   },
 
-  disclaimer: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    lineHeight: 15,
-    textAlign: "center",
-    marginTop: 6,
-    paddingHorizontal: 20,
-    fontFamily: TYPO.fontFamily.regular,
-  },
-  avatarTopRight: {
-    position: "absolute",
-    top: 18,
-    right: 18,
-  },
-
-  profileBio: {
-    color: BRAND.sub,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 10,
-    fontFamily: TYPO.fontFamily.regular,
-    paddingRight: 90,
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 2,
-    paddingRight: 110,
-  },
-  nameEditBtn: {
-    marginLeft: 8,
-
-    width: 24,
-    height: 24,
-
-    borderRadius: 12,
-
-    backgroundColor: "rgba(255,255,255,0.06)",
-
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    flexShrink: 0,
-  },
-
-  avatarEditBadge: {
-    position: "absolute",
-    right: -2,
-    bottom: -2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: BRAND.card,
-  },
-  nameFieldsRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-
-  nameFieldCol: {
-    flex: 1,
-  },
   footerWrap: {
-    marginTop: 34,
+    marginTop: 14,
     marginBottom: 8,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 22,
+    backgroundColor: "rgba(15,23,42,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
     alignItems: "center",
   },
 
   powered: {
     color: BRAND.sub,
     fontSize: 12,
+    marginBottom: 6,
     fontFamily: TYPO.fontFamily.medium,
   },
 

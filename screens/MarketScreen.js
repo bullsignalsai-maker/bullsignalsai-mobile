@@ -12,10 +12,19 @@ import {
   Alert,
   Linking,
   Animated,
+  Image,
 } from "react-native";
-
+import Svg, {
+  Path,
+  Circle,
+  Line,
+  Defs,
+  Stop,
+  LinearGradient as SvgLinearGradient,
+} from "react-native-svg";
 import * as Haptics from "expo-haptics";
-
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   getMarketOverview,
   getMarketMovers,
@@ -237,6 +246,7 @@ export default function MarketScreen({ navigation }) {
   }
 
   const groupedNews = groupNewsByDate(news);
+  const todayNews = groupedNews.today || [];
 
   const usMarketItems = getCarouselItems(carousel, "us_market");
   const cryptoItems = getCarouselItems(carousel, "crypto").filter((i) =>
@@ -266,15 +276,24 @@ export default function MarketScreen({ navigation }) {
 
     const rawChange =
       typeof q.change === "number" ? q.change : price * (q.changePct / 100);
-
     return (
       <View
         key={ticker || label}
         style={[styles.tableRow, priceFlashStyle(prevPrice, price)]}
       >
-        <Text style={styles.colSymbol} numberOfLines={1}>
-          {label}
-        </Text>
+        <View style={styles.assetCell}>
+          {item.logoUrl ? (
+            <Image
+              source={{ uri: item.logoUrl }}
+              style={styles.assetLogo}
+              resizeMode="contain"
+            />
+          ) : null}
+
+          <Text style={styles.assetLabel} numberOfLines={1}>
+            {label}
+          </Text>
+        </View>
 
         <Text style={styles.colPrice}>${formatPrice(price)}</Text>
 
@@ -307,12 +326,22 @@ export default function MarketScreen({ navigation }) {
           navigation.navigate("StockDetailScreen", {
             symbol: m.symbol,
             name: m.company || m.symbol,
-            source: "market_movers",
+            source: "ui",
           });
         }}
       >
         <View style={styles.moverTopRow}>
-          <Text style={styles.moverSymbol}>{m.symbol}</Text>
+          <View style={styles.moverSymbolRow}>
+            {m.logoUrl ? (
+              <Image
+                source={{ uri: m.logoUrl }}
+                style={styles.moverLogo}
+                resizeMode="contain"
+              />
+            ) : null}
+
+            <Text style={styles.moverSymbol}>{m.symbol}</Text>
+          </View>
           <Text style={styles.moverPrice}>
             {typeof m.price === "number" ? `$${m.price.toFixed(2)}` : "—"}
           </Text>
@@ -353,15 +382,20 @@ export default function MarketScreen({ navigation }) {
       <StatusBar barStyle="light-content" backgroundColor={BRAND.bg} />
 
       <View style={styles.stickyHeader}>
-        <Text style={styles.headerTitle}>Market Intelligence</Text>
+        <View style={styles.headerTopRow}>
+          <View>
+            <Text style={styles.headerTitle}>Market</Text>
 
-        <View style={styles.marketHeaderPill}>
-          <View style={styles.marketHeaderDot} />
-          <Text style={styles.updatedTime}>Updated {lastUpdated} ET</Text>
+            <View style={styles.updatedInline}>
+              <View style={styles.marketHeaderDot} />
+              <Text style={styles.updatedTime}>Updated {lastUpdated} ET</Text>
+            </View>
+          </View>
         </View>
       </View>
 
       <ScrollView
+        showsVerticalScrollIndicator={false}
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -375,12 +409,53 @@ export default function MarketScreen({ navigation }) {
         {/* MARKET SNAPSHOT */}
         <View style={styles.overviewCard}>
           <View style={styles.overviewTopRow}>
-            <View>
-              <Text style={styles.cardEyebrow}>Market Snapshot</Text>
-              <Text style={styles.marketStatusText}>
-                {overview?.marketStatus || "Market"} ·{" "}
-                {overview?.marketMood || "Overview"}
-              </Text>
+            <View style={styles.snapshotHeroLeft}>
+              <View style={styles.snapshotBadgeRow}>
+                <View
+                  style={[
+                    styles.marketLiveDot,
+                    overview?.marketStatus === "Market Closed" && {
+                      backgroundColor: "#6B7280",
+                    },
+                  ]}
+                />
+
+                <Text style={styles.cardEyebrow}>MARKET SNAPSHOT</Text>
+              </View>
+
+              <View style={styles.snapshotTitleRow}>
+                <Text style={styles.marketStatusText}>
+                  {overview?.marketStatus || "Market Open"}
+                </Text>
+
+                <View
+                  style={[
+                    styles.marketMoodPill,
+                    overview?.marketMood?.toLowerCase() === "bullish" && {
+                      backgroundColor: "rgba(0,227,150,0.14)",
+                      borderColor: "rgba(0,227,150,0.32)",
+                    },
+                    overview?.marketMood?.toLowerCase() === "bearish" && {
+                      backgroundColor: "rgba(239,68,68,0.14)",
+                      borderColor: "rgba(239,68,68,0.30)",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.marketMoodText,
+                      overview?.marketMood?.toLowerCase() === "bullish" && {
+                        color: BRAND.green,
+                      },
+                      overview?.marketMood?.toLowerCase() === "bearish" && {
+                        color: "#F87171",
+                      },
+                    ]}
+                  >
+                    {overview?.marketMood || "Neutral"}
+                  </Text>
+                </View>
+              </View>
             </View>
 
             <View
@@ -411,7 +486,7 @@ export default function MarketScreen({ navigation }) {
             <Text style={styles.colPct}>% Chg</Text>
           </View>
 
-          <Text style={styles.sectionSubtle}>US Market</Text>
+          <Text style={styles.sectionSubtle}>🇺🇸 US Market</Text>
           {usMarketItems.map((item) => {
             const ticker = tickerFromLabel(item.label);
             const symbolLabel =
@@ -424,10 +499,10 @@ export default function MarketScreen({ navigation }) {
             return renderMarketRow(item, symbolLabel);
           })}
 
-          <Text style={styles.sectionSubtle}>Crypto</Text>
+          <Text style={styles.sectionSubtle}>₿ Crypto</Text>
           {cryptoItems.map((item) => renderMarketRow(item, item.label))}
 
-          <Text style={styles.sectionSubtle}>Commodities (ETFs)</Text>
+          <Text style={styles.sectionSubtle}>🟡 Commodities (ETFs)</Text>
           {commodityItems.map((item) => {
             const symbol = tickerFromLabel(item.label);
 
@@ -443,23 +518,77 @@ export default function MarketScreen({ navigation }) {
             return renderMarketRow(item, label);
           })}
 
-          <View style={styles.chipRow}>
-            <View style={styles.infoChip}>
-              <Text style={styles.infoChipLabel}>Fear & Greed</Text>
-              <Text style={styles.infoChipValue}>
-                {overview?.fearGreed?.value ?? "—"}{" "}
-                {overview?.fearGreed?.label
-                  ? `(${overview.fearGreed.label})`
-                  : ""}
-              </Text>
-            </View>
+          {/* MARKET HEALTH ROW - Updated to match mockup */}
+          <View style={styles.marketHealthRow}>
+            {/* FEAR & GREED INDEX */}
+            <LinearGradient
+              colors={["rgba(0,227,150,0.08)", "rgba(17,24,39,0.94)"]}
+              style={styles.healthCard}
+            >
+              <View style={styles.healthHeaderRow}>
+                <Text style={styles.healthTitle}>FEAR & GREED INDEX</Text>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={15}
+                  color={BRAND.muted}
+                />
+              </View>
 
-            <View style={styles.infoChip}>
-              <Text style={styles.infoChipLabel}>Risk</Text>
-              <Text style={styles.infoChipValue}>
+              <View style={styles.gaugeArea}>
+                <FearGreedGauge value={overview?.fearGreed?.value ?? 50} />
+
+                <Text style={styles.gaugeValue}>
+                  {overview?.fearGreed?.value ?? "—"}
+                </Text>
+                <Text style={styles.gaugeLabel}>
+                  {String(
+                    overview?.fearGreed?.label || "NEUTRAL",
+                  ).toUpperCase()}
+                </Text>
+              </View>
+
+              <Text style={styles.healthFooter}>
+                Previous Close: {overview?.fearGreed?.previousClose ?? 49}
+              </Text>
+            </LinearGradient>
+
+            {/* MARKET RISK */}
+            <LinearGradient
+              colors={["rgba(250,204,21,0.08)", "rgba(17,24,39,0.94)"]}
+              style={[styles.healthCard, styles.riskCard]}
+            >
+              <View style={styles.healthHeaderRow}>
+                <Text style={styles.healthTitle}>MARKET RISK</Text>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={15}
+                  color={BRAND.muted}
+                />
+              </View>
+
+              <MarketRiskGauge
+                riskLevel={deriveRiskLevel(overview?.fearGreed)}
+              />
+
+              <Text
+                style={[
+                  styles.riskValue,
+                  deriveRiskLevel(overview?.fearGreed) === "Low" && {
+                    color: "#22C55E",
+                  },
+                  deriveRiskLevel(overview?.fearGreed) === "Moderate" && {
+                    color: "#FACC15",
+                  },
+                  deriveRiskLevel(overview?.fearGreed) === "High" && {
+                    color: "#F87171",
+                  },
+                ]}
+              >
                 {deriveRiskLevel(overview?.fearGreed)}
               </Text>
-            </View>
+
+              <Text style={styles.riskSubText}>Stay alert. Manage risk.</Text>
+            </LinearGradient>
           </View>
         </View>
 
@@ -512,63 +641,71 @@ export default function MarketScreen({ navigation }) {
 
         {/* MARKET NEWS */}
         <View style={styles.newsBox}>
-          <Text style={styles.sectionTitle}>Market News</Text>
+          <View style={styles.newsHeaderRow}>
+            <View>
+              <Text style={styles.newsMainTitle}>Market News</Text>
+              <Text style={styles.newsSubTitle}>
+                Today’s top market updates
+              </Text>
+            </View>
 
-          {news.length === 0 ? (
-            <Text style={styles.mutedNote}>Loading market news…</Text>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => navigation.navigate("MarketNewsScreen")}
+            >
+              <Text style={styles.newsViewAll}>View all →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {todayNews.length === 0 ? (
+            <Text style={styles.mutedNote}>No market news for today yet.</Text>
           ) : (
-            [
-              { key: "today", label: "Today" },
-              { key: "yesterday", label: "Yesterday" },
-              { key: "week", label: "Last 7 Days" },
-              { key: "older", label: "Older" },
-            ].map(({ key, label }) => {
-              const items = groupedNews[key];
-              if (!items || items.length === 0) return null;
+            todayNews.map((n, i) => (
+              <TouchableOpacity
+                key={`today-news-${i}`}
+                style={styles.premiumNewsItem}
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (!n.link) return;
 
-              return (
-                <View key={key} style={styles.newsGroup}>
-                  <Text style={styles.newsGroupTitle}>{label}</Text>
+                  Alert.alert(
+                    "Open External Link",
+                    "You are leaving Alphaclara to view this market news article.",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Continue",
+                        onPress: () => Linking.openURL(n.link),
+                      },
+                    ],
+                  );
+                }}
+              >
+                <View style={styles.newsAccentLine} />
 
-                  {items.map((n, i) => (
-                    <TouchableOpacity
-                      key={`${key}-${i}`}
-                      style={styles.newsItem}
-                      activeOpacity={0.85}
-                      onPress={() => {
-                        if (!n.link) return;
+                <View style={styles.newsContent}>
+                  {i === 0 && (
+                    <View style={styles.topStoryPill}>
+                      <Text style={styles.topStoryText}>TOP STORY</Text>
+                    </View>
+                  )}
 
-                        Alert.alert(
-                          "Open External Link",
-                          "You are leaving Alphaclara to view this market news article.",
-                          [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                              text: "Continue",
-                              onPress: () => Linking.openURL(n.link),
-                            },
-                          ],
-                        );
-                      }}
-                    >
-                      <Text style={styles.newsTitle} numberOfLines={2}>
-                        {n.title}
-                      </Text>
+                  <Text style={styles.newsTitle} numberOfLines={2}>
+                    {n.title}
+                  </Text>
 
-                      {!!n.summary && (
-                        <Text style={styles.newsSummary} numberOfLines={2}>
-                          {n.summary}
-                        </Text>
-                      )}
+                  {!!n.summary && (
+                    <Text style={styles.newsSummary} numberOfLines={2}>
+                      {n.summary}
+                    </Text>
+                  )}
 
-                      <Text style={styles.newsMeta}>
-                        {n.source} · {timeAgoFromUtc(n.pubDate)} ↗
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  <Text style={styles.newsMeta}>
+                    {n.source} · {timeAgoFromUtc(n.pubDate)} ↗
+                  </Text>
                 </View>
-              );
-            })
+              </TouchableOpacity>
+            ))
           )}
         </View>
 
@@ -603,6 +740,172 @@ export default function MarketScreen({ navigation }) {
       />
     </View>
   );
+  /* =============================================
+   PREMIUM PROFESSIONAL FEAR & GREED GAUGE
+   (High-end Stock Market Style)
+============================================= */
+  function FearGreedGauge({ value = 50 }) {
+    const v = Math.max(0, Math.min(100, value));
+
+    const cx = 81;
+    const cy = 82;
+    const r = 58;
+
+    const angle = Math.PI * (1 - v / 100);
+
+    const nx = cx + r * Math.cos(angle);
+    const ny = cy - r * Math.sin(angle);
+
+    const ticks = Array.from({ length: 11 }, (_, i) => {
+      const a = Math.PI * (1 - i / 10);
+
+      const r1 = r + 3;
+      const r2 = r + (i % 5 === 0 ? 10 : 6);
+
+      return {
+        x1: cx + r1 * Math.cos(a),
+        y1: cy - r1 * Math.sin(a),
+        x2: cx + r2 * Math.cos(a),
+        y2: cy - r2 * Math.sin(a),
+        major: i % 5 === 0,
+      };
+    });
+
+    return (
+      <Svg width={162} height={100} viewBox="0 0 162 100">
+        {/* background track */}
+        <Path
+          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+          fill="none"
+          stroke="rgba(148,163,184,0.12)"
+          strokeWidth="9"
+          strokeLinecap="round"
+        />
+
+        {/* colored arc */}
+        <Path
+          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+          fill="none"
+          stroke="url(#fearGradient)"
+          strokeWidth="6"
+          strokeLinecap="round"
+        />
+
+        <Defs>
+          <SvgLinearGradient
+            id="fearGradient"
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="0%"
+          >
+            <Stop offset="0%" stopColor="#EF4444" />
+            <Stop offset="45%" stopColor="#FACC15" />
+            <Stop offset="100%" stopColor="#22C55E" />
+          </SvgLinearGradient>
+        </Defs>
+
+        {/* ticks */}
+        {ticks.map((t, i) => (
+          <Line
+            key={i}
+            x1={t.x1}
+            y1={t.y1}
+            x2={t.x2}
+            y2={t.y2}
+            stroke="rgba(255,255,255,0.25)"
+            strokeWidth={t.major ? 1.1 : 0.6}
+          />
+        ))}
+
+        {/* needle */}
+        <Line
+          x1={cx}
+          y1={cy}
+          x2={nx}
+          y2={ny}
+          stroke="#FFFFFF"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+
+        {/* center */}
+        <Circle
+          cx={cx}
+          cy={cy}
+          r="6.5"
+          fill="#0F172A"
+          stroke="#FFFFFF"
+          strokeWidth="1.5"
+        />
+
+        {/* glow dot */}
+        <Circle cx={nx} cy={ny} r="4" fill="#FFFFFF" />
+      </Svg>
+    );
+  }
+  /* =============================================
+   MARKET RISK GAUGE (Horizontal Bar)
+============================================= */
+  function MarketRiskGauge({ riskLevel = "Moderate" }) {
+    const normalized = riskLevel.toLowerCase();
+
+    // LOW = green side
+    // MODERATE = yellow middle
+    // HIGH = red side
+    const riskPosition =
+      normalized === "low" ? 1 : normalized === "moderate" ? 5 : 8;
+
+    return (
+      <View style={styles.riskBarsRow}>
+        {Array.from({ length: 10 }).map((_, i) => {
+          const isGreen = i < 3;
+          const isYellow = i >= 3 && i < 7;
+          const isRed = i >= 7;
+
+          return (
+            <View
+              key={i}
+              style={[
+                styles.riskBar,
+
+                isGreen && {
+                  backgroundColor: "#22C55E",
+                },
+
+                isYellow && {
+                  backgroundColor: "#FACC15",
+                },
+
+                isRed && {
+                  backgroundColor: "#F87171",
+                },
+
+                i === riskPosition && [
+                  styles.riskBarActive,
+
+                  isGreen && {
+                    borderColor: "#22C55E",
+                    shadowColor: "#22C55E",
+                  },
+
+                  isYellow && {
+                    borderColor: "#FACC15",
+                    shadowColor: "#FACC15",
+                  },
+
+                  isRed && {
+                    borderColor: "#F87171",
+                    shadowColor: "#F87171",
+                  },
+                ],
+              ]}
+            />
+          );
+        })}
+      </View>
+    );
+  }
 }
 
 /* ---------------------------------------------------------
@@ -616,57 +919,75 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
 
   scrollContent: {
-    paddingTop: 122,
+    paddingTop: 116,
     paddingBottom: 170,
   },
 
+  /* HEADER */
   stickyHeader: {
     position: "absolute",
     top: 0,
     width: "100%",
     backgroundColor: BRAND.bg,
     paddingTop: 52,
-    paddingBottom: 6,
-    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingBottom: 14,
     zIndex: 1000,
-    pointerEvents: "box-none",
+  },
+
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
 
   headerTitle: {
     color: BRAND.text,
     fontSize: 25,
     fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.45,
+    letterSpacing: -0.55,
   },
-  updatedTime: {
-    color: BRAND.sub,
-    fontSize: 11.5,
-    fontFamily: TYPO.fontFamily.semibold,
+
+  headerTitleAccent: {
+    color: BRAND.green,
   },
-  marketHeaderPill: {
-    marginTop: 5,
+
+  updatedInline: {
+    marginTop: 7,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: BRAND.card2,
-    borderWidth: 1,
-    borderColor: BRAND.softBorder,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  },
+
+  updatedTime: {
+    color: BRAND.sub,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   marketHeaderDot: {
-    width: 6,
-    height: 6,
+    width: 7,
+    height: 7,
     borderRadius: 999,
-    backgroundColor: BRAND.accent,
-    marginRight: 6,
+    backgroundColor: BRAND.green,
+    marginRight: 8,
   },
 
+  headerIconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(17,24,39,0.78)",
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.22)",
+  },
+
+  /* LOADING */
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -678,25 +999,64 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     marginTop: 8,
     fontSize: 13,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
-  overviewCard: {
-    backgroundColor: BRAND.card,
+  /* MARKET PULSE STRIP */
+  marketPulseStrip: {
+    minHeight: 56,
     borderRadius: 22,
     paddingHorizontal: 14,
-    paddingTop: 13,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(0,227,150,0.22)",
+    marginBottom: 8,
+  },
+
+  pulseIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,227,150,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(0,227,150,0.32)",
+    marginRight: 12,
+  },
+
+  pulseText: {
+    color: BRAND.text,
+    fontSize: 14,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  pulseDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: "rgba(148,163,184,0.25)",
+    marginHorizontal: 14,
+  },
+
+  /* MARKET SNAPSHOT */
+  overviewCard: {
+    backgroundColor: "rgba(17,24,39,0.88)",
+    borderRadius: 24,
+    paddingHorizontal: 14,
+    paddingTop: 12,
     paddingBottom: 11,
     borderWidth: 1,
-    borderColor: BRAND.border,
-    marginBottom: 16,
-    marginHorizontal: -4,
+    borderColor: "rgba(148,163,184,0.22)",
+    marginBottom: 18,
   },
 
   overviewTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 9,
+    marginBottom: 8,
   },
 
   cardEyebrow: {
@@ -714,27 +1074,52 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.bold,
   },
 
+  livePill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+
+  livePillLive: {
+    backgroundColor: "rgba(0,227,150,0.10)",
+    borderColor: "rgba(0,227,150,0.28)",
+  },
+
+  livePillClosed: {
+    backgroundColor: "rgba(107,114,128,0.10)",
+    borderColor: "rgba(107,114,128,0.35)",
+  },
+
   livePillText: {
     fontSize: 11,
     fontFamily: TYPO.fontFamily.bold,
   },
 
+  livePillTextLive: {
+    color: BRAND.green,
+  },
+
+  livePillTextClosed: {
+    color: BRAND.muted,
+  },
+
   tableHeader: {
     flexDirection: "row",
-    paddingVertical: 0,
+    paddingVertical: 7,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderTopColor: BRAND.softBorder,
-    borderBottomColor: BRAND.softBorder,
-    marginBottom: 2,
+    borderTopColor: "rgba(148,163,184,0.14)",
+    borderBottomColor: "rgba(148,163,184,0.14)",
+    marginBottom: 3,
   },
 
   tableRow: {
     flexDirection: "row",
     paddingVertical: 6,
-    paddingHorizontal: 2,
+    paddingHorizontal: 6,
     alignItems: "center",
-    borderRadius: 10,
+    borderRadius: 12,
   },
 
   colSymbol: {
@@ -776,39 +1161,100 @@ const styles = StyleSheet.create({
     marginBottom: 1,
     color: BRAND.muted,
     fontSize: 11,
-    fontWeight: "900",
+    fontFamily: TYPO.fontFamily.extrabold,
     textTransform: "uppercase",
-    letterSpacing: 0.4,
+    letterSpacing: 0.45,
   },
-
-  chipRow: {
+  marketHealthRow: {
     flexDirection: "row",
-    columnGap: 10,
-    marginTop: 14,
+    columnGap: 8,
+    marginTop: 10,
   },
 
-  infoChip: {
+  healthCard: {
     flex: 1,
-    backgroundColor: BRAND.card2,
+    minHeight: 88,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingTop: 5,
+    paddingBottom: 5,
     borderWidth: 1,
-    borderColor: BRAND.softBorder,
-    borderRadius: 14,
-    padding: 10,
+    borderColor: "rgba(0,227,150,0.28)",
+    backgroundColor: "rgba(8,13,23,0.96)",
+    overflow: "hidden",
   },
 
-  infoChipLabel: {
-    color: BRAND.muted,
-    fontSize: 10.5,
-    fontWeight: "800",
-    marginBottom: 3,
+  healthHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 2,
   },
 
-  infoChipValue: {
+  healthTitle: {
     color: BRAND.text,
-    fontSize: 12,
-    fontWeight: "900",
+    fontSize: 9,
+    fontFamily: TYPO.fontFamily.extrabold,
+    textTransform: "uppercase",
+    letterSpacing: 0.55,
   },
 
+  gaugeLabel: {
+    position: "absolute",
+    top: 42,
+    color: "#FACC15",
+    fontSize: 5,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: 0.7,
+  },
+
+  healthFooter: {
+    color: BRAND.muted,
+    fontSize: 8.8,
+    fontFamily: TYPO.fontFamily.semibold,
+    textAlign: "center",
+    marginTop: -1,
+  },
+
+  riskBarsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    columnGap: 3,
+    marginTop: 18,
+    marginBottom: 9,
+  },
+
+  riskBar: {
+    flex: 1,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(148,163,184,0.16)",
+  },
+
+  riskBarActive: {
+    height: 12,
+    marginTop: -3,
+    borderWidth: 1.2,
+    borderColor: "#FFFFFF",
+  },
+
+  riskValue: {
+    color: "#FACC15",
+    fontSize: 15,
+    fontFamily: TYPO.fontFamily.extrabold,
+    textTransform: "uppercase",
+    textAlign: "center",
+    letterSpacing: -0.25,
+  },
+
+  riskSubText: {
+    color: BRAND.muted,
+    fontSize: 9.5,
+    fontFamily: TYPO.fontFamily.semibold,
+    marginTop: 2,
+    textAlign: "center",
+  },
+  /* SECTIONS */
   sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -818,15 +1264,15 @@ const styles = StyleSheet.create({
 
   sectionTitle: {
     color: BRAND.text,
-    fontSize: 17,
+    fontSize: 18,
     fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.2,
+    letterSpacing: -0.25,
   },
 
   viewAll: {
-    color: BRAND.text,
+    color: BRAND.green,
     fontSize: 13,
-    fontFamily: TYPO.fontFamily.semibold,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   moversSubTitle: {
@@ -842,15 +1288,17 @@ const styles = StyleSheet.create({
     color: BRAND.muted,
     fontSize: 12,
     marginBottom: 10,
-    backgroundColor: BRAND.card2,
+    backgroundColor: "rgba(17,24,39,0.78)",
     borderWidth: 1,
-    borderColor: BRAND.softBorder,
-    borderRadius: 12,
-    paddingVertical: 10,
+    borderColor: "rgba(148,163,184,0.16)",
+    borderRadius: 14,
+    paddingVertical: 11,
     paddingHorizontal: 12,
     overflow: "hidden",
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
+  /* MOVERS */
   moverGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -860,25 +1308,25 @@ const styles = StyleSheet.create({
 
   moverCard: {
     width: "48%",
-    backgroundColor: BRAND.card2,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 12,
     borderWidth: 1,
   },
 
   moverUp: {
-    borderColor: "rgba(0,227,150,0.45)",
+    borderColor: "rgba(0,227,150,0.36)",
     backgroundColor: "rgba(0,227,150,0.07)",
   },
 
   moverDown: {
-    borderColor: "rgba(239,68,68,0.45)",
+    borderColor: "rgba(239,68,68,0.34)",
     backgroundColor: "rgba(239,68,68,0.07)",
   },
 
   moverTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 7,
   },
 
@@ -901,10 +1349,18 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
 
+  moverMoveLabel: {
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.semibold,
+    fontStyle: "italic",
+    letterSpacing: -0.15,
+    marginTop: 5,
+  },
+
   trendBadge: {
     color: BRAND.blue,
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: TYPO.fontFamily.bold,
     marginTop: 6,
   },
 
@@ -912,18 +1368,18 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontSize: 10.5,
     color: BRAND.amber,
-    fontWeight: "800",
+    fontFamily: TYPO.fontFamily.bold,
   },
 
+  /* HIGHLIGHTS */
   highlightsBox: {
-    backgroundColor: BRAND.card,
-    borderRadius: 18,
+    backgroundColor: "rgba(17,24,39,0.88)",
+    borderRadius: 22,
     padding: 16,
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: "rgba(148,163,184,0.22)",
     marginBottom: 14,
     marginTop: 14,
-    marginHorizontal: -4,
   },
 
   highlightItem: {
@@ -931,59 +1387,158 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     marginTop: 6,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
+  /* MARKET NEWS */
   newsBox: {
-    backgroundColor: BRAND.card,
-    borderRadius: 22,
+    backgroundColor: "rgba(17,24,39,0.9)",
+    borderRadius: 24,
     padding: 16,
     borderWidth: 1,
-    borderColor: BRAND.border,
+    borderColor: "rgba(148,163,184,0.22)",
     marginTop: 18,
-    marginHorizontal: -4,
   },
 
-  newsGroup: {
-    marginTop: 10,
+  newsHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
   },
 
-  newsGroupTitle: {
+  newsMainTitle: {
+    color: BRAND.text,
+    fontSize: 19,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.25,
+  },
+
+  newsSubTitle: {
     color: BRAND.muted,
-    fontSize: 11,
-    fontWeight: "900",
-    marginBottom: 6,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.semibold,
+    marginTop: 3,
   },
 
-  newsItem: {
-    paddingVertical: 11,
+  newsViewAll: {
+    color: BRAND.green,
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  premiumNewsItem: {
+    flexDirection: "row",
+    paddingVertical: 14,
+    paddingRight: 4,
     borderBottomWidth: 1,
-    borderBottomColor: BRAND.softBorder,
-    backgroundColor: "transparent",
+    borderBottomColor: "rgba(148,163,184,0.12)",
+  },
+
+  newsAccentLine: {
+    width: 3,
+    borderRadius: 99,
+    backgroundColor: "rgba(0,227,150,0.75)",
+    marginRight: 12,
+  },
+
+  newsContent: {
+    flex: 1,
+  },
+
+  topStoryPill: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(0,227,150,0.14)",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 6,
+  },
+
+  topStoryText: {
+    color: BRAND.green,
+    fontSize: 9.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: 0.3,
   },
 
   newsTitle: {
     color: BRAND.text,
     fontFamily: TYPO.fontFamily.bold,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 19,
   },
 
   newsSummary: {
     color: BRAND.sub,
     marginTop: 5,
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
     fontFamily: TYPO.fontFamily.regular,
   },
 
   newsMeta: {
     color: BRAND.muted,
-    fontSize: 11,
-    marginTop: 5,
+    fontSize: 11.5,
+    marginTop: 7,
     fontFamily: TYPO.fontFamily.semibold,
   },
+
+  /* AI INSIGHT */
+  aiInsightCard: {
+    marginTop: 18,
+    borderRadius: 22,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,227,150,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(0,227,150,0.22)",
+  },
+
+  aiIconBox: {
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,227,150,0.12)",
+    marginRight: 13,
+  },
+
+  aiInsightTitle: {
+    color: BRAND.green,
+    fontSize: 15,
+    fontFamily: TYPO.fontFamily.extrabold,
+    marginBottom: 3,
+  },
+
+  aiInsightText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+
+  aiInsightButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(0,227,150,0.28)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginLeft: 10,
+  },
+
+  aiInsightButtonText: {
+    color: BRAND.green,
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.bold,
+    marginRight: 5,
+  },
+
+  /* FOOTER */
   footerWrap: {
     marginTop: 28,
     marginBottom: 30,
@@ -995,6 +1550,7 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     fontSize: 12,
     marginBottom: 8,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   footerBrand: {
@@ -1009,7 +1565,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     textAlign: "center",
+    fontFamily: TYPO.fontFamily.regular,
   },
+
+  /* ASTRA */
   astraWrap: {
     position: "absolute",
     left: 20,
@@ -1026,28 +1585,157 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  livePillLive: {
-    backgroundColor: "rgba(0,227,150,0.10)",
-    borderColor: "rgba(0,227,150,0.28)",
+  gaugeArea: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -12,
+    height: 95,
   },
 
-  livePillClosed: {
-    backgroundColor: "rgba(107,114,128,0.10)",
-    borderColor: "rgba(107,114,128,0.35)",
+  gaugeValue: {
+    position: "absolute",
+    top: 34,
+    color: BRAND.text,
+    fontSize: 25,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.8,
   },
 
-  livePillTextLive: {
-    color: BRAND.green,
-  },
-
-  livePillTextClosed: {
-    color: BRAND.muted,
-  },
-  moverMoveLabel: {
+  gaugeLabel: {
+    position: "absolute",
+    top: 66,
+    color: "#FACC15",
     fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: 1,
+  },
+
+  healthFooter: {
+    color: BRAND.muted,
+    fontSize: 9.5,
     fontFamily: TYPO.fontFamily.semibold,
-    fontStyle: "italic",
-    letterSpacing: -0.15,
-    marginTop: 5,
+    textAlign: "center",
+    marginTop: 1,
+  },
+
+  riskBarsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    columnGap: 3,
+    marginTop: 24,
+    marginBottom: 13,
+  },
+
+  riskBar: {
+    flex: 1,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(148,163,184,0.16)",
+  },
+
+  riskBarActive: {
+    height: 14,
+    marginTop: -4,
+    borderWidth: 1.4,
+    borderColor: "#FFFFFF",
+  },
+
+  riskValue: {
+    color: "#FACC15",
+    fontSize: 17,
+    fontFamily: TYPO.fontFamily.extrabold,
+    textTransform: "uppercase",
+    textAlign: "center",
+    letterSpacing: -0.3,
+  },
+
+  riskSubText: {
+    color: BRAND.muted,
+    fontSize: 10,
+    fontFamily: TYPO.fontFamily.semibold,
+    marginTop: 3,
+    textAlign: "center",
+  },
+  snapshotHeroLeft: {
+    flex: 1,
+  },
+
+  snapshotBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+
+  marketLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: BRAND.green,
+    marginRight: 7,
+
+    shadowColor: BRAND.green,
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+
+  snapshotTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  marketMoodPill: {
+    marginLeft: 10,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.18)",
+    backgroundColor: "rgba(148,163,184,0.10)",
+  },
+
+  marketMoodText: {
+    color: BRAND.text,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: 0.35,
+  },
+
+  marketStatusText: {
+    color: BRAND.text,
+    fontSize: 18,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.45,
+  },
+  assetCell: {
+    width: "33%",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  assetLogo: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    marginRight: 6,
+  },
+
+  assetLabel: {
+    flex: 1,
+    color: BRAND.text,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+  moverSymbolRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+
+  moverLogo: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginRight: 6,
   },
 });
