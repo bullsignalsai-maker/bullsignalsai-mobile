@@ -19,7 +19,7 @@ export default {
     },
 
     ios: {
-      supportsTablet: true,
+      supportsTablet: false,
       bundleIdentifier: "ai.alphaclara.app",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
