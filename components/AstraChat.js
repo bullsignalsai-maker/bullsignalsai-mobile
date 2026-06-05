@@ -59,7 +59,7 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
       const stockSymbol = portfolioData?.symbol || "this stock";
       return [
         { id: "stock_explain", label: `Explain ${stockSymbol}` },
-        { id: "decision_explain", label: `Why this rating?` },
+        { id: "decision_explain", label: `Why this market view?` },
         { id: "pattern_explain", label: `Explain the pattern` },
         { id: "technical_explain", label: `Explain technicals` },
         { id: "risk_explain", label: `Biggest risk?` },
@@ -131,7 +131,7 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
             : portfolioData?.contextType === "market"
               ? "Ask Clara about market context, risk sentiment, movers, news, crypto, and major indexes."
               : portfolioData?.contextType === "stock_detail"
-                ? `Ask Clara about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
+                ? `Ask Clara about ${portfolioData?.symbol || "this stock"} — market view, pattern, technicals, and risks.`
                 : "Ask Clara about your portfolio, holdings, risk exposure, and performance context.",
       },
     ]);
@@ -266,7 +266,7 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
             : portfolioData?.contextType === "market"
               ? "Ask Clara about market context, risk sentiment, movers, news, crypto, and major indexes."
               : portfolioData?.contextType === "stock_detail"
-                ? `Ask Clara about ${portfolioData?.symbol || "this stock"} — signal, pattern, technicals, and risks.`
+                ? `Ask Clara about ${portfolioData?.symbol || "this stock"} — market view, pattern, technicals, and risks.`
                 : "Ask Clara about your portfolio, holdings, risk exposure, and performance context.",
       },
     ]);

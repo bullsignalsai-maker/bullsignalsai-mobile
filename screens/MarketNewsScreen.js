@@ -95,35 +95,41 @@ export default function MarketNewsScreen({ navigation }) {
       >
         <Text style={styles.groupTitle}>{title}</Text>
 
-        {items.map((n, i) => (
-          <View style={styles.newsRow}>
-            <View style={styles.newsAccent} />
+        {items.map((n, i) => {
+          const rowKey =
+            n.id ||
+            n.link ||
+            `${title}-${n.source || "news"}-${n.pubDate || "date"}-${i}`;
 
-            <TouchableOpacity
-              key={`${title}-${i}`}
-              style={[
-                styles.newsItem,
-                i === items.length - 1 && styles.lastNewsItem,
-              ]}
-              activeOpacity={0.85}
-              onPress={() => openNews(n)}
-            >
-              <Text style={styles.newsTitle} numberOfLines={2}>
-                {n.title}
-              </Text>
+          return (
+            <View key={rowKey} style={styles.newsRow}>
+              <View style={styles.newsAccent} />
 
-              {!!n.summary && (
-                <Text style={styles.newsSummary} numberOfLines={2}>
-                  {n.summary}
+              <TouchableOpacity
+                style={[
+                  styles.newsItem,
+                  i === items.length - 1 && styles.lastNewsItem,
+                ]}
+                activeOpacity={0.85}
+                onPress={() => openNews(n)}
+              >
+                <Text style={styles.newsTitle} numberOfLines={2}>
+                  {n.title}
                 </Text>
-              )}
 
-              <Text style={styles.newsMeta}>
-                {n.source} · {timeAgoFromUtc(n.pubDate)} ↗
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ))}
+                {!!n.summary && (
+                  <Text style={styles.newsSummary} numberOfLines={2}>
+                    {n.summary}
+                  </Text>
+                )}
+
+                <Text style={styles.newsMeta}>
+                  {n.source} · {timeAgoFromUtc(n.pubDate)} ↗
+                </Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
       </LinearGradient>
     );
   };

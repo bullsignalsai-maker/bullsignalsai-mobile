@@ -159,87 +159,6 @@ const getShortAlphaReason = (item) => {
     .trim();
 };
 
-function HeroMiniChart({ changePct = 0 }) {
-  const isUp = Number(changePct || 0) >= 0;
-  const stroke = isUp ? BRAND.accent : BRAND.red;
-  const gradientId = isUp ? "heroGradUp" : "heroGradDown";
-
-  const linePath = isUp
-    ? "M4 54 L15 45 L24 47 L34 34 L45 37 L56 25 L67 29 L80 16 L94 18 L108 8 L114 6"
-    : "M4 8 L16 18 L28 15 L40 29 L52 25 L65 38 L78 34 L92 46 L106 43 L116 52";
-
-  const areaPath = isUp
-    ? `${linePath} L116 56 L4 56 Z`
-    : `${linePath} L116 56 L4 56 Z`;
-
-  const endX = isUp ? 114 : 116;
-  const endY = isUp ? 6 : 52;
-
-  return (
-    <View style={styles.heroChartWrap}>
-      <Svg
-        width="90"
-        height="40"
-        viewBox="0 0 122 60"
-        style={{ marginTop: -10 }}
-      >
-        <Defs>
-          <SvgLinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor={stroke} stopOpacity="0.13" />
-            <Stop offset="55%" stopColor={stroke} stopOpacity="0.035" />
-            <Stop offset="100%" stopColor={stroke} stopOpacity="0" />
-          </SvgLinearGradient>
-        </Defs>
-
-        <Path d={areaPath} fill={`url(#${gradientId})`} />
-
-        <Path
-          d={linePath}
-          fill="none"
-          stroke={stroke}
-          strokeWidth="14"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity={0.07}
-        />
-
-        <Path
-          d={linePath}
-          fill="none"
-          stroke={stroke}
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity={0.1}
-        />
-
-        <Path
-          d={linePath}
-          fill="none"
-          stroke={stroke}
-          strokeWidth="3.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity={0.76}
-        />
-
-        <Path
-          d={linePath}
-          fill="none"
-          stroke="#FFFFFF"
-          strokeWidth="1.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity={0.28}
-        />
-
-        <Circle cx={endX} cy={endY} r="14" fill={stroke} opacity={0.12} />
-        <Circle cx={endX} cy={endY} r="8" fill={stroke} opacity={0.22} />
-        <Circle cx={endX} cy={endY} r="4.8" fill={stroke} />
-      </Svg>
-    </View>
-  );
-}
 export default function HomeScreen({ navigation }) {
   const scrollRef = useRef(null);
 
@@ -596,29 +515,39 @@ Pull To Refresh
 
   const GUIDE_STEPS = [
     {
-      icon: "compass-outline",
-      title: "Welcome to Alphaclara",
-      text: "AI-powered market intelligence designed to surface clearer opportunities, faster.",
+      icon: "home-outline",
+      title: "Home",
+      text: "Your AI command center. View Top Alpha, AI Setups, Market Movers, and Core Signals ranked by Alphaclara.",
     },
     {
-      icon: "analytics-outline",
-      title: "Top Alpha Opportunity",
-      text: "Our strongest AI-ranked opportunity right now.",
-    },
-    {
-      icon: "swap-horizontal-outline",
-      title: "Setups & Movers",
-      text: "Swipe through AI Alpha Setups and today’s fastest moving stocks without digging through noise.",
+      icon: "briefcase-outline",
+      title: "Assets",
+      text: "Monitor your Watchlist and Portfolio in one place with real-time pricing and AI intelligence.",
     },
     {
       icon: "pulse-outline",
-      title: "AI Ranked Ideas",
-      text: "Explore stocks ranked by Alphaclara’s intelligence engine with signal, confidence, and reasoning.",
+      title: "Momentum",
+      text: "Track stocks showing sustained strength across multiple market sessions, not just one-day moves.",
+    },
+    {
+      icon: "globe-outline",
+      title: "Market",
+      text: "Monitor market mood, risk levels, crypto, commodities, and news to understand the broader environment.",
+    },
+    {
+      icon: "trending-up-outline",
+      title: "Market Movers",
+      text: "Discover today's strongest gainers and losers with AI-ranked catalysts and momentum.",
+    },
+    {
+      icon: "chatbubble-ellipses-outline",
+      title: "Clara AI",
+      text: "Ask questions about stocks, markets, opportunities, and risk. Clara explains what matters in plain language.",
     },
     {
       icon: "rocket-outline",
-      title: "You’re Ready",
-      text: "Tap any card to open full AI analysis, charts, patterns, and market insight.",
+      title: "You're Ready",
+      text: "Tap any stock to access AI ratings, technical analysis, patterns, market context, and deeper intelligence.",
     },
   ];
   function getMarketPhaseET() {
@@ -753,7 +682,10 @@ Pull To Refresh
               : marketStatusLabel}
           </Text>
 
-          <Text style={styles.marketGuideHint}>Guide</Text>
+          <View style={styles.quickTourWrap}>
+            <Ionicons name="compass-outline" size={11} color={ACCENT_GOLD} />
+            <Text style={styles.marketGuideHint}>Quick Tour</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -870,10 +802,9 @@ Pull To Refresh
                           {displayRating(getSignal(heroItem))}
                         </Text>
                       </View>
-
-                      <View style={styles.heroSignalGraphWrap}>
-                        <HeroMiniChart changePct={heroItem.changePct} />
-                      </View>
+                      <Text style={styles.heroMetaText}>
+                        Confidence {Math.round(getConfidence(heroItem))}%
+                      </Text>
                     </View>
                   </View>
 
@@ -1571,14 +1502,21 @@ const styles = StyleSheet.create({
     marginBottom: 13,
   },
 
-  marketGuideHint: {
-    color: ACCENT_GOLD,
-    fontSize: 10.5,
+  quickTourWrap: {
+    flexDirection: "row",
+    alignItems: "center",
     marginLeft: 8,
     paddingLeft: 8,
     borderLeftWidth: 1,
     borderLeftColor: "rgba(255,255,255,0.10)",
+  },
+
+  marketGuideHint: {
+    color: ACCENT_GOLD,
+    fontSize: 10.5,
+    marginLeft: 4,
     fontFamily: TYPO.fontFamily.bold,
+    letterSpacing: 0.2,
   },
   marketDot: {
     width: 7.5,
@@ -2161,12 +2099,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 2,
   },
-  heroSignalGraphWrap: {
-    flex: 1,
-    alignItems: "flex-start",
-    justifyContent: "center",
-    marginLeft: 8,
-  },
 
   heroInsightGrid: {
     flexDirection: "row",
@@ -2279,15 +2211,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  heroChartWrap: {
-    width: 102,
-    height: 24,
-    marginTop: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    opacity: 0.95,
-    transform: [{ translateX: -10 }],
-  },
   header: {
     paddingTop: 52,
     paddingHorizontal: 16,
@@ -2609,5 +2532,11 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
+  },
+  heroMetaText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.semibold,
+    marginLeft: 10,
   },
 });

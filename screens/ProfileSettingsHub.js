@@ -336,7 +336,15 @@ export default function ProfileSettingsHub({ navigation }) {
             end={{ x: 1, y: 0.5 }}
             style={StyleSheet.absoluteFill}
           />
-
+          {!editable && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setEditable(true)}
+              style={styles.editProfileBtn}
+            >
+              <Ionicons name="create-outline" size={17} color={BRAND.text} />
+            </TouchableOpacity>
+          )}
           <Svg style={styles.meshSvg} viewBox="0 0 220 150">
             <Path
               d="M0 115 C55 70 95 135 150 70 C180 35 205 45 220 25"
@@ -380,7 +388,12 @@ export default function ProfileSettingsHub({ navigation }) {
 
           <View style={styles.profileMain}>
             <View style={styles.nameRow}>
-              <Text style={styles.name} numberOfLines={1}>
+              <Text
+                style={styles.name}
+                numberOfLines={2}
+                adjustsFontSizeToFit
+                minimumFontScale={0.82}
+              >
                 {fullName}
               </Text>
               <Ionicons name="checkmark-circle" size={18} color="#FACC15" />
@@ -399,7 +412,7 @@ export default function ProfileSettingsHub({ navigation }) {
         {editable && (
           <View style={styles.editCard}>
             <View style={styles.editHeaderRow}>
-              <Text style={styles.sectionTitle}>Edit Profile</Text>
+              <Text style={styles.sectionTitle}>Edit Name & Bio</Text>
             </View>
 
             <View style={styles.nameFieldsRow}>
@@ -674,13 +687,14 @@ const styles = StyleSheet.create({
 
   nameRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 6,
   },
 
   name: {
     color: BRAND.text,
     fontSize: 20,
+    lineHeight: 24,
     fontFamily: TYPO.fontFamily.extrabold,
     flexShrink: 1,
     letterSpacing: -0.35,
@@ -955,5 +969,19 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: "center",
     fontFamily: TYPO.fontFamily.regular,
+  },
+  editProfileBtn: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(15,23,42,0.82)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
   },
 });

@@ -531,6 +531,9 @@ export default function StockDetailScreen({ route, navigation }) {
                     styles.aiSignalText,
                     { color: signalColor(finalAISignal) },
                   ]}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.82}
                 >
                   {displayRating(finalAISignal)}
                 </Text>
@@ -610,7 +613,7 @@ export default function StockDetailScreen({ route, navigation }) {
             <View style={styles.aiReasonChips}>
               {aiReasonChips.slice(0, 3).map((reason, idx) => (
                 <View key={`ai-chip-${idx}`} style={styles.aiReasonChip}>
-                  <Text style={styles.aiReasonChipText} numberOfLines={2}>
+                  <Text style={styles.aiReasonChipText}>
                     {reason.replace(/([A-Z])/g, " $1").trim()}
                   </Text>
                 </View>
@@ -1526,17 +1529,20 @@ const styles = StyleSheet.create({
 
   aiSignalRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     flexWrap: "wrap",
     gap: 7,
     marginBottom: 10,
   },
 
   aiSignalText: {
-    fontSize: 18,
+    fontSize: 15.5,
+    lineHeight: 20,
     fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.55,
+    letterSpacing: -0.35,
     textTransform: "uppercase",
+    flexShrink: 1,
+    maxWidth: "100%",
   },
 
   aiBiasPill: {
@@ -1608,8 +1614,8 @@ const styles = StyleSheet.create({
 
   aiReasonChip: {
     width: "100%",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     borderRadius: 13,
     backgroundColor: "rgba(255,255,255,0.055)",
     borderWidth: 1,
@@ -1618,9 +1624,9 @@ const styles = StyleSheet.create({
 
   aiReasonChipText: {
     color: BRAND.text,
-    fontSize: 11,
-    lineHeight: 14,
-    fontFamily: TYPO.fontFamily.bold,
+    fontSize: 11.5,
+    lineHeight: 17,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   aiDetailsButton: {

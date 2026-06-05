@@ -620,6 +620,10 @@ export default function MarketMoversScreen({ navigation }) {
           data={data}
           keyExtractor={(item, index) => `${item.symbol}-${index}`}
           renderItem={renderRow}
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          persistentScrollbar={false}
+          automaticallyAdjustsScrollIndicatorInsets={false}
           ListHeaderComponent={ListHeader}
           stickyHeaderIndices={[0]}
           ListEmptyComponent={

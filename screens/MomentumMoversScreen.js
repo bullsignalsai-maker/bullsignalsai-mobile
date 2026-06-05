@@ -377,6 +377,12 @@ export default function MomentumMoversScreen({ navigation }) {
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" />
+      <View style={styles.stickyHeader}>
+        <Text style={styles.title}>Momentum</Text>
+        <Text style={styles.subtitle}>
+          Real-time detection of sustained institutional momentum
+        </Text>
+      </View>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
@@ -391,15 +397,6 @@ export default function MomentumMoversScreen({ navigation }) {
           />
         }
       >
-        {/* ========== PREMIUM HEADER ========== */}
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.title}>Momentum Movers</Text>
-            <Text style={styles.subtitle}>
-              Real-time detection of sustained institutional momentum
-            </Text>
-          </View>
-        </View>
         {refreshing && (
           <View style={styles.refreshBanner}>
             <ActivityIndicator size="small" color={BRAND.green} />
@@ -1208,12 +1205,27 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    paddingTop: 65,
+    paddingTop: 110,
     paddingHorizontal: 8,
     paddingBottom: 34,
   },
 
   /* Header */
+  stickyHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    backgroundColor: BRAND.bg,
+
+    paddingTop: 58,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+
+    borderBottomWidth: 1,
+    borderBottomColor: BRAND.softBorder,
+  },
   header: {
     flexDirection: "row",
     alignItems: "flex-start",

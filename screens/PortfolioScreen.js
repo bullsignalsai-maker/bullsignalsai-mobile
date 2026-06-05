@@ -307,7 +307,18 @@ export default function PortfolioScreen({ navigation }) {
       }));
     }
   };
+  const compactMoney = (n) => {
+    const value = Number(n || 0);
+    const abs = Math.abs(value);
 
+    if (abs >= 1000000)
+      return `${value >= 0 ? "+" : "-"}$${(abs / 1000000).toFixed(2)}M`;
+
+    if (abs >= 1000)
+      return `${value >= 0 ? "+" : "-"}$${(abs / 1000).toFixed(1)}K`;
+
+    return signedMoney(value);
+  };
   const portfolioData = {
     total_value: totalValue,
     total_gain: totalGain,
@@ -478,6 +489,7 @@ export default function PortfolioScreen({ navigation }) {
 
       <ScrollView
         style={styles.container}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
@@ -505,7 +517,9 @@ export default function PortfolioScreen({ navigation }) {
           <View style={styles.overviewStatsGrid}>
             <View style={styles.overviewStat}>
               <Text style={styles.overviewLabel}>Total Value</Text>
-              <Text style={styles.overviewValue}>{money(totalValue)}</Text>
+              <Text style={styles.overviewValue}>
+                {compactMoney(totalValue).replace("+", "")}
+              </Text>
               <Text
                 style={[
                   styles.overviewChange,
@@ -547,8 +561,10 @@ export default function PortfolioScreen({ navigation }) {
                   styles.overviewValue,
                   { color: getGainColor(totalGain) },
                 ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
               >
-                {signedMoney(totalGain)}
+                {compactMoney(totalGain)}
               </Text>
               <Text
                 style={[
@@ -589,12 +605,25 @@ export default function PortfolioScreen({ navigation }) {
                   ? `✓ ${winnersCount} positive holdings`
                   : "Add holdings to analyze"}
               </Text>
-              <Text style={styles.healthBullet}>
-                ✓ {riskExposure.label} exposure profile
-              </Text>
-              <Text style={styles.healthBullet}>
-                ✓ Top holding: {topHolding?.symbol || "--"}
-              </Text>
+              {enrichedSorted.length === 1 ? (
+                <>
+                  <Text style={styles.healthBullet}>
+                    ✓ Position is being tracked
+                  </Text>
+                  <Text style={styles.healthBullet}>
+                    ✓ {topHolding?.symbol || "--"} performance visible
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.healthBullet}>
+                    ✓ {riskExposure.label} exposure profile
+                  </Text>
+                  <Text style={styles.healthBullet}>
+                    ✓ Top holding: {topHolding?.symbol || "--"}
+                  </Text>
+                </>
+              )}
             </View>
 
             <View style={styles.healthColumn}>
@@ -605,14 +634,32 @@ export default function PortfolioScreen({ navigation }) {
                 </Text>
               </View>
 
-              <Text style={styles.healthBullet}>
-                • Largest allocation{" "}
-                {topHolding ? fmt(topHolding.allocationPct) : "--"}%
-              </Text>
-              <Text style={styles.healthBullet}>
-                • Weakest: {worstPerformer?.symbol || "--"}
-              </Text>
-              <Text style={styles.healthBullet}>• Market volatility risk</Text>
+              {enrichedSorted.length === 1 ? (
+                <>
+                  <Text style={styles.healthBullet}>
+                    • Single-stock portfolio
+                  </Text>
+                  <Text style={styles.healthBullet}>
+                    • Diversification is limited
+                  </Text>
+                  <Text style={styles.healthBullet}>
+                    • Market volatility can affect this position
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.healthBullet}>
+                    • Largest allocation{" "}
+                    {topHolding ? fmt(topHolding.allocationPct) : "--"}%
+                  </Text>
+                  <Text style={styles.healthBullet}>
+                    • Weakest: {worstPerformer?.symbol || "--"}
+                  </Text>
+                  <Text style={styles.healthBullet}>
+                    • Market volatility risk
+                  </Text>
+                </>
+              )}
             </View>
           </View>
         </View>

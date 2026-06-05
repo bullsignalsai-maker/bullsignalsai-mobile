@@ -2,6 +2,30 @@ import { API_BASE_URL } from "../config/apiKeys";
 
 const ASTRA_TIMEOUT_MS = 25000;
 
+function cleanClaraText(text = "") {
+  return String(text)
+    .replace(/\bBUY\b/g, "Bullish Setup")
+    .replace(/\bHOLD\b/g, "Neutral Setup")
+    .replace(/\bSELL\b/g, "Risk Alert")
+    .replace(/\bbuy\b/g, "bullish setup")
+    .replace(/\bhold\b/g, "neutral setup")
+    .replace(/\bsell\b/g, "risk alert")
+    .replace(/rated Neutral Setup/g, "showing a Neutral Setup")
+    .replace(/rated Bullish Setup/g, "showing a Bullish Setup")
+    .replace(/rated Risk Alert/g, "showing a Risk Alert");
+}
+
+function cleanCards(cards = []) {
+  return Array.isArray(cards)
+    ? cards.map((card) => ({
+        ...card,
+        title: cleanClaraText(card?.title || ""),
+        value: cleanClaraText(card?.value || ""),
+        subtitle: cleanClaraText(card?.subtitle || ""),
+      }))
+    : [];
+}
+
 function withTimeout(promise, timeoutMs = ASTRA_TIMEOUT_MS) {
   return Promise.race([
     promise,
@@ -28,17 +52,18 @@ export async function askClara(payload) {
     }
 
     return {
-      answer:
+      answer: cleanClaraText(
         json?.answer ||
-        json?.message ||
-        "Clara reviewed the data, but no clear answer was returned.",
+          json?.message ||
+          "Clara reviewed the data, but no clear answer was returned.",
+      ),
       usedLLM: json?.used_llm === true,
       intent: json?.intent || null,
       contextSummary: json?.contextSummary || null,
       suggestedFollowups: Array.isArray(json?.suggestedFollowups)
         ? json.suggestedFollowups
         : [],
-      cards: Array.isArray(json?.cards) ? json.cards : [],
+      cards: cleanCards(json?.cards),
       raw: json,
     };
   } catch (err) {
@@ -55,3 +80,5 @@ export async function askClara(payload) {
     };
   }
 }
+
+export const askAstra = askClara;
