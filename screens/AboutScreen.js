@@ -130,7 +130,7 @@ export default function AboutScreen({ navigation }) {
           <FeatureCard
             icon="chart-timeline-variant-shimmer"
             title="AI Signals"
-            text="AI-generated BUY, HOLD, SELL signals with confidence levels."
+            text="AI-generated market setups with confidence levels."
           />
           <FeatureCard
             icon="bookmark-outline"
