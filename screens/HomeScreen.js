@@ -84,7 +84,8 @@ const getItemSession = (item) =>
 const getDisplaySession = (item, marketPhase) => {
   if (marketPhase === "OPEN") return "LIVE";
   if (marketPhase === "PREMARKET") return "PRE";
-  return "AH";
+  if (marketPhase === "AFTER_HOURS") return "AH";
+  return "CLOSED";
 };
 
 const getDisplaySessionSuffix = (item, marketPhase) => {
@@ -96,7 +97,9 @@ const getDisplaySessionColor = (item, marketPhase) => {
   const session = getDisplaySession(item, marketPhase);
 
   if (session === "LIVE") return BRAND.accent;
-  if (session === "PRE") return BRAND.amber;
+  // PRE and AH both mean "outside regular session but still actively
+  // tradable" — matches Watchlist's SESSION_DOT_COLOR treatment.
+  if (session === "PRE" || session === "AH") return BRAND.amber;
   return BRAND.sub;
 };
 
@@ -570,7 +573,7 @@ Pull To Refresh
 
     if (isWeekend) return "CLOSED";
     if (totalMinutes < 9 * 60 + 30) return "PREMARKET";
-    if (totalMinutes >= 16 * 60) return "CLOSED";
+    if (totalMinutes >= 16 * 60) return "AFTER_HOURS";
 
     return "OPEN";
   }
