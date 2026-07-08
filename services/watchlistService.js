@@ -79,9 +79,9 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
 
     const needsRefresh = q?.needs_refresh === true;
 
-    const price = q?.price ?? s.quote?.price ?? null;
-    const change = q?.change ?? s.quote?.change ?? null;
-    const rawChangePct = q?.changePct ?? s.quote?.changePct ?? null;
+    const price = q?.price ?? null;
+    const change = q?.change ?? null;
+    const rawChangePct = q?.changePct ?? null;
     const changePct =
       rawChangePct !== null && rawChangePct !== undefined
         ? Number(rawChangePct)
