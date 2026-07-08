@@ -98,6 +98,8 @@ function getMarketPeriod(now = new Date()) {
   return "LIVE";
 }
 
+const STALE_THRESHOLD_MS = 180 * 1000;
+
 /* =========================================================
   MERGE LOGIC
   - Normalizes quote fields
@@ -105,6 +107,7 @@ function getMarketPeriod(now = new Date()) {
 ========================================================= */
 function mergeWatchlistQuotes(items = [], quotes = {}) {
   const marketPeriod = getMarketPeriod();
+  const now = Date.now();
 
   return items.map((s) => {
     const sym = (s.symbol || "").toUpperCase();
@@ -121,6 +124,14 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
         : null;
 
     const quoteUpdatedAt = q?.updated_at ?? null;
+
+    // needs_refresh is a backend worker-queue signal (ensure_quote()
+    // re-flags it every 30s regardless of actual data age) — not a
+    // reliable freshness indicator. Staleness is judged purely from
+    // how old quote_updated_at actually is, flat across all sessions.
+    const isStale =
+      !quoteUpdatedAt ||
+      now - new Date(quoteUpdatedAt).getTime() > STALE_THRESHOLD_MS;
 
     const displayIntelligence = s.displayIntelligence || null;
 
@@ -171,10 +182,12 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
       changePct,
       quote_updated_at: quoteUpdatedAt,
       needs_refresh: needsRefresh,
+      isStale,
 
-      // PRE/LIVE/AH only apply when the quote is actually fresh —
-      // a stale or missing quote is never labeled with a live market period.
-      session: !price ? "PENDING" : needsRefresh ? "LAST" : marketPeriod,
+      // PENDING is the one honest "we have no data" state. Otherwise
+      // always the real market period — staleness no longer fakes a
+      // "LAST" label, it only dims the dot (see isStale above).
+      session: !price ? "PENDING" : marketPeriod,
 
       displayIntelligence,
       displayLabel: displayIntelligence?.label || s.displayLabel || null,

@@ -43,17 +43,15 @@ import {
   signalColor,
   getAuthoritativeSignal,
 } from "../utils/signalUtils";
-// Per-session visual treatment for the price freshness dot.
-// LIVE/PRE/AH/CLOSED are all "we know exactly what this is" states.
-// LAST/PENDING mean data quality is degraded, so they're dimmed
-// rather than lumped visually with a normal closed market.
-const SESSION_DOT_STYLE = {
-  LIVE: { color: BRAND.accent, opacity: 1 },
-  PRE: { color: BRAND.amber, opacity: 1 },
-  AH: { color: BRAND.amber, opacity: 1 },
-  CLOSED: { color: BRAND.sub, opacity: 1 },
-  LAST: { color: BRAND.sub, opacity: 0.6 },
-  PENDING: { color: BRAND.sub, opacity: 0.6 },
+// Dot color reflects market period (session); opacity reflects data
+// staleness (item.isStale, from quote_updated_at age) — two
+// independent axes, no longer conflated.
+const SESSION_DOT_COLOR = {
+  LIVE: BRAND.accent,
+  PRE: BRAND.amber,
+  AH: BRAND.amber,
+  CLOSED: BRAND.sub,
+  PENDING: BRAND.sub,
 };
 
 const fmt = (v) =>
@@ -393,12 +391,12 @@ export default function WatchlistScreen({ navigation }) {
     });
   };
 
-  const timeAgoFrom = (ts, needsRefresh) => {
-    // A quote the backend has flagged as needing refresh is never
-    // "Live"/"Ns ago", no matter how recent its timestamp looks —
-    // matches the session dot's LAST state (see watchlistService.js).
-    if (needsRefresh) return "LAST";
+  const timeAgoFrom = (ts, isStale) => {
     if (!ts) return "";
+    // Same staleness signal as the session dot (quote_updated_at age,
+    // not needs_refresh) — a stale quote is never "Live"/"Ns ago",
+    // no matter how recent its timestamp looks.
+    if (isStale) return "LAST";
     const diff = Date.now() - new Date(ts).getTime();
     const sec = Math.floor(diff / 1000);
     const min = Math.floor(sec / 60);
@@ -566,8 +564,10 @@ export default function WatchlistScreen({ navigation }) {
     const patternName = item.pattern?.name;
     const patternWinRate = item.pattern?.winRate;
 
-    const sessionDotStyle =
-      SESSION_DOT_STYLE[session] || SESSION_DOT_STYLE.PENDING;
+    const sessionDotStyle = {
+      color: SESSION_DOT_COLOR[session] || BRAND.sub,
+      opacity: item.isStale ? 0.6 : 1,
+    };
 
     return (
       <Swipeable
@@ -732,7 +732,7 @@ export default function WatchlistScreen({ navigation }) {
               </View>
 
               <Text style={styles.patternTime}>
-                {timeAgoFrom(item.quote_updated_at, item.needs_refresh)}
+                {timeAgoFrom(item.quote_updated_at, item.isStale)}
               </Text>
             </View>
           )}
