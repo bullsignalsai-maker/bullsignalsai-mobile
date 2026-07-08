@@ -43,6 +43,19 @@ import {
   signalColor,
   getAuthoritativeSignal,
 } from "../utils/signalUtils";
+// Per-session visual treatment for the price freshness dot.
+// LIVE/PRE/AH/CLOSED are all "we know exactly what this is" states.
+// LAST/PENDING mean data quality is degraded, so they're dimmed
+// rather than lumped visually with a normal closed market.
+const SESSION_DOT_STYLE = {
+  LIVE: { color: BRAND.accent, opacity: 1 },
+  PRE: { color: BRAND.amber, opacity: 1 },
+  AH: { color: BRAND.amber, opacity: 1 },
+  CLOSED: { color: BRAND.sub, opacity: 1 },
+  LAST: { color: BRAND.sub, opacity: 0.6 },
+  PENDING: { color: BRAND.sub, opacity: 0.6 },
+};
+
 const fmt = (v) =>
   typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "--";
 
@@ -66,18 +79,6 @@ const fmtDateTime = (ts) => {
     return "";
   }
 };
-function getMarketSession(ts) {
-  if (!ts) return null;
-
-  const d = new Date(ts);
-  const h = d.getHours();
-  const m = d.getMinutes();
-
-  if (h < 9 || (h === 9 && m < 30)) return "PRE";
-  if (h >= 16) return "AH";
-  return "LIVE";
-}
-
 const fmtChange = (v) =>
   typeof v === "number" && !Number.isNaN(v)
     ? `${v >= 0 ? "+" : ""}$${Math.abs(v).toFixed(2)}`
@@ -392,7 +393,11 @@ export default function WatchlistScreen({ navigation }) {
     });
   };
 
-  const timeAgoFrom = (ts) => {
+  const timeAgoFrom = (ts, needsRefresh) => {
+    // A quote the backend has flagged as needing refresh is never
+    // "Live"/"Ns ago", no matter how recent its timestamp looks —
+    // matches the session dot's LAST state (see watchlistService.js).
+    if (needsRefresh) return "LAST";
     if (!ts) return "";
     const diff = Date.now() - new Date(ts).getTime();
     const sec = Math.floor(diff / 1000);
@@ -544,14 +549,10 @@ export default function WatchlistScreen({ navigation }) {
     const change = item.change;
     const changePct = item.changePct;
 
-    // Prefer backend/session field, fallback to timestamps
-    const session = getMarketSession(
-      item.lastUpdated ||
-        item.quote_updated_at ||
-        item.quoteUpdatedAt ||
-        item.updated_at ||
-        item.timestamp,
-    );
+    // Backend/service-computed session: PRE/LIVE/AH/CLOSED only apply
+    // to a fresh quote; a stale or missing quote is LAST/PENDING.
+    // See watchlistService.js's getMarketPeriod/mergeWatchlistQuotes.
+    const session = item.session;
 
     const isLive = session === "LIVE";
 
@@ -565,12 +566,8 @@ export default function WatchlistScreen({ navigation }) {
     const patternName = item.pattern?.name;
     const patternWinRate = item.pattern?.winRate;
 
-    const sessionDotColor =
-      session === "LIVE"
-        ? BRAND.accent
-        : session === "PRE"
-          ? BRAND.amber
-          : BRAND.sub;
+    const sessionDotStyle =
+      SESSION_DOT_STYLE[session] || SESSION_DOT_STYLE.PENDING;
 
     return (
       <Swipeable
@@ -707,7 +704,10 @@ export default function WatchlistScreen({ navigation }) {
                 <View
                   style={[
                     styles.sessionDot,
-                    { backgroundColor: sessionDotColor },
+                    {
+                      backgroundColor: sessionDotStyle.color,
+                      opacity: sessionDotStyle.opacity,
+                    },
                   ]}
                 />
                 <Text style={styles.sessionText}>{session || "LAST"}</Text>
@@ -732,7 +732,7 @@ export default function WatchlistScreen({ navigation }) {
               </View>
 
               <Text style={styles.patternTime}>
-                {timeAgoFrom(item.lastUpdated || item.quote_updated_at)}
+                {timeAgoFrom(item.quote_updated_at, item.needs_refresh)}
               </Text>
             </View>
           )}

@@ -68,11 +68,44 @@ export async function getWatchlistScreen(userId) {
 }
 
 /* =========================================================
+  MARKET PERIOD (PRE / LIVE / AH / CLOSED)
+  - Reflects the current moment, never a quote's own timestamp,
+    so a stale quote can never borrow "now"'s market period.
+  - Uses America/New_York wall-clock time (same technique as
+    HomeScreen.js's market-status check) so this is correct
+    regardless of the device's local timezone.
+========================================================= */
+function getMarketPeriod(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+    weekday: "short",
+  }).formatToParts(now);
+
+  const hour = Number(parts.find((p) => p.type === "hour")?.value || 0);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value || 0);
+  const weekday = parts.find((p) => p.type === "weekday")?.value;
+
+  const isWeekend = weekday === "Sat" || weekday === "Sun";
+  const totalMinutes = hour * 60 + minute;
+
+  if (isWeekend) return "CLOSED";
+  if (totalMinutes < 9 * 60 + 30) return "PRE";
+  if (totalMinutes >= 16 * 60) return "AH";
+
+  return "LIVE";
+}
+
+/* =========================================================
   MERGE LOGIC
   - Normalizes quote fields
   - Exposes freshness explicitly
 ========================================================= */
 function mergeWatchlistQuotes(items = [], quotes = {}) {
+  const marketPeriod = getMarketPeriod();
+
   return items.map((s) => {
     const sym = (s.symbol || "").toUpperCase();
     const q = quotes?.[sym];
@@ -87,8 +120,7 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
         ? Number(rawChangePct)
         : null;
 
-    const quoteUpdatedAt =
-      q?.updated_at || s.quote_updated_at || s.quote?.updated_at || null;
+    const quoteUpdatedAt = q?.updated_at ?? null;
 
     const displayIntelligence = s.displayIntelligence || null;
 
@@ -140,7 +172,9 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
       quote_updated_at: quoteUpdatedAt,
       needs_refresh: needsRefresh,
 
-      session: price ? (needsRefresh ? "LAST" : "LIVE") : "PENDING",
+      // PRE/LIVE/AH only apply when the quote is actually fresh —
+      // a stale or missing quote is never labeled with a live market period.
+      session: !price ? "PENDING" : needsRefresh ? "LAST" : marketPeriod,
 
       displayIntelligence,
       displayLabel: displayIntelligence?.label || s.displayLabel || null,
