@@ -26,10 +26,10 @@ import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Swipeable } from "react-native-gesture-handler";
 
-import { auth } from "../firebaseConfig";
 import { API_BASE_URL } from "../config/apiKeys";
 import ToastMessage from "../components/ToastMessage";
 import MoveLabel from "../components/MoveLabel";
+import { useAuthUser } from "../hooks/useAuthUser";
 import {
   getWatchlistScreen,
   addToWatchlist,
@@ -100,7 +100,7 @@ function formatPatternLabel(pattern, winRate) {
 }
 
 export default function WatchlistScreen({ navigation }) {
-  const user = auth.currentUser;
+  const user = useAuthUser();
   const priceFlash = useRef({}).current;
   const prevPrices = useRef({}).current;
   const searchSeqRef = useRef(0);
@@ -233,7 +233,7 @@ export default function WatchlistScreen({ navigation }) {
 
   /* ================= SEARCH ================= */
   const handleInputChange = async (text) => {
-    const up = (text || "").toUpperCase();
+    const up = (text || "").toUpperCase().trim();
     setNewSymbol(up);
 
     if (!up.trim()) {
@@ -281,8 +281,14 @@ export default function WatchlistScreen({ navigation }) {
 
   /* ================= ADD / REMOVE ================= */
   const handleAddTicker = async (sym) => {
-    const s = (sym || newSymbol || "").split(" ")[0].toUpperCase().trim();
-    if (!s || !user) return;
+    const raw = (sym || newSymbol || "").trim();
+    const s = raw.split(" ")[0].toUpperCase();
+    if (!s) return;
+
+    if (!user) {
+      showToast("Please sign in to add tickers");
+      return;
+    }
 
     Keyboard.dismiss();
     searchSeqRef.current += 1; // invalidate any in-flight search
