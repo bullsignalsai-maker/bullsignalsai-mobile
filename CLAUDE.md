@@ -29,6 +29,23 @@ UI (React Native) → services/*.js → FastAPI backend (API_BASE_URL) → Fires
 
 `config/apiKeys.js` intentionally holds only `API_BASE_URL` (`https://bullbrain-api.onrender.com`); all other key constants are empty strings by design — "keys handled by backend" is a hard constraint, not an oversight. Do not add frontend API keys here. See `docs/stock-detail-architecture.md` for the full Firestore schema (`stock_realtime`, `stock_ai_snapshot`, `stock_smart_pattern`, `stock_technical_snapshot`, `stock_grok_summary`, `stock_news`) and per-section TTLs — useful when a screen needs to know how fresh a given field is expected to be.
 
+### Main tab screens: data flow
+
+Every main-tab screen follows the same shape: its `services/*.js` module fetches a snapshot endpoint, then does a second `GET /quotes-bulk?scope=<screen>&symbols=...` call for live prices on whatever symbols the first call returned, merges the two, and returns a defensively-normalized object (never throws — falls back to an empty-but-well-shaped result). The screen just renders it and polls on a fixed interval while focused; none of these use websockets or push-driven refresh.
+
+| Screen | Service | Snapshot endpoint(s) | Poll interval |
+|---|---|---|---|
+| Home | `services/HomeService.js` | `GET /homescreen-data` (→ `getHomeScreen`), `GET /market-movers?mode=home` (→ `getHomeMovers`), `GET /verified-alpha` (→ `getVerifiedAlpha`) | 5s |
+| Assets / Watchlist | `services/watchlistService.js` | `GET /watchlist/{userId}` (→ `getWatchlistScreen`) | 15s (aligned to backend quote-snapshot TTL) |
+| Momentum | `services/MomentumService.js` | `GET /market-momentum` (→ `getMarketMomentum`); `POST /market-momentum/refresh` for manual/pull-to-refresh | 30s |
+| Market | `services/MarketPulseService.js` | `GET /homescreen-context` (→ `getMarketOverview`), `GET /market-movers?mode=preview` + `GET /market-news` via `Promise.allSettled` | 30s |
+
+Notes:
+- **Bulk-quotes pattern**: always snapshot-fetch → collect symbols → one shared `quotes-bulk` call per screen (never N per-symbol requests). The `scope` param lets the backend apply different cache/priority rules per screen. Follow this pattern for any new screen that shows live prices.
+- **`needs_refresh` / `session` flags**: quotes carry a `needs_refresh` boolean from the backend; services turn that into `session: "LIVE" | "LAST" | "PENDING"` so the UI can show staleness instead of pretending everything is real-time.
+- Watchlist's `mergeWatchlistQuotes` additionally detects when a cached text summary ("under pressure") contradicts the live price move and regenerates the sentence rather than showing stale copy — a pattern worth reusing if other screens show AI-generated copy next to live prices.
+- `services/MarketStatsService.js` (`fetchLiveMarketStats` → `/stats/live`) and `services/MarketFeedService.js` (`fetchMarketOverview` → `/market-overview`) are older, partially-used siblings of `MarketPulseService.js` — unlike the pattern above, they return hardcoded stub data on failure instead of an empty result. Prefer `MarketPulseService.js` for new Market-screen work.
+
 ### Layers
 
 - **`screens/`** — one file per screen, wired together in `App.js` via a single `Stack.Navigator` (auth/onboarding flow) wrapping a `Tab.Navigator` (`MainTabs`: Home, Assets/Watchlist, Momentum, Market, Profile). Initial route is decided at launch by checking `AsyncStorage` for `userToken` / `onboarded` (see the `checkUserStatus` effect in `App.js`).
