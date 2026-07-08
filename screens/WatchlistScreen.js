@@ -18,6 +18,7 @@ import {
   UIManager,
   FlatList,
   Image,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -102,6 +103,7 @@ export default function WatchlistScreen({ navigation }) {
   const user = auth.currentUser;
   const priceFlash = useRef({}).current;
   const prevPrices = useRef({}).current;
+  const searchSeqRef = useRef(0);
   const [viewMode, setViewMode] = useState("watchlist");
   const [items, setItems] = useState([]);
   const [newSymbol, setNewSymbol] = useState("");
@@ -235,15 +237,23 @@ export default function WatchlistScreen({ navigation }) {
     setNewSymbol(up);
 
     if (!up.trim()) {
+      searchSeqRef.current += 1; // invalidate any in-flight request
       setSuggestions([]);
       return;
     }
+
+    // Sequence guard: only the most recently issued request is allowed
+    // to commit results, so a slow older response (e.g. a no-match
+    // query) can't overwrite a faster newer one that resolved first.
+    const seq = ++searchSeqRef.current;
 
     try {
       const res = await fetch(
         `${API_BASE_URL}/search?q=${encodeURIComponent(up)}`,
       );
       const json = await res.json();
+
+      if (seq !== searchSeqRef.current) return; // superseded by a newer request
 
       // dedupe by symbol to avoid "duplicate key" warnings
       const raw = (json?.data || []).slice(0, 10);
@@ -258,8 +268,15 @@ export default function WatchlistScreen({ navigation }) {
       }
       setSuggestions(list);
     } catch {
-      setSuggestions([]);
+      if (seq === searchSeqRef.current) setSuggestions([]);
     }
+  };
+
+  const closeSuggestions = () => {
+    if (suggestions.length === 0) return;
+    searchSeqRef.current += 1; // invalidate any in-flight search
+    Keyboard.dismiss();
+    setSuggestions([]);
   };
 
   /* ================= ADD / REMOVE ================= */
@@ -268,6 +285,7 @@ export default function WatchlistScreen({ navigation }) {
     if (!s || !user) return;
 
     Keyboard.dismiss();
+    searchSeqRef.current += 1; // invalidate any in-flight search
     setSuggestions([]);
     setNewSymbol("");
 
@@ -907,7 +925,8 @@ export default function WatchlistScreen({ navigation }) {
       {viewMode === "portfolio" ? (
         <PortfolioScreen navigation={navigation} embedded />
       ) : (
-        <>
+        <TouchableWithoutFeedback onPress={closeSuggestions} accessible={false}>
+        <View style={{ flex: 1 }}>
           <View style={styles.addRow}>
             <Ionicons name="search-outline" size={18} color="#6B7280" />
             <TextInput
@@ -932,6 +951,15 @@ export default function WatchlistScreen({ navigation }) {
 
           {suggestions.length > 0 && (
             <View style={styles.suggestionsBox}>
+              <View style={styles.suggestionsHeader}>
+                <TouchableOpacity
+                  onPress={closeSuggestions}
+                  style={styles.suggestionsCloseBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="close" size={16} color={BRAND.sub} />
+                </TouchableOpacity>
+              </View>
               {suggestions.map((s, idx) => (
                 <TouchableOpacity
                   key={`${s.symbol}-${idx}`}
@@ -988,7 +1016,8 @@ export default function WatchlistScreen({ navigation }) {
               </View>
             }
           />
-        </>
+        </View>
+        </TouchableWithoutFeedback>
       )}
       <Modal transparent visible={sortVisible} animationType="none">
         <TouchableOpacity
@@ -1428,6 +1457,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
     overflow: "hidden",
+  },
+
+  suggestionsHeader: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 6,
+    paddingTop: 6,
+  },
+
+  suggestionsCloseBtn: {
+    padding: 4,
   },
 
   suggestionRow: {
