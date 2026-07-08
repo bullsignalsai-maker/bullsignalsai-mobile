@@ -221,7 +221,16 @@ export async function addToWatchlist(userId, symbol) {
     method: "POST",
   });
   if (!res.ok) throw new Error("Add failed");
-  return res.json();
+
+  const json = await res.json();
+
+  // Backend returns 200 OK even on rejection (status: "error" in the
+  // body, e.g. an unrecognized ticker) — res.ok alone can't see that.
+  if (json?.status !== "ok") {
+    throw new Error(json?.error || "Add failed");
+  }
+
+  return json;
 }
 
 export async function removeFromWatchlist(userId, symbol) {

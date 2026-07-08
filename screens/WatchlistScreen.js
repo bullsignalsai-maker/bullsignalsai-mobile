@@ -276,8 +276,8 @@ export default function WatchlistScreen({ navigation }) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       showToast(`${s} added`);
       await loadWatchlist();
-    } catch {
-      showToast("Failed to add ticker");
+    } catch (err) {
+      showToast(err?.message || "Failed to add ticker");
     }
   };
 
