@@ -33,6 +33,18 @@ import {
   getAuthoritativeSignal,
 } from "../utils/signalUtils";
 
+// riskLevel/riskFlags only exist on alphaWatchItem (Home's AI Opportunity
+// Watch card, passed via route.params when navigating from there) — a
+// lookup, not a fallback default, so a stock opened any other way never
+// shows a fabricated tier it was never actually assessed for.
+const RISK_LEVEL_COLOR = {
+  Controlled: BRAND.accent,
+  Low: BRAND.accent,
+  Moderate: BRAND.amber,
+  Elevated: BRAND.amber,
+  High: BRAND.red,
+};
+
 // -------- Helpers --------
 function timeAgo(tsMs) {
   if (!tsMs) return "";
@@ -238,6 +250,7 @@ export default function StockDetailScreen({ route, navigation }) {
     symbol: initialSymbol = "TSLA",
     name: initialName = "Tesla Inc.",
     source, // ✅ ADD THIS
+    alphaWatchItem,
   } = route.params || {};
 
   const [symbol] = useState(initialSymbol);
@@ -620,6 +633,55 @@ export default function StockDetailScreen({ route, navigation }) {
               ))}
             </View>
           )}
+
+          {!!alphaWatchItem &&
+            (alphaWatchItem.riskLevel ||
+              alphaWatchItem.riskFlags?.length > 0) && (
+              <View style={styles.alphaWatchRiskNote}>
+                <View style={styles.alphaWatchRiskHeader}>
+                  <Ionicons
+                    name="flag-outline"
+                    size={13}
+                    color={BRAND.sub}
+                  />
+                  <Text style={styles.alphaWatchRiskLabel} numberOfLines={1}>
+                    {alphaWatchItem.setupLabel || "AI Opportunity Watch"}
+                  </Text>
+                  {!!alphaWatchItem.riskLevel && (
+                    <View style={styles.alphaWatchRiskBadge}>
+                      <View
+                        style={[
+                          styles.alphaWatchRiskDot,
+                          {
+                            backgroundColor:
+                              RISK_LEVEL_COLOR[alphaWatchItem.riskLevel] ||
+                              BRAND.sub,
+                          },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.alphaWatchRiskBadgeText,
+                          {
+                            color:
+                              RISK_LEVEL_COLOR[alphaWatchItem.riskLevel] ||
+                              BRAND.sub,
+                          },
+                        ]}
+                      >
+                        {alphaWatchItem.riskLevel}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {alphaWatchItem.riskFlags?.length > 0 && (
+                  <Text style={styles.alphaWatchRiskFlags}>
+                    {alphaWatchItem.riskFlags.join(" • ")}
+                  </Text>
+                )}
+              </View>
+            )}
 
           <TouchableOpacity
             style={styles.aiDetailsButton}
@@ -1654,6 +1716,54 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.bold,
     marginTop: 8,
     textAlign: "center",
+  },
+
+  alphaWatchRiskNote: {
+    marginTop: 10,
+    borderRadius: 13,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+
+  alphaWatchRiskHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  alphaWatchRiskLabel: {
+    flex: 1,
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  alphaWatchRiskBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  alphaWatchRiskDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+
+  alphaWatchRiskBadgeText: {
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  alphaWatchRiskFlags: {
+    color: BRAND.text,
+    fontSize: 11,
+    lineHeight: 15,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 6,
   },
 
   /* =========================

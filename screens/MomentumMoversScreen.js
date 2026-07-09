@@ -43,6 +43,18 @@ import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
 
 const AMBER_TAGS = new Set(["AI Conviction", "Sector Strength"]);
 
+// riskLevel only exists on aiSetups/topAISetup items (backend-computed from
+// riskFlags). confirmedMomentum/continuousMovers items never carry it — so
+// this is intentionally a lookup, not a fallback default, to avoid showing
+// a fabricated tier for a stock the backend never actually risk-assessed.
+const RISK_LEVEL_COLOR = {
+  Controlled: BRAND.green,
+  Low: BRAND.green,
+  Moderate: BRAND.amber,
+  Elevated: BRAND.amber,
+  High: BRAND.red,
+};
+
 const MOMENTUM_SCORE_INFO = {
   MARKET: {
     title: "Market Momentum",
@@ -643,9 +655,24 @@ export default function MomentumMoversScreen({ navigation }) {
                     marginTop: 3,
                   }}
                 >
-                  <View style={styles.dotGreen} />
-                  <Text style={styles.metricValueGreen}>
-                    {leader?.riskLevel || "High"}
+                  <View
+                    style={[
+                      styles.dotGreen,
+                      {
+                        backgroundColor:
+                          RISK_LEVEL_COLOR[leader?.riskLevel] || BRAND.sub,
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.metricValueGreen,
+                      {
+                        color: RISK_LEVEL_COLOR[leader?.riskLevel] || BRAND.sub,
+                      },
+                    ]}
+                  >
+                    {leader?.riskLevel || "Not assessed"}
                   </Text>
                 </View>
               </View>
