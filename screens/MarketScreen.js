@@ -36,6 +36,7 @@ import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import MoveLabel from "../components/MoveLabel";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
+import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
 
 /* ---------------------------------------------------------
    Utils
@@ -139,6 +140,12 @@ function getCarouselItems(carousel, id) {
    Screen
 --------------------------------------------------------- */
 export default function MarketScreen({ navigation }) {
+  const pageScrollRef = useRef(null);
+
+  useResetScrollOnTabPress(navigation, () =>
+    pageScrollRef.current?.scrollTo({ y: 0, animated: true }),
+  );
+
   const [overview, setOverview] = useState(null);
   const [carousel, setCarousel] = useState([]);
   const [movers, setMovers] = useState({ gainers: [], losers: [] });
@@ -395,6 +402,7 @@ export default function MarketScreen({ navigation }) {
       </View>
 
       <ScrollView
+        ref={pageScrollRef}
         showsVerticalScrollIndicator={false}
         style={styles.container}
         contentContainerStyle={styles.scrollContent}

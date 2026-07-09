@@ -37,6 +37,7 @@ import {
   getAuthoritativeSignal,
   signalColor,
 } from "../utils/signalUtils";
+import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
 const LOGO = require("../assets/alpha-transparent.png");
 
 const getSignal = (item) => getAuthoritativeSignal(item);
@@ -164,6 +165,11 @@ const getShortAlphaReason = (item) => {
 
 export default function HomeScreen({ navigation }) {
   const scrollRef = useRef(null);
+  const pageScrollRef = useRef(null);
+
+  useResetScrollOnTabPress(navigation, () =>
+    pageScrollRef.current?.scrollTo({ y: 0, animated: true }),
+  );
 
   const [home, setHome] = useState(null);
   const [topMovers, setTopMovers] = useState([]);
@@ -693,6 +699,7 @@ Pull To Refresh
       </View>
 
       <ScrollView
+        ref={pageScrollRef}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"

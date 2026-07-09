@@ -30,6 +30,7 @@ import { API_BASE_URL } from "../config/apiKeys";
 import ToastMessage from "../components/ToastMessage";
 import MoveLabel from "../components/MoveLabel";
 import { useAuthUser } from "../hooks/useAuthUser";
+import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
 import {
   getWatchlistScreen,
   addToWatchlist,
@@ -165,6 +166,11 @@ export default function WatchlistScreen({ navigation }) {
   const priceFlash = useRef({}).current;
   const prevPrices = useRef({}).current;
   const searchSeqRef = useRef(0);
+  const pageListRef = useRef(null);
+
+  useResetScrollOnTabPress(navigation, () =>
+    pageListRef.current?.scrollToOffset({ offset: 0, animated: true }),
+  );
   const [viewMode, setViewMode] = useState("watchlist");
   const [items, setItems] = useState([]);
   const [newSymbol, setNewSymbol] = useState("");
@@ -1063,6 +1069,7 @@ export default function WatchlistScreen({ navigation }) {
           )}
 
           <FlatList
+            ref={pageListRef}
             data={displayList}
             keyExtractor={(item, index) => `${item.symbol}-${index}`}
             renderItem={renderItem}
