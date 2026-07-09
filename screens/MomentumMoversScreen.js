@@ -39,6 +39,7 @@ import {
 } from "../services/MomentumService";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
+import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
 
 const AMBER_TAGS = new Set(["AI Conviction", "Sector Strength"]);
 
@@ -211,6 +212,11 @@ export default function MomentumMoversScreen({ navigation }) {
   const [infoModal, setInfoModal] = useState(null);
   const priceFlash = useRef({}).current;
   const lastPrices = useRef({}).current;
+  const pageScrollRef = useRef(null);
+
+  useResetScrollOnTabPress(navigation, () =>
+    pageScrollRef.current?.scrollTo({ y: 0, animated: true }),
+  );
   const flashPricesForItems = (items = []) => {
     items.forEach((it) => {
       const symbol = String(it?.symbol || "").toUpperCase();
@@ -401,6 +407,7 @@ export default function MomentumMoversScreen({ navigation }) {
         </Text>
       </View>
       <ScrollView
+        ref={pageScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
         refreshControl={
