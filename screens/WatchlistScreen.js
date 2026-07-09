@@ -55,6 +55,67 @@ const SESSION_DOT_COLOR = {
   PENDING: BRAND.sub,
 };
 
+// Friendly labels for displayIntelligence.scoreBreakdown.factors keys.
+// Falls back to a title-cased version of the raw key so a factor the
+// backend adds later never silently disappears from the breakdown.
+const FACTOR_LABELS = {
+  baseSignal: "BullBrain Signal",
+  confidence: "Model Confidence",
+  priceMove: "Price Move Today",
+  catalyst: "News Catalyst",
+  catalystDetail: "Catalyst Strength",
+  candidateType: "Setup Type",
+  trend: "Trend",
+  volume: "Volume",
+  risk: "Risk Level",
+};
+
+const titleCaseFactorKey = (key) =>
+  String(key || "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (c) => c.toUpperCase());
+
+const fmtSignedPts = (v) => {
+  const n = Number(v) || 0;
+  return `${n >= 0 ? "+" : ""}${n}`;
+};
+
+function buildScoreBreakdownInfo(item) {
+  const breakdown = item?.displayIntelligence?.scoreBreakdown;
+  if (!breakdown) return null;
+
+  const base = Number(breakdown.base ?? 50);
+  const factors = breakdown.factors || {};
+  const rawTotal = Number(breakdown.rawTotal ?? base);
+  const clampedBy = Number(breakdown.clampedBy ?? 0);
+  const total = rawTotal + clampedBy;
+
+  const rows = [
+    { label: "Base", value: String(base) },
+    ...Object.entries(factors).map(([key, value]) => ({
+      label: FACTOR_LABELS[key] || titleCaseFactorKey(key),
+      value: fmtSignedPts(value),
+    })),
+    { label: "Total", value: String(total), emphasis: true },
+  ];
+
+  if (clampedBy !== 0) {
+    rows.push({
+      label: "Adjusted",
+      value: `raw ${fmtSignedPts(rawTotal)} kept within 0–100`,
+      note: true,
+    });
+  }
+
+  return {
+    title: `${item.symbol} Rating Breakdown`,
+    whyNow: Array.isArray(item.displayIntelligence?.whyNow)
+      ? item.displayIntelligence.whyNow
+      : [],
+    rows,
+  };
+}
+
 const fmt = (v) =>
   typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "--";
 
@@ -113,6 +174,7 @@ export default function WatchlistScreen({ navigation }) {
   const [sortVisible, setSortVisible] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: "" });
   const [lastSync, setLastSync] = useState(new Date());
+  const [infoModal, setInfoModal] = useState(null);
 
   // Pin + Notes (local UX polish)
   const [pinned, setPinned] = useState({});
@@ -664,6 +726,20 @@ export default function WatchlistScreen({ navigation }) {
                 >
                   {Math.round(item.bullbrain?.confidence ?? 0)}%
                 </Text>
+
+                {!!item.displayIntelligence?.scoreBreakdown && (
+                  <TouchableOpacity
+                    onPress={() => setInfoModal(buildScoreBreakdownInfo(item))}
+                    style={styles.infoBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name="help-circle-outline"
+                      size={13}
+                      color={BRAND.sub}
+                    />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
@@ -1149,6 +1225,70 @@ export default function WatchlistScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {infoModal && (
+        <Modal transparent animationType="fade" visible>
+          <View style={styles.infoModalOverlay}>
+            <View style={styles.infoModalCard}>
+              <View style={styles.infoModalHeader}>
+                <Text style={styles.infoModalTitle}>{infoModal.title}</Text>
+                <TouchableOpacity onPress={() => setInfoModal(null)}>
+                  <Ionicons name="close" size={20} color={BRAND.sub} />
+                </TouchableOpacity>
+              </View>
+
+              {!!infoModal.text && (
+                <Text style={styles.infoModalText}>{infoModal.text}</Text>
+              )}
+
+              {infoModal.whyNow?.length > 0 && (
+                <View style={styles.infoModalWhyNow}>
+                  {infoModal.whyNow.map((reason, idx) => (
+                    <Text
+                      key={idx}
+                      style={styles.infoModalWhyNowText}
+                    >
+                      • {reason}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {infoModal.rows?.length > 0 && (
+                <View style={styles.infoModalRows}>
+                  {infoModal.rows.map((row, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.infoModalRow,
+                        row.emphasis && styles.infoModalRowEmphasis,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.infoModalRowLabel,
+                          row.emphasis && styles.infoModalRowLabelEmphasis,
+                        ]}
+                      >
+                        {row.label}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.infoModalRowValue,
+                          row.emphasis && styles.infoModalRowLabelEmphasis,
+                          row.note && styles.infoModalRowNote,
+                        ]}
+                      >
+                        {row.value}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
 
       <ToastMessage
         visible={toast.visible}
@@ -1682,6 +1822,11 @@ const styles = StyleSheet.create({
     fontSize: 10.2,
     fontFamily: TYPO.fontFamily.semibold,
   },
+
+  infoBtn: {
+    marginLeft: 4,
+    padding: 3,
+  },
   tickerLogoImage: {
     width: 28,
     height: 28,
@@ -1891,5 +2036,99 @@ const styles = StyleSheet.create({
   assetsIconPlaceholder: {
     width: 44,
     height: 44,
+  },
+
+  infoModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.68)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  infoModalCard: {
+    width: "100%",
+    backgroundColor: BRAND.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: PREMIUM.border,
+    padding: 16,
+  },
+
+  infoModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  infoModalTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
+    flex: 1,
+    marginRight: 10,
+  },
+
+  infoModalText: {
+    color: BRAND.sub,
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+
+  infoModalWhyNow: {
+    marginBottom: 12,
+  },
+
+  infoModalWhyNowText: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+
+  infoModalRows: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    paddingTop: 8,
+  },
+
+  infoModalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 5,
+  },
+
+  infoModalRowEmphasis: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    marginTop: 4,
+    paddingTop: 8,
+  },
+
+  infoModalRowLabel: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  infoModalRowLabelEmphasis: {
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  infoModalRowValue: {
+    color: BRAND.text,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  infoModalRowNote: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.regular,
+    fontStyle: "italic",
   },
 });
