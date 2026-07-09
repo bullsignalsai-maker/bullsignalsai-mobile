@@ -68,6 +68,24 @@ const MOMENTUM_SCORE_INFO = {
     title: "Momentum Score & Tiers",
     text: "An AI-generated 0–100 score built from recent price action, trend persistence, and volume behavior. ELITE, STRONG, and EMERGING are display tiers on top of that score — ELITE is 85+, STRONG is 70–84, EMERGING is below 70 — meant for a quick scan, not a separately verified rating.",
   },
+  RISING_FADING: {
+    title: "Rising / Fading",
+    text: "Compares today's move to this stock's own average move over the tracked window. Rising means today is stronger than its average; Fading means today is weaker. This is a same-session signal, not a verified multi-day trend.",
+  },
+  NEW_ENTRANTS: {
+    title: "New Entrants",
+    text: "Stocks that have only recently started showing up in this momentum list (few tracked sessions so far). It reflects how new the stock is to this list, not whether it recently IPO'd or was newly listed.",
+  },
+};
+
+// theme only exists on aiSetups/topAISetup — Sector filtering is scoped to
+// that section for this reason (see MomentumMoversScreen investigation).
+const THEME_LABELS = {
+  AI_Semis: "AI & Semis",
+  Cloud_Software: "Cloud & Software",
+  Consumer_Internet: "Consumer Internet",
+  Financial_Crypto: "Financial & Crypto",
+  Other: "Other",
 };
 
 /* ---------------- Mini sparkline ---------------- */
@@ -216,6 +234,7 @@ const normalizeMoverForClara = (raw) => {
 /* ============================================================ */
 export default function MomentumMoversScreen({ navigation }) {
   const [selected, setSelected] = useState("All");
+  const [selectedTheme, setSelectedTheme] = useState("All");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -369,8 +388,57 @@ export default function MomentumMoversScreen({ navigation }) {
       );
     }
 
+    // Approximation, not a verified multi-day trend — see
+    // MOMENTUM_SCORE_INFO.RISING_FADING. Compares today's move against
+    // this stock's own average move over the tracked window.
+    if (selected === "Rising") {
+      return [...movers]
+        .filter(
+          (x) => Number(x.latestMovePct || 0) > Number(x.avgMovePct || 0),
+        )
+        .sort(
+          (a, b) =>
+            Number(b.latestMovePct || 0) -
+              Number(b.avgMovePct || 0) -
+              (Number(a.latestMovePct || 0) - Number(a.avgMovePct || 0)),
+        );
+    }
+
+    if (selected === "Fading") {
+      return [...movers]
+        .filter(
+          (x) => Number(x.latestMovePct || 0) < Number(x.avgMovePct || 0),
+        )
+        .sort(
+          (a, b) =>
+            Number(a.latestMovePct || 0) -
+              Number(a.avgMovePct || 0) -
+              (Number(b.latestMovePct || 0) - Number(b.avgMovePct || 0)),
+        );
+    }
+
+    // Means "few tracked sessions in this list so far," not "recently
+    // IPO'd" — see MOMENTUM_SCORE_INFO.NEW_ENTRANTS. Threshold picked
+    // from the current appearances distribution (backend already floors
+    // it around 3-4), not a backend-defined cutoff.
+    if (selected === "New") {
+      return [...movers]
+        .filter((x) => Number(x.appearances || 0) <= 5)
+        .sort((a, b) => Number(a.appearances || 0) - Number(b.appearances || 0));
+    }
+
     return movers;
   }, [selected, movers, pullbacks]);
+
+  const visibleAiSetups = useMemo(() => {
+    if (selectedTheme === "All") return aiSetups;
+    return aiSetups.filter((x) => x.theme === selectedTheme);
+  }, [selectedTheme, aiSetups]);
+
+  const aiSetupThemes = useMemo(
+    () => [...new Set(aiSetups.map((x) => x.theme).filter(Boolean))],
+    [aiSetups],
+  );
 
   const leader = confirmed[0] || movers[0] || topAISetup;
 
@@ -389,9 +457,22 @@ export default function MomentumMoversScreen({ navigation }) {
     lookbackSnapshots: data?.lookbackSnapshots,
   };
   const filters = useMemo(
-    () => ["All", "Strongest", "3+ Sessions", "Biggest Move", "Pullbacks"],
+    () => [
+      "All",
+      "Strongest",
+      "3+ Sessions",
+      "Biggest Move",
+      "Rising",
+      "Fading",
+      "New",
+      "Pullbacks",
+    ],
     [],
   );
+
+  // Market Cap filter: skipped — no marketCap/market_cap field exists
+  // anywhere in the /market-momentum response (checked live, all four
+  // sections). Needs a new backend field before this can be built.
 
   if (loading) {
     return (
@@ -745,6 +826,37 @@ export default function MomentumMoversScreen({ navigation }) {
             );
           })}
         </ScrollView>
+
+        {/* Approximation disclosures for the two newest filters — see
+            MOMENTUM_SCORE_INFO.RISING_FADING / NEW_ENTRANTS */}
+        <View style={styles.filterLegendRow}>
+          <TouchableOpacity
+            style={styles.filterLegendItem}
+            onPress={() => setInfoModal(MOMENTUM_SCORE_INFO.RISING_FADING)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons
+              name="information-circle-outline"
+              size={12}
+              color={BRAND.sub}
+            />
+            <Text style={styles.filterLegendText}>Rising/Fading</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.filterLegendItem}
+            onPress={() => setInfoModal(MOMENTUM_SCORE_INFO.NEW_ENTRANTS)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons
+              name="information-circle-outline"
+              size={12}
+              color={BRAND.sub}
+            />
+            <Text style={styles.filterLegendText}>New Entrants</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.moversTableCard}>
           <ScrollView
             horizontal
@@ -985,6 +1097,38 @@ export default function MomentumMoversScreen({ navigation }) {
           </View>
         </View>
 
+        {aiSetupThemes.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filters}
+          >
+            {["All", ...aiSetupThemes].map((t) => {
+              const active = selectedTheme === t;
+              return (
+                <TouchableOpacity
+                  key={t}
+                  onPress={() => setSelectedTheme(t)}
+                  style={[
+                    styles.filterPill,
+                    active && styles.filterPillActive,
+                  ]}
+                  activeOpacity={0.85}
+                >
+                  <Text
+                    style={[
+                      styles.filterText,
+                      active && styles.filterTextActive,
+                    ]}
+                  >
+                    {t === "All" ? "All" : THEME_LABELS[t] || t}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -993,7 +1137,7 @@ export default function MomentumMoversScreen({ navigation }) {
           snapToAlignment="start"
           contentContainerStyle={styles.alphaMemoryScroll}
         >
-          {aiSetups.slice(0, 10).map((item, idx) => {
+          {visibleAiSetups.slice(0, 10).map((item, idx) => {
             const score = Math.round(
               item.momentumScore ||
                 item.opportunityScore ||
@@ -1528,6 +1672,24 @@ const styles = StyleSheet.create({
 
   filterTextActive: {
     color: BRAND.green,
+  },
+
+  filterLegendRow: {
+    flexDirection: "row",
+    gap: 14,
+    paddingBottom: 8,
+  },
+
+  filterLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  filterLegendText: {
+    color: BRAND.sub,
+    fontSize: 10.5,
+    fontWeight: "700",
   },
 
   /* Leader card */
