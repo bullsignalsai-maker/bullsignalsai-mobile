@@ -40,6 +40,7 @@ import {
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 import PortfolioScreen from "./PortfolioScreen";
+import { getPortfolio } from "../firebaseConfig";
 import {
   displayRating,
   signalColor,
@@ -145,6 +146,13 @@ const fmtChange = (v) =>
     ? `${v >= 0 ? "+" : ""}$${Math.abs(v).toFixed(2)}`
     : "--";
 
+// Lots can be fractional (e.g. dollar-based buys), so trim to 4dp and
+// drop trailing zeros rather than always showing a whole share count.
+const fmtShares = (v) =>
+  typeof v === "number" && !Number.isNaN(v)
+    ? v.toFixed(4).replace(/\.?0+$/, "")
+    : "--";
+
 function getPatternColor(winRate) {
   if (typeof winRate !== "number") return "#374151"; // neutral gray
   if (winRate >= 0.7) return "#16A34A"; // strong green
@@ -181,6 +189,11 @@ export default function WatchlistScreen({ navigation }) {
   const [toast, setToast] = useState({ visible: false, message: "" });
   const [lastSync, setLastSync] = useState(new Date());
   const [infoModal, setInfoModal] = useState(null);
+
+  // Owned positions (symbol -> {shares, avgCost, ...}), fetched separately
+  // from the watchlist snapshot since lots/avgCost don't change between
+  // 15s price polls — refreshed on focus and pull-to-refresh only.
+  const [positions, setPositions] = useState({});
 
   // Pin + Notes (local UX polish)
   const [pinned, setPinned] = useState({});
@@ -292,9 +305,26 @@ export default function WatchlistScreen({ navigation }) {
     }
   };
 
+  /* ================= LOAD OWNED POSITIONS ================= */
+  const loadPositions = async () => {
+    if (!user) return;
+
+    try {
+      const list = await getPortfolio(user.uid);
+      const bySymbol = {};
+      list.forEach((p) => {
+        if (p.symbol && p.shares > 0) bySymbol[p.symbol] = p;
+      });
+      setPositions(bySymbol);
+    } catch {
+      // Non-critical: watchlist still renders fine without ownership info.
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadWatchlist();
+      loadPositions();
       loadPins();
     }, [user]),
   );
@@ -661,6 +691,16 @@ export default function WatchlistScreen({ navigation }) {
       opacity: item.isStale ? 0.6 : 1,
     };
 
+    // Owned position for this symbol, if any — shares/avgCost come from
+    // Firestore (loadPositions), gain/loss reuses the live watchlist price
+    // already polled for this card (see PortfolioScreen.js for the same
+    // cost-basis formula applied to the dedicated Portfolio tab).
+    const pos = positions[item.symbol];
+    const ownedPrice = price ?? pos?.avgCost ?? 0;
+    const ownedCost = pos ? pos.shares * pos.avgCost : 0;
+    const ownedGain = pos ? pos.shares * ownedPrice - ownedCost : 0;
+    const ownedGainPct = pos && ownedCost > 0 ? (ownedGain / ownedCost) * 100 : 0;
+
     return (
       <Swipeable
         ref={(r) => (swipeRefs.current[item.symbol] = r)}
@@ -697,6 +737,12 @@ export default function WatchlistScreen({ navigation }) {
             <View style={styles.cardMiddle}>
               <View style={styles.symbolRow}>
                 <Text style={styles.symbol}>{item.symbol}</Text>
+
+                {!!pos && (
+                  <View style={styles.ownedPill}>
+                    <Text style={styles.ownedPillText}>Owned</Text>
+                  </View>
+                )}
 
                 <MoveLabel
                   changePct={item.changePct}
@@ -828,6 +874,23 @@ export default function WatchlistScreen({ navigation }) {
               </View>
             </View>
           </View>
+
+          {/* OWNED POSITION */}
+          {!!pos && (
+            <View style={styles.ownedRow}>
+              <Text style={styles.ownedRowText}>
+                {fmtShares(pos.shares)} sh · Avg {fmt(pos.avgCost)}
+              </Text>
+              <Text
+                style={[
+                  styles.ownedRowGain,
+                  { color: ownedGain >= 0 ? BRAND.accent : BRAND.red },
+                ]}
+              >
+                {fmtChange(ownedGain)} ({fmtPct(ownedGainPct)})
+              </Text>
+            </View>
+          )}
 
           {/* SUMMARY */}
 
@@ -1085,7 +1148,10 @@ export default function WatchlistScreen({ navigation }) {
               <RefreshControl
                 tintColor={BRAND.accent}
                 refreshing={refreshing}
-                onRefresh={() => loadWatchlist({ silent: false })}
+                onRefresh={() => {
+                  loadWatchlist({ silent: false });
+                  loadPositions();
+                }}
               />
             }
             contentContainerStyle={{ paddingBottom: 110 }}
@@ -1589,6 +1655,43 @@ const styles = StyleSheet.create({
     color: "#D1D5DB",
     fontSize: 9.4,
     fontWeight: "800",
+  },
+
+  ownedPill: {
+    marginLeft: 7,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(212,166,58,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(212,166,58,0.35)",
+  },
+
+  ownedPillText: {
+    color: "#D4A63A",
+    fontSize: 8.5,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  ownedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
+
+  ownedRowText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  ownedRowGain: {
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
   },
 
   sectionHeader: {
