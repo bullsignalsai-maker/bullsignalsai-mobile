@@ -866,17 +866,29 @@ Pull To Refresh
                         style={[
                           styles.signalBadge,
                           {
-                            backgroundColor: signalColor(getSignal(heroItem)),
+                            backgroundColor:
+                              // hasIntelligence is only set on items sourced
+                              // from buildHomeSignals — verified-alpha/alpha-watch
+                              // items have their own, separately-real signal
+                              // data and should never be forced into "Analyzing…".
+                              heroItem.hasIntelligence === false
+                                ? BRAND.sub
+                                : signalColor(getSignal(heroItem)),
                           },
                         ]}
                       >
                         <Text style={styles.signalText}>
-                          {displayRating(getSignal(heroItem))}
+                          {heroItem.hasIntelligence === false
+                            ? "Analyzing…"
+                            : displayRating(getSignal(heroItem))}
                         </Text>
                       </View>
-                      <Text style={styles.heroMetaText}>
-                        Confidence {Math.round(getConfidence(heroItem))}%
-                      </Text>
+
+                      {heroItem.hasIntelligence !== false && (
+                        <Text style={styles.heroMetaText}>
+                          Confidence {Math.round(getConfidence(heroItem))}%
+                        </Text>
+                      )}
 
                       {!!heroItem.displayIntelligence?.scoreBreakdown && (
                         <TouchableOpacity
@@ -1300,7 +1312,9 @@ Pull To Refresh
               {coreSignalCards.map((item, index) => {
                 const isUp = Number(item.changePct || 0) >= 0;
                 const signal = getSignal(item);
-                const ratingColor = signalColor(signal);
+                const ratingColor = item.hasIntelligence
+                  ? signalColor(signal)
+                  : BRAND.sub;
 
                 return (
                   <TouchableOpacity
@@ -1347,13 +1361,17 @@ Pull To Refresh
                           ]}
                         >
                           <Text style={styles.coreSignalMiniText}>
-                            {displayRating(signal)}
+                            {item.hasIntelligence
+                              ? displayRating(signal)
+                              : "Analyzing…"}
                           </Text>
                         </View>
 
-                        <Text style={styles.corePremiumConfidence}>
-                          {Math.round(getConfidence(item))}%
-                        </Text>
+                        {item.hasIntelligence && (
+                          <Text style={styles.corePremiumConfidence}>
+                            {Math.round(getConfidence(item))}%
+                          </Text>
+                        )}
 
                         {!!item.displayIntelligence?.scoreBreakdown && (
                           <TouchableOpacity

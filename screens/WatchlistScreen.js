@@ -716,22 +716,30 @@ export default function WatchlistScreen({ navigation }) {
                 <View
                   style={[
                     styles.inlineSignalBadge,
-                    { backgroundColor: signalColor(signal) },
+                    {
+                      backgroundColor: item.hasIntelligence
+                        ? signalColor(signal)
+                        : BRAND.sub,
+                    },
                   ]}
                 >
                   <Text style={styles.inlineSignalText}>
-                    {displayRating(signal)}
+                    {item.hasIntelligence
+                      ? displayRating(signal)
+                      : "Analyzing…"}
                   </Text>
                 </View>
 
-                <Text
-                  style={[
-                    styles.inlineConfidence,
-                    { color: signalColor(signal) },
-                  ]}
-                >
-                  {Math.round(item.bullbrain?.confidence ?? 0)}%
-                </Text>
+                {item.hasIntelligence && (
+                  <Text
+                    style={[
+                      styles.inlineConfidence,
+                      { color: signalColor(signal) },
+                    ]}
+                  >
+                    {Math.round(item.bullbrain?.confidence ?? 0)}%
+                  </Text>
+                )}
 
                 {!!item.displayIntelligence?.scoreBreakdown && (
                   <TouchableOpacity

@@ -150,6 +150,14 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
           : typeof s.bullbrain?.confidence === "number"
             ? s.bullbrain.confidence
             : 0;
+
+    // Whether displayIntelligence has actually been computed for this
+    // symbol yet — distinct from bullbrain (an older, separate signal
+    // system) having a value. Gates the badge/confidence/summary so a
+    // freshly-added or not-yet-computed symbol never looks like it has
+    // a real (if unremarkable) rating.
+    const hasIntelligence = typeof displayIntelligence?.score === "number";
+
     const baseSummary =
       displayIntelligence?.headline ||
       s.displayHeadline ||
@@ -165,13 +173,19 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
             baseSummary,
           )));
 
-    const watchlistSummary = contradictsLiveMove
-      ? `${sym} is ${
-          changePct >= 0 ? "moving higher" : "under pressure"
-        } today, ${changePct >= 0 ? "up" : "down"} ${Math.abs(
-          changePct,
-        ).toFixed(2)}%.`
-      : baseSummary;
+    // When there's no real intelligence yet, never fall through to
+    // market_awareness/resolve_watchlist_summary content the backend
+    // may still attach to baseSummary — that's exactly the "stale or
+    // misleading previous intelligence" this is meant to avoid.
+    const watchlistSummary = !hasIntelligence
+      ? "Analyzing…"
+      : contradictsLiveMove
+        ? `${sym} is ${
+            changePct >= 0 ? "moving higher" : "under pressure"
+          } today, ${changePct >= 0 ? "up" : "down"} ${Math.abs(
+            changePct,
+          ).toFixed(2)}%.`
+        : baseSummary;
     return {
       symbol: sym,
       companyName: s.companyName || sym,
@@ -190,6 +204,7 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
       session: !price ? "PENDING" : marketPeriod,
 
       displayIntelligence,
+      hasIntelligence,
       displayLabel: displayIntelligence?.label || s.displayLabel || null,
       displayHeadline:
         displayIntelligence?.headline || s.displayHeadline || null,
