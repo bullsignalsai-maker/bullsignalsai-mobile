@@ -958,7 +958,6 @@ export default function StockDetailScreen({ route, navigation }) {
               ].map((item, idx) => {
                 const bias =
                   detail?.probability?.bias ||
-                  detail?.signal?.bias ||
                   probBias ||
                   "Neutral";
 
