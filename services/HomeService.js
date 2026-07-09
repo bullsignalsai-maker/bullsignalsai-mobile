@@ -267,6 +267,7 @@ function buildHomeSignals(stocks = [], quotes = {}) {
 
       signal: s.signal || s.bullbrain?.signal || "HOLD",
       confidence: Number(s.confidence ?? s.bullbrain?.confidence ?? 0),
+      displayIntelligence: s.displayIntelligence || null,
 
       summary: getHomeInsight(s),
       marketAwareness: s.marketAwareness || null,
