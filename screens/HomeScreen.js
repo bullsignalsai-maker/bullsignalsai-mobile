@@ -40,6 +40,16 @@ import {
 import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
 const LOGO = require("../assets/alpha-transparent.png");
 
+const FEAR_INDEX_INFO = {
+  title: "Fear & Greed Index",
+  text: "A 0–100 gauge of overall market sentiment, built from volatility, momentum, and trading behavior across the market. Low readings mean fear is dominating (investors selling, risk-off); high readings mean greed is dominating (investors buying, risk-on). Around 50 is neutral.",
+};
+
+const MARKET_MOVERS_INFO = {
+  title: "Market Movers",
+  text: "Stocks with the largest verified price moves right now. \"Exploding\" means the stock is up on the day; \"Pulling back\" means it's down. This reflects today's price action only, not a forecast of where it goes next.",
+};
+
 // Friendly labels for displayIntelligence.scoreBreakdown.factors keys.
 // Falls back to a title-cased version of the raw key so a factor the
 // backend adds later never silently disappears from the breakdown.
@@ -753,6 +763,23 @@ Pull To Refresh
               : marketStatusLabel}
           </Text>
 
+          {marketPhase !== "PREMARKET" && (
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={(e) => {
+                e.stopPropagation();
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setInfoModal(FEAR_INDEX_INFO);
+              }}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={14}
+                color={BRAND.sub}
+              />
+            </TouchableOpacity>
+          )}
+
           <View style={styles.quickTourWrap}>
             <Ionicons name="compass-outline" size={11} color={ACCENT_GOLD} />
             <Text style={styles.marketGuideHint}>Quick Tour</Text>
@@ -1125,7 +1152,25 @@ Pull To Refresh
           <View style={styles.homeSectionWrap}>
             <View style={styles.homeSectionHeader}>
               <View>
-                <Text style={styles.sectionTitle}>Market Movers</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <Text style={styles.sectionTitle}>Market Movers</Text>
+                  <TouchableOpacity
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={() => setInfoModal(MARKET_MOVERS_INFO)}
+                  >
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={14}
+                      color={BRAND.sub}
+                    />
+                  </TouchableOpacity>
+                </View>
                 <Text style={styles.sectionSubtitle}>
                   Fast-moving stocks verified by Alphaclara
                 </Text>
