@@ -1085,10 +1085,6 @@ export default function MomentumMoversScreen({ navigation }) {
             <View style={{ flex: 1 }}>
               <View style={styles.sectionTitleLine}>
                 <Text style={styles.sectionTitle}>AI SETUPS</Text>
-                <View style={styles.sectionLiveDot}>
-                  <View style={styles.sectionLiveDotInner} />
-                  <Text style={styles.sectionLiveText}>LIVE</Text>
-                </View>
               </View>
               <Text style={styles.sectionSub}>
                 Internal AI-ranked opportunities with momentum confirmation
@@ -1154,6 +1150,13 @@ export default function MomentumMoversScreen({ navigation }) {
                 key={item.symbol}
                 activeOpacity={0.9}
                 style={styles.alphaCard}
+                onPress={() => {
+                  navigation.navigate("StockDetailScreen", {
+                    symbol: item.symbol,
+                    name: item.companyName || item.symbol,
+                    source: "ui",
+                  });
+                }}
               >
                 {/* Base background */}
                 <LinearGradient
@@ -1331,6 +1334,13 @@ export default function MomentumMoversScreen({ navigation }) {
               key={item.symbol}
               activeOpacity={0.86}
               style={styles.pullCard}
+              onPress={() => {
+                navigation.navigate("StockDetailScreen", {
+                  symbol: item.symbol,
+                  name: item.companyName || item.symbol,
+                  source: "ui",
+                });
+              }}
             >
               <LinearGradient
                 colors={["rgba(255,69,96,0.22)", "rgba(15,8,10,0.98)"]}
@@ -2111,32 +2121,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-
-  sectionLiveDot: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: "rgba(254,176,25,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(254,176,25,0.28)",
-  },
-
-  sectionLiveDotInner: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: BRAND.amber,
-  },
-
-  sectionLiveText: {
-    color: BRAND.amber,
-    fontSize: 8.5,
-    fontWeight: "900",
-    letterSpacing: 1,
   },
 
   alphaMemoryScroll: {
