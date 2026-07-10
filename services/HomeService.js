@@ -2,6 +2,30 @@
 import { API_BASE_URL } from "../config/apiKeys";
 
 /* =========================================================
+   TODAY STRIP (Portfolio Today / Watchlist Performance)
+   - One combined quotes-bulk call for whatever symbol union
+     the caller passes in (owned + watchlisted), instead of a
+     separate call per section.
+========================================================= */
+export async function fetchHomeQuotes(symbols = []) {
+  try {
+    const symbolsParam = [...new Set(symbols.filter(Boolean))].join(",");
+    if (!symbolsParam) return {};
+
+    const res = await fetch(
+      `${API_BASE_URL}/quotes-bulk?scope=home&symbols=${symbolsParam}`,
+    );
+    if (!res.ok) return {};
+
+    const json = await res.json();
+    return json?.quotes || {};
+  } catch (err) {
+    console.warn("fetchHomeQuotes error:", err.message);
+    return {};
+  }
+}
+
+/* =========================================================
    PUBLIC API
 ========================================================= */
 export async function getHomeScreen() {

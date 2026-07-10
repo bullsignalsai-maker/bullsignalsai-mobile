@@ -28,6 +28,7 @@ import {
   getHomeScreen,
   getHomeMovers,
   getVerifiedAlpha,
+  fetchHomeQuotes,
 } from "../services/HomeService";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
@@ -279,6 +280,10 @@ export default function HomeScreen({ navigation }) {
   // "Owned" pill work).
   const [positions, setPositions] = useState({});
   const [watchlistedSymbols, setWatchlistedSymbols] = useState(new Set());
+  // Live quotes for the union of owned + watchlisted symbols — one
+  // combined quotes-bulk call backing both the Portfolio Today and
+  // Watchlist Performance halves of the "Today" strip.
+  const [todayQuotes, setTodayQuotes] = useState({});
 
   // 🔥 price flash animation per symbol
   const priceFlash = useRef({}).current;
@@ -316,7 +321,10 @@ export default function HomeScreen({ navigation }) {
   };
 
   /* ---------------------------------------------------------
-Owned / Watchlisted lookup (focus only, not the 5s poll)
+Owned / Watchlisted lookup + Today-strip quotes (focus only,
+not the 5s poll) — positions and watchlist membership don't
+change that often, and the combined quotes fetch depends on
+knowing both symbol sets first.
 --------------------------------------------------------- */
   useFocusEffect(
     React.useCallback(() => {
@@ -326,30 +334,38 @@ Owned / Watchlisted lookup (focus only, not the 5s poll)
 
       (async () => {
         try {
-          const list = await getPortfolio(user.uid);
+          const [list, wl] = await Promise.all([
+            getPortfolio(user.uid).catch(() => []),
+            fetchWatchlist(user.uid).catch(() => null),
+          ]);
           if (!active) return;
+
           const bySymbol = {};
           list.forEach((p) => {
             if (p.symbol && p.shares > 0) bySymbol[p.symbol] = p;
           });
           setPositions(bySymbol);
-        } catch {
-          // Non-critical: core signals still render fine without it.
-        }
-      })();
 
-      (async () => {
-        try {
-          const wl = await fetchWatchlist(user.uid);
-          if (!active) return;
-          const items = wl?.watchlist || wl?.items || [];
-          setWatchlistedSymbols(
-            new Set(
-              items.map((i) => String(i.symbol || "").toUpperCase()).filter(Boolean),
-            ),
+          const wlItems = wl?.watchlist || wl?.items || [];
+          const wlSymbols = new Set(
+            wlItems
+              .map((i) => String(i.symbol || "").toUpperCase())
+              .filter(Boolean),
           );
+          setWatchlistedSymbols(wlSymbols);
+
+          const unionSymbols = [
+            ...new Set([...Object.keys(bySymbol), ...wlSymbols]),
+          ];
+
+          if (unionSymbols.length) {
+            const quotes = await fetchHomeQuotes(unionSymbols);
+            if (active) setTodayQuotes(quotes);
+          } else {
+            setTodayQuotes({});
+          }
         } catch {
-          // Non-critical: core signals still render fine without it.
+          // Non-critical: rest of Home still renders fine without it.
         }
       })();
 
@@ -789,6 +805,42 @@ Pull To Refresh
     }
   };
 
+  /* ---------------------------------------------------------
+"Today" strip — Portfolio Today + Watchlist Performance.
+3 states: A) has positions (± watchlist), B) watchlist only,
+C) neither (plain nudge line, no card chrome).
+--------------------------------------------------------- */
+  const ownedSymbols = Object.keys(positions);
+  const hasPositions = ownedSymbols.length > 0;
+  const watchlistSymbolsArr = [...watchlistedSymbols];
+  const hasWatchlist = watchlistSymbolsArr.length > 0;
+
+  const portfolioToday = hasPositions
+    ? ownedSymbols.reduce((sum, sym) => {
+        const pos = positions[sym];
+        const change = Number(todayQuotes[sym]?.change ?? 0);
+        return sum + pos.shares * change;
+      }, 0)
+    : null;
+
+  const watchlistPerformance = hasWatchlist
+    ? watchlistSymbolsArr.reduce(
+        (acc, sym) => {
+          const pct = Number(todayQuotes[sym]?.changePct ?? 0);
+          if (pct >= 0) acc.up += 1;
+          else acc.down += 1;
+          if (
+            acc.leader === null ||
+            Math.abs(pct) > Math.abs(acc.leader.changePct)
+          ) {
+            acc.leader = { symbol: sym, changePct: pct };
+          }
+          return acc;
+        },
+        { up: 0, down: 0, leader: null },
+      )
+    : null;
+
   return (
     <Animated.View style={[styles.container, { opacity: screenFade }]}>
       <LinearGradient
@@ -896,6 +948,84 @@ Pull To Refresh
         }
         contentContainerStyle={{ paddingBottom: 50 }}
       >
+        {/* TODAY STRIP — Portfolio Today / Watchlist Performance */}
+        {hasPositions ? (
+          <View style={styles.todayRow}>
+            <View
+              style={[styles.todayCard, hasWatchlist && styles.todayCardHalf]}
+            >
+              <Text style={styles.todayCardLabel}>Portfolio Today</Text>
+              <Text
+                style={[
+                  styles.todayCardValue,
+                  { color: portfolioToday >= 0 ? BRAND.accent : BRAND.red },
+                ]}
+              >
+                {portfolioToday >= 0 ? "+" : "-"}$
+                {Math.abs(portfolioToday).toFixed(2)}
+              </Text>
+              <Text style={styles.todayCardSub}>
+                {ownedSymbols.length} position
+                {ownedSymbols.length === 1 ? "" : "s"}
+              </Text>
+            </View>
+
+            {hasWatchlist && (
+              <View style={[styles.todayCard, styles.todayCardHalf]}>
+                <Text style={styles.todayCardLabel}>
+                  Watchlist Performance
+                </Text>
+                <Text style={styles.todayCardValue}>
+                  <Text style={{ color: BRAND.accent }}>
+                    {watchlistPerformance.up} up
+                  </Text>
+                  <Text style={{ color: BRAND.sub }}> / </Text>
+                  <Text style={{ color: BRAND.red }}>
+                    {watchlistPerformance.down} down
+                  </Text>
+                </Text>
+                {!!watchlistPerformance.leader && (
+                  <Text style={styles.todayCardSub}>
+                    {watchlistPerformance.leader.symbol}{" "}
+                    {watchlistPerformance.leader.changePct >= 0 ? "+" : ""}
+                    {watchlistPerformance.leader.changePct.toFixed(2)}%
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+        ) : hasWatchlist ? (
+          <View style={styles.todayStripWrap}>
+            <View style={styles.todayCard}>
+              <Text style={styles.todayCardLabel}>Watchlist Performance</Text>
+              <Text style={styles.todayCardValue}>
+                <Text style={{ color: BRAND.accent }}>
+                  {watchlistPerformance.up} up
+                </Text>
+                <Text style={{ color: BRAND.sub }}> / </Text>
+                <Text style={{ color: BRAND.red }}>
+                  {watchlistPerformance.down} down
+                </Text>
+              </Text>
+              {!!watchlistPerformance.leader && (
+                <Text style={styles.todayCardSub}>
+                  {watchlistPerformance.leader.symbol}{" "}
+                  {watchlistPerformance.leader.changePct >= 0 ? "+" : ""}
+                  {watchlistPerformance.leader.changePct.toFixed(2)}%
+                </Text>
+              )}
+            </View>
+            <Text style={styles.todayNudgeLine}>
+              Track a position to see your P/L here.
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.todayNudgeLineOnly}>
+            Add a stock to your watchlist to start seeing your daily summary
+            here.
+          </Text>
+        )}
+
         {/* AI OPPORTUNITY WATCH / TOP ALPHA IDEA */}
         {heroItem && (
           <View style={styles.heroWrap}>
@@ -1951,6 +2081,74 @@ const styles = StyleSheet.create({
   /* ==================== SECTIONS ==================== */
   homeSectionWrap: {
     marginBottom: 2,
+  },
+
+  // State A: Portfolio Today + (optional) Watchlist Performance side by
+  // side. flexDirection: row is required here — flex:1 on the child
+  // cards does nothing without a row container to distribute width in.
+  todayRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginHorizontal: 12,
+    marginBottom: 14,
+  },
+
+  // State B: single Watchlist Performance card + nudge line, stacked
+  // vertically — deliberately NOT a row container.
+  todayStripWrap: {
+    marginHorizontal: 12,
+    marginBottom: 14,
+  },
+
+  todayCard: {
+    backgroundColor: PREMIUM.cardSoft,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+
+  todayCardHalf: {
+    flex: 1,
+  },
+
+  todayCardLabel: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+
+  todayCardValue: {
+    fontSize: 20,
+    fontFamily: TYPO.fontFamily.extrabold,
+    marginTop: 4,
+  },
+
+  todayCardSub: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  todayNudgeLine: {
+    color: BRAND.sub,
+    fontSize: 11.5,
+    marginTop: 8,
+    fontFamily: TYPO.fontFamily.medium,
+    textAlign: "center",
+  },
+
+  todayNudgeLineOnly: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    marginHorizontal: 12,
+    marginBottom: 14,
+    fontFamily: TYPO.fontFamily.medium,
+    textAlign: "center",
   },
 
   homeSectionHeader: {
