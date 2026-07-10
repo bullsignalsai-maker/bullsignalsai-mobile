@@ -179,70 +179,85 @@ export default function MarketScreen({ navigation }) {
   const priceCacheRef = useRef({});
   const prevPriceCacheRef = useRef({});
 
-  const loadData = useCallback(
-    async (silent = false) => {
-      try {
-        if (refreshing) return;
+  // Mirrors of `refreshing`/`overview` for loadData to read without
+  // being in its own dependency array — loadData both reads and (via
+  // setOverview) writes `overview`, so including it as a dep meant every
+  // fetch recreated loadData, which retriggered the polling useEffect
+  // below, which called loadData again immediately: a runaway refetch
+  // loop instead of the intended 30s cadence, degrading responsiveness
+  // (e.g. modal taps appearing to stop working after the first one).
+  const refreshingRef = useRef(false);
+  const hasOverviewRef = useRef(false);
 
-        if (!silent && !overview) setLoading(true);
+  useEffect(() => {
+    refreshingRef.current = refreshing;
+  }, [refreshing]);
 
-        // 1) Load overview first so Market tab opens fast
-        const overviewData = await getMarketOverview();
+  useEffect(() => {
+    hasOverviewRef.current = !!overview;
+  }, [overview]);
 
-        if (overviewData?.market) {
-          prevPriceCacheRef.current = { ...priceCacheRef.current };
+  const loadData = useCallback(async (silent = false) => {
+    try {
+      if (refreshingRef.current) return;
 
-          const nextCarousel = overviewData.carousel || [];
+      if (!silent && !hasOverviewRef.current) setLoading(true);
 
-          setOverview(overviewData.market || {});
-          setCarousel(nextCarousel);
-          setLastUpdated(timeAgoFromUtc(overviewData.market?.updated_at));
+      // 1) Load overview first so Market tab opens fast
+      const overviewData = await getMarketOverview();
 
-          nextCarousel.forEach((card) => {
-            if (!card?.items) return;
+      if (overviewData?.market) {
+        prevPriceCacheRef.current = { ...priceCacheRef.current };
 
-            card.items.forEach((it) => {
-              const key = tickerFromLabel(it.label);
-              const price = it?.quote?.price;
+        const nextCarousel = overviewData.carousel || [];
 
-              if (typeof price === "number" && key) {
-                priceCacheRef.current[key] = price;
-              }
-            });
+        setOverview(overviewData.market || {});
+        setCarousel(nextCarousel);
+        setLastUpdated(timeAgoFromUtc(overviewData.market?.updated_at));
+
+        nextCarousel.forEach((card) => {
+          if (!card?.items) return;
+
+          card.items.forEach((it) => {
+            const key = tickerFromLabel(it.label);
+            const price = it?.quote?.price;
+
+            if (typeof price === "number" && key) {
+              priceCacheRef.current[key] = price;
+            }
           });
-        }
-
-        // 2) Stop full-page loader once overview is ready
-        setLoading(false);
-
-        // 3) Load slower sections in background
-        Promise.allSettled([getMarketMovers("preview"), getMarketNews()]).then(
-          ([moversResult, newsResult]) => {
-            if (moversResult.status === "fulfilled") {
-              setMovers(moversResult.value || { gainers: [], losers: [] });
-            } else {
-              console.warn("Market movers error:", moversResult.reason);
-            }
-
-            if (newsResult.status === "fulfilled") {
-              const newsData = newsResult.value;
-              setNews(Array.isArray(newsData?.news) ? newsData.news : []);
-            } else {
-              console.warn("Market news error:", newsResult.reason);
-            }
-
-            setHighlights([]);
-          },
-        );
-      } catch (e) {
-        console.warn("MarketScreen error:", e?.message || e);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+        });
       }
-    },
-    [refreshing, overview],
-  );
+
+      // 2) Stop full-page loader once overview is ready
+      setLoading(false);
+
+      // 3) Load slower sections in background
+      Promise.allSettled([getMarketMovers("preview"), getMarketNews()]).then(
+        ([moversResult, newsResult]) => {
+          if (moversResult.status === "fulfilled") {
+            setMovers(moversResult.value || { gainers: [], losers: [] });
+          } else {
+            console.warn("Market movers error:", moversResult.reason);
+          }
+
+          if (newsResult.status === "fulfilled") {
+            const newsData = newsResult.value;
+            setNews(Array.isArray(newsData?.news) ? newsData.news : []);
+          } else {
+            console.warn("Market news error:", newsResult.reason);
+          }
+
+          setHighlights([]);
+        },
+      );
+    } catch (e) {
+      console.warn("MarketScreen error:", e?.message || e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadData(false);
