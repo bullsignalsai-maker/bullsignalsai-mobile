@@ -38,6 +38,9 @@ import {
   signalColor,
 } from "../utils/signalUtils";
 import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
+import { useAuthUser } from "../hooks/useAuthUser";
+import { getPortfolio } from "../firebaseConfig";
+import { fetchWatchlist } from "../services/watchlistService";
 const LOGO = require("../assets/alpha-transparent.png");
 
 const FEAR_INDEX_INFO = {
@@ -48,6 +51,26 @@ const FEAR_INDEX_INFO = {
 const MARKET_MOVERS_INFO = {
   title: "Market Movers",
   text: "Stocks with the largest verified price moves right now. \"Exploding\" means the stock is up on the day; \"Pulling back\" means it's down. This reflects today's price action only, not a forecast of where it goes next.",
+};
+
+// Same thresholds as MomentumMoversScreen.js's MOMENTUM_SCORE_INFO.TIER —
+// reused deliberately so the vocabulary is consistent across screens.
+const CORE_TIER_INFO = {
+  title: "Core Signal Tiers",
+  text: "ELITE, STRONG, and EMERGING are confidence tiers on top of each stock's AI confidence score — ELITE is 85+, STRONG is 70–84, EMERGING is below 70. Meant for a quick scan of which names have the most model conviction, not a separately verified rating.",
+};
+
+const getConfidenceTier = (confidence) => {
+  const c = Number(confidence) || 0;
+  if (c >= 85) return "ELITE";
+  if (c >= 70) return "STRONG";
+  return "EMERGING";
+};
+
+const CORE_TIER_ACCENT = {
+  ELITE: "#D4A63A",
+  STRONG: "rgba(59,130,246,0.45)",
+  EMERGING: "rgba(255,255,255,0.07)",
 };
 
 // Friendly labels for displayIntelligence.scoreBreakdown.factors keys.
@@ -242,10 +265,21 @@ export default function HomeScreen({ navigation }) {
     pageScrollRef.current?.scrollTo({ y: 0, animated: true }),
   );
 
+  const user = useAuthUser();
   const [home, setHome] = useState(null);
   const [topMovers, setTopMovers] = useState([]);
   const [verifiedAlpha, setVerifiedAlpha] = useState(null);
   const [infoModal, setInfoModal] = useState(null);
+  const [coreSortMode, setCoreSortMode] = useState("confidence");
+
+  // Owned positions (symbol -> {shares, avgCost, ...}) and watchlisted
+  // symbols, fetched separately from the 5s home poll below — lots/
+  // avgCost and watchlist membership don't change that often, so these
+  // are refreshed on focus only (same pattern as WatchlistScreen.js's
+  // "Owned" pill work).
+  const [positions, setPositions] = useState({});
+  const [watchlistedSymbols, setWatchlistedSymbols] = useState(new Set());
+
   // 🔥 price flash animation per symbol
   const priceFlash = useRef({}).current;
 
@@ -280,6 +314,51 @@ export default function HomeScreen({ navigation }) {
       }).start();
     });
   };
+
+  /* ---------------------------------------------------------
+Owned / Watchlisted lookup (focus only, not the 5s poll)
+--------------------------------------------------------- */
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!user) return;
+
+      let active = true;
+
+      (async () => {
+        try {
+          const list = await getPortfolio(user.uid);
+          if (!active) return;
+          const bySymbol = {};
+          list.forEach((p) => {
+            if (p.symbol && p.shares > 0) bySymbol[p.symbol] = p;
+          });
+          setPositions(bySymbol);
+        } catch {
+          // Non-critical: core signals still render fine without it.
+        }
+      })();
+
+      (async () => {
+        try {
+          const wl = await fetchWatchlist(user.uid);
+          if (!active) return;
+          const items = wl?.watchlist || wl?.items || [];
+          setWatchlistedSymbols(
+            new Set(
+              items.map((i) => String(i.symbol || "").toUpperCase()).filter(Boolean),
+            ),
+          );
+        } catch {
+          // Non-critical: core signals still render fine without it.
+        }
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [user]),
+  );
+
   /* ---------------------------------------------------------
 Load + Auto Refresh (5s)
 --------------------------------------------------------- */
@@ -565,10 +644,25 @@ Pull To Refresh
     ].filter(Boolean),
   );
 
-  const coreSignalCards = (signals || [])
+  const coreSignalCardsSorted = (signals || [])
     .filter(hasDisplayQuote)
     .filter((item) => !usedHomeSymbols.has(item.symbol))
-    .slice(0, 7);
+    .sort((a, b) => {
+      if (coreSortMode === "az") {
+        return String(a.symbol || "").localeCompare(String(b.symbol || ""));
+      }
+      if (coreSortMode === "change") {
+        return (
+          Math.abs(Number(b.changePct || 0)) - Math.abs(Number(a.changePct || 0))
+        );
+      }
+      // "confidence" (default)
+      return Number(getConfidence(b)) - Number(getConfidence(a));
+    });
+
+  // Sorting happens before the cap so "top 7" actually reflects the
+  // chosen sort, not whatever 7 survived the earlier exclusion filter.
+  const coreSignalCards = coreSignalCardsSorted.slice(0, 7);
 
   const hasVerifiedHero =
     heroItem && verifiedPositiveAlpha.some((x) => x.symbol === heroItem.symbol);
@@ -1345,13 +1439,61 @@ Pull To Refresh
             <View style={styles.homeSectionHeader}>
               <View>
                 <Text style={styles.sectionEyebrow}>ALPHACLARA AI</Text>
-                <Text style={styles.sectionTitle}>Core Signals</Text>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                >
+                  <Text style={styles.sectionTitle}>Core Signals</Text>
+                  <TouchableOpacity
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={() => setInfoModal(CORE_TIER_INFO)}
+                  >
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={13}
+                      color={BRAND.sub}
+                    />
+                  </TouchableOpacity>
+                </View>
                 <Text style={styles.sectionSubtitle}>
                   Additional AI-ranked names with signal, confidence, and market
                   context
                 </Text>
               </View>
             </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.coreSortRow}
+            >
+              {[
+                { key: "confidence", label: "Top Confidence" },
+                { key: "change", label: "Biggest Move" },
+                { key: "az", label: "A–Z" },
+              ].map((opt) => {
+                const active = coreSortMode === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    onPress={() => setCoreSortMode(opt.key)}
+                    style={[
+                      styles.coreSortPill,
+                      active && styles.coreSortPillActive,
+                    ]}
+                    activeOpacity={0.85}
+                  >
+                    <Text
+                      style={[
+                        styles.coreSortPillText,
+                        active && styles.coreSortPillTextActive,
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
             <View style={styles.corePremiumShell}>
               {coreSignalCards.map((item, index) => {
@@ -1360,6 +1502,11 @@ Pull To Refresh
                 const ratingColor = item.hasIntelligence
                   ? signalColor(signal)
                   : BRAND.sub;
+                const tier = item.hasIntelligence
+                  ? getConfidenceTier(getConfidence(item))
+                  : null;
+                const pos = positions[item.symbol];
+                const isWatchlisted = watchlistedSymbols.has(item.symbol);
 
                 return (
                   <TouchableOpacity
@@ -1369,6 +1516,10 @@ Pull To Refresh
                       styles.corePremiumRow,
                       index !== coreSignalCards.length - 1 &&
                         styles.corePremiumDivider,
+                      tier && {
+                        borderLeftWidth: 3,
+                        borderLeftColor: CORE_TIER_ACCENT[tier],
+                      },
                     ]}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1405,16 +1556,37 @@ Pull To Refresh
                             { backgroundColor: ratingColor },
                           ]}
                         >
-                          <Text style={styles.coreSignalMiniText}>
+                          <Text
+                            style={styles.coreSignalMiniText}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
                             {item.hasIntelligence
                               ? displayRating(signal)
                               : "Analyzing…"}
                           </Text>
                         </View>
+                      </View>
+
+                      <View style={styles.corePremiumMetaLine}>
+                        {!!pos && (
+                          <View style={styles.ownedPill}>
+                            <Text style={styles.ownedPillText}>Owned</Text>
+                          </View>
+                        )}
+
+                        {!pos && isWatchlisted && (
+                          <Ionicons
+                            name="star"
+                            size={11}
+                            color="#D4A63A"
+                            style={{ marginRight: 4 }}
+                          />
+                        )}
 
                         {item.hasIntelligence && (
                           <Text style={styles.corePremiumConfidence}>
-                            {Math.round(getConfidence(item))}%
+                            {tier} {Math.round(getConfidence(item))}%
                           </Text>
                         )}
 
@@ -2655,6 +2827,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
+  corePremiumMetaLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginBottom: 4,
+  },
+
   corePremiumSymbol: {
     color: PREMIUM.textSoft,
     fontSize: 18,
@@ -2664,6 +2843,7 @@ const styles = StyleSheet.create({
   },
 
   coreSignalMiniBadge: {
+    flexShrink: 1,
     borderRadius: 999,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -2680,6 +2860,56 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     marginLeft: 7,
     fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  coreSortRow: {
+    gap: 8,
+    paddingHorizontal: 2,
+    paddingBottom: 10,
+  },
+
+  coreSortPill: {
+    paddingHorizontal: 12,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(17,24,39,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  coreSortPillActive: {
+    backgroundColor: "rgba(0,227,150,0.16)",
+    borderColor: BRAND.accent,
+  },
+
+  coreSortPillText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  coreSortPillTextActive: {
+    color: BRAND.accent,
+  },
+
+  ownedPill: {
+    marginRight: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(212,166,58,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(212,166,58,0.35)",
+  },
+
+  ownedPillText: {
+    color: "#D4A63A",
+    fontSize: 8.5,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
 
   corePremiumCompany: {
