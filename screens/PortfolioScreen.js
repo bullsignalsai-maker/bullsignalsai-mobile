@@ -629,8 +629,10 @@ export default function PortfolioScreen({ navigation }) {
               ) : (
                 <>
                   <Text style={styles.healthBullet}>
-                    ✓ Diversification: {diversificationScore}/100 (
-                    {riskExposure.label})
+                    ✓ Diversification:{" "}
+                    {hasHoldings
+                      ? `${diversificationScore}/100 (${riskExposure.label})`
+                      : "--"}
                   </Text>
                   <Text style={styles.healthBullet}>
                     ✓ Top holding: {topHolding?.symbol || "--"}
