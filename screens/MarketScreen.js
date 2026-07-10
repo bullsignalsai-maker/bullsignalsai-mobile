@@ -13,6 +13,7 @@ import {
   Linking,
   Animated,
   Image,
+  Modal,
 } from "react-native";
 import Svg, {
   Path,
@@ -98,6 +99,22 @@ function deriveRiskLevel(fg) {
   return "Low";
 }
 
+// Same copy as HomeScreen.js's FEAR_INDEX_INFO — reused verbatim so the
+// concept reads consistently across screens rather than two slightly
+// different explanations of the same gauge.
+const FEAR_INDEX_INFO = {
+  title: "Fear & Greed Index",
+  text: "A 0–100 gauge of overall market sentiment, built from volatility, momentum, and trading behavior across the market. Low readings mean fear is dominating (investors selling, risk-off); high readings mean greed is dominating (investors buying, risk-on). Around 50 is neutral.",
+};
+
+// Market Risk is directly derived from the Fear & Greed value above via
+// deriveRiskLevel() — not an independent risk model — so the copy says
+// that plainly instead of implying a separate calculation.
+const MARKET_RISK_INFO = {
+  title: "Market Risk",
+  text: "A quick-read risk level derived from the Fear & Greed value above — Low when sentiment is calm or greedy, Moderate in between, High when fear is elevated. It's a simplified view of the same sentiment data, not a separate volatility or macro risk model.",
+};
+
 function formatPrice(v) {
   if (typeof v !== "number" || Number.isNaN(v)) return "—";
   if (v >= 1000)
@@ -149,6 +166,7 @@ export default function MarketScreen({ navigation }) {
   const [overview, setOverview] = useState(null);
   const [carousel, setCarousel] = useState([]);
   const [movers, setMovers] = useState({ gainers: [], losers: [] });
+  const [infoModal, setInfoModal] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -395,7 +413,7 @@ export default function MarketScreen({ navigation }) {
 
             <View style={styles.updatedInline}>
               <View style={styles.marketHeaderDot} />
-              <Text style={styles.updatedTime}>Updated {lastUpdated} ET</Text>
+              <Text style={styles.updatedTime}>Updated {lastUpdated}</Text>
             </View>
           </View>
         </View>
@@ -535,11 +553,16 @@ export default function MarketScreen({ navigation }) {
             >
               <View style={styles.healthHeaderRow}>
                 <Text style={styles.healthTitle}>FEAR & GREED INDEX</Text>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={15}
-                  color={BRAND.muted}
-                />
+                <TouchableOpacity
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => setInfoModal(FEAR_INDEX_INFO)}
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={15}
+                    color={BRAND.muted}
+                  />
+                </TouchableOpacity>
               </View>
 
               <View style={styles.gaugeArea}>
@@ -567,11 +590,16 @@ export default function MarketScreen({ navigation }) {
             >
               <View style={styles.healthHeaderRow}>
                 <Text style={styles.healthTitle}>MARKET RISK</Text>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={15}
-                  color={BRAND.muted}
-                />
+                <TouchableOpacity
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => setInfoModal(MARKET_RISK_INFO)}
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={15}
+                    color={BRAND.muted}
+                  />
+                </TouchableOpacity>
               </View>
 
               <MarketRiskGauge
@@ -746,6 +774,22 @@ export default function MarketScreen({ navigation }) {
         onClose={() => setAstraVisible(false)}
         portfolioData={astraMarketContext}
       />
+
+      {infoModal && (
+        <Modal transparent animationType="fade" visible>
+          <View style={styles.modalOverlay}>
+            <View style={styles.infoModalCard}>
+              <View style={styles.infoModalHeader}>
+                <Text style={styles.infoModalTitle}>{infoModal.title}</Text>
+                <TouchableOpacity onPress={() => setInfoModal(null)}>
+                  <Ionicons name="close" size={20} color={BRAND.sub} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.infoModalText}>{infoModal.text}</Text>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
   /* =============================================
@@ -1745,5 +1789,42 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     marginRight: 6,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.68)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  infoModalCard: {
+    width: "100%",
+    backgroundColor: BRAND.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    padding: 16,
+  },
+
+  infoModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  infoModalTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  infoModalText: {
+    color: BRAND.sub,
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontFamily: TYPO.fontFamily.regular,
   },
 });
