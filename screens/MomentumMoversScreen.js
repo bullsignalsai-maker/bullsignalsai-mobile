@@ -1305,6 +1305,10 @@ export default function MomentumMoversScreen({ navigation }) {
         </ScrollView>
 
         {/* ---------- PULLBACK WATCH - Premium Horizontal Cards ---------- */}
+        {/* No "View All" here on purpose — the horizontal scroll below
+            already renders every fetched pullback item (capped at 12 by
+            MomentumService.js's normalizePullbacks), so there's nothing
+            further to reveal. */}
         <View style={[styles.sectionHeader, { marginTop: 6 }]}>
           <View style={styles.sectionTitleRow}>
             <Ionicons name="trending-down" size={20} color={BRAND.red} />
@@ -1315,12 +1319,6 @@ export default function MomentumMoversScreen({ navigation }) {
               </Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.viewAll}>
-            <Text style={[styles.viewAllText, { color: BRAND.red }]}>
-              View All
-            </Text>
-            <Ionicons name="arrow-forward" size={16} color={BRAND.red} />
-          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -1469,7 +1467,10 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    paddingTop: 110,
+    // stickyHeader (title + subtitle + its own padding/border) renders
+    // to ~125px tall; this must clear it or the first card's top edge
+    // (including its border) sits hidden underneath it at rest.
+    paddingTop: 132,
     paddingHorizontal: 8,
     paddingBottom: 34,
   },
