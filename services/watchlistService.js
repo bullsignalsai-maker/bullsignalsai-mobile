@@ -75,7 +75,7 @@ export async function getWatchlistScreen(userId) {
     HomeScreen.js's market-status check) so this is correct
     regardless of the device's local timezone.
 ========================================================= */
-function getMarketPeriod(now = new Date()) {
+export function getMarketPeriod(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
     hour: "numeric",

@@ -23,6 +23,7 @@ import {
 import { LinearGradient as ExpoLinearGradient } from "expo-linear-gradient";
 
 import { getStockDetail } from "../services/stockDetailService";
+import { getMarketPeriod } from "../services/watchlistService";
 import AstraChat from "../components/AstraChat";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import { BRAND } from "../constants/theme";
@@ -43,6 +44,23 @@ const RISK_LEVEL_COLOR = {
   Moderate: BRAND.amber,
   Elevated: BRAND.amber,
   High: BRAND.red,
+};
+
+// getMarketPeriod (services/watchlistService.js) returns LIVE/PRE/AH/CLOSED
+// from actual America/New_York wall-clock time — replaces a hardcoded
+// "Market Open" label that never reflected real market state.
+const MARKET_SESSION_LABEL = {
+  LIVE: "Market Open",
+  PRE: "Pre-Market",
+  AH: "After Hours",
+  CLOSED: "Market Closed",
+};
+
+const MARKET_SESSION_COLOR = {
+  LIVE: BRAND.accent,
+  PRE: BRAND.amber,
+  AH: BRAND.amber,
+  CLOSED: BRAND.muted,
 };
 
 // -------- Helpers --------
@@ -283,6 +301,7 @@ export default function StockDetailScreen({ route, navigation }) {
   };
 
   const quote = detail?.quote;
+  const marketPeriod = getMarketPeriod();
   const bullbrain = detail?.bullbrain;
   const patternInsight = detail?.patternInsight || null;
   // ---- SMART PATTERN (from /stockdetail) ----
@@ -398,9 +417,24 @@ export default function StockDetailScreen({ route, navigation }) {
                   </View>
                 </View>
 
-                <View style={styles.marketStatusPill}>
-                  <View style={styles.liveDot} />
-                  <Text style={styles.marketStatusText}>Market Open</Text>
+                <View
+                  style={[
+                    styles.marketStatusPill,
+                    {
+                      backgroundColor: `${MARKET_SESSION_COLOR[marketPeriod]}14`,
+                      borderColor: `${MARKET_SESSION_COLOR[marketPeriod]}33`,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.liveDot,
+                      { backgroundColor: MARKET_SESSION_COLOR[marketPeriod] },
+                    ]}
+                  />
+                  <Text style={styles.marketStatusText}>
+                    {MARKET_SESSION_LABEL[marketPeriod]}
+                  </Text>
                 </View>
               </View>
 
