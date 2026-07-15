@@ -952,9 +952,38 @@ C) neither (plain nudge line, no card chrome).
         {hasPositions ? (
           <View style={styles.todayRow}>
             <View
-              style={[styles.todayCard, hasWatchlist && styles.todayCardHalf]}
+              style={[
+                styles.todayCard,
+                hasWatchlist && styles.todayCardHalf,
+                {
+                  borderColor:
+                    portfolioToday >= 0
+                      ? "rgba(0,227,150,0.34)"
+                      : "rgba(239,68,68,0.34)",
+                  shadowColor: portfolioToday >= 0 ? BRAND.accent : BRAND.red,
+                },
+              ]}
             >
-              <Text style={styles.todayCardLabel}>Portfolio Today</Text>
+              <View style={styles.todayCardHeader}>
+                <View
+                  style={[
+                    styles.todayCardIconWrap,
+                    {
+                      backgroundColor:
+                        portfolioToday >= 0
+                          ? "rgba(0,227,150,0.12)"
+                          : "rgba(239,68,68,0.12)",
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="briefcase-outline"
+                    size={13}
+                    color={portfolioToday >= 0 ? BRAND.accent : BRAND.red}
+                  />
+                </View>
+                <Text style={styles.todayCardLabel}>Portfolio Today</Text>
+              </View>
               <Text
                 style={[
                   styles.todayCardValue,
@@ -971,19 +1000,63 @@ C) neither (plain nudge line, no card chrome).
             </View>
 
             {hasWatchlist && (
-              <View style={[styles.todayCard, styles.todayCardHalf]}>
-                <Text style={styles.todayCardLabel}>
-                  Watchlist Performance
-                </Text>
-                <Text style={styles.todayCardValue}>
-                  <Text style={{ color: BRAND.accent }}>
-                    {watchlistPerformance.up} up
+              <View
+                style={[
+                  styles.todayCard,
+                  styles.todayCardHalf,
+                  {
+                    borderColor:
+                      watchlistPerformance.up >= watchlistPerformance.down
+                        ? "rgba(0,227,150,0.34)"
+                        : "rgba(239,68,68,0.34)",
+                    shadowColor:
+                      watchlistPerformance.up >= watchlistPerformance.down
+                        ? BRAND.accent
+                        : BRAND.red,
+                  },
+                ]}
+              >
+                <View style={styles.todayCardHeader}>
+                  <View
+                    style={[
+                      styles.todayCardIconWrap,
+                      {
+                        backgroundColor:
+                          watchlistPerformance.up >= watchlistPerformance.down
+                            ? "rgba(0,227,150,0.12)"
+                            : "rgba(239,68,68,0.12)",
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="eye-outline"
+                      size={13}
+                      color={
+                        watchlistPerformance.up >= watchlistPerformance.down
+                          ? BRAND.accent
+                          : BRAND.red
+                      }
+                    />
+                  </View>
+                  <Text style={styles.todayCardLabel}>
+                    Watchlist Performance
                   </Text>
-                  <Text style={{ color: BRAND.sub }}> / </Text>
-                  <Text style={{ color: BRAND.red }}>
-                    {watchlistPerformance.down} down
+                </View>
+                <View style={styles.todayUpDownRow}>
+                  <Text style={styles.todayUpDownValue}>
+                    <Text style={{ color: BRAND.accent }}>
+                      {watchlistPerformance.up}
+                    </Text>
+                    <Text style={styles.todayUpDownUnit}> up</Text>
                   </Text>
-                </Text>
+                  <View style={styles.todayUpDownDivider} />
+                  <Text style={styles.todayUpDownValue}>
+                    <Text style={{ color: BRAND.red }}>
+                      {watchlistPerformance.down}
+                    </Text>
+                    <Text style={styles.todayUpDownUnit}> down</Text>
+                  </Text>
+                </View>
                 {!!watchlistPerformance.leader && (
                   <Text style={styles.todayCardSub}>
                     {watchlistPerformance.leader.symbol}{" "}
@@ -996,17 +1069,62 @@ C) neither (plain nudge line, no card chrome).
           </View>
         ) : hasWatchlist ? (
           <View style={styles.todayStripWrap}>
-            <View style={styles.todayCard}>
-              <Text style={styles.todayCardLabel}>Watchlist Performance</Text>
-              <Text style={styles.todayCardValue}>
-                <Text style={{ color: BRAND.accent }}>
-                  {watchlistPerformance.up} up
+            <View
+              style={[
+                styles.todayCard,
+                {
+                  borderColor:
+                    watchlistPerformance.up >= watchlistPerformance.down
+                      ? "rgba(0,227,150,0.34)"
+                      : "rgba(239,68,68,0.34)",
+                  shadowColor:
+                    watchlistPerformance.up >= watchlistPerformance.down
+                      ? BRAND.accent
+                      : BRAND.red,
+                },
+              ]}
+            >
+              <View style={styles.todayCardHeader}>
+                <View
+                  style={[
+                    styles.todayCardIconWrap,
+                    {
+                      backgroundColor:
+                        watchlistPerformance.up >= watchlistPerformance.down
+                          ? "rgba(0,227,150,0.12)"
+                          : "rgba(239,68,68,0.12)",
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="eye-outline"
+                    size={13}
+                    color={
+                      watchlistPerformance.up >= watchlistPerformance.down
+                        ? BRAND.accent
+                        : BRAND.red
+                    }
+                  />
+                </View>
+                <Text style={styles.todayCardLabel}>
+                  Watchlist Performance
                 </Text>
-                <Text style={{ color: BRAND.sub }}> / </Text>
-                <Text style={{ color: BRAND.red }}>
-                  {watchlistPerformance.down} down
+              </View>
+              <View style={styles.todayUpDownRow}>
+                <Text style={styles.todayUpDownValue}>
+                  <Text style={{ color: BRAND.accent }}>
+                    {watchlistPerformance.up}
+                  </Text>
+                  <Text style={styles.todayUpDownUnit}> up</Text>
                 </Text>
-              </Text>
+                <View style={styles.todayUpDownDivider} />
+                <Text style={styles.todayUpDownValue}>
+                  <Text style={{ color: BRAND.red }}>
+                    {watchlistPerformance.down}
+                  </Text>
+                  <Text style={styles.todayUpDownUnit}> down</Text>
+                </Text>
+              </View>
               {!!watchlistPerformance.leader && (
                 <Text style={styles.todayCardSub}>
                   {watchlistPerformance.leader.symbol}{" "}
@@ -2103,14 +2221,33 @@ const styles = StyleSheet.create({
   todayCard: {
     backgroundColor: PREMIUM.cardSoft,
     borderRadius: 18,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.08)",
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 13,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 3,
   },
 
   todayCardHalf: {
     flex: 1,
+  },
+
+  todayCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+
+  todayCardIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   todayCardLabel: {
@@ -2122,9 +2259,34 @@ const styles = StyleSheet.create({
   },
 
   todayCardValue: {
-    fontSize: 20,
+    fontSize: 22,
+    letterSpacing: -0.3,
     fontFamily: TYPO.fontFamily.extrabold,
-    marginTop: 4,
+    marginTop: 5,
+  },
+
+  todayUpDownRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 5,
+  },
+
+  todayUpDownValue: {
+    fontSize: 18,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  todayUpDownUnit: {
+    fontSize: 11,
+    color: BRAND.sub,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  todayUpDownDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    marginHorizontal: 9,
   },
 
   todayCardSub: {
