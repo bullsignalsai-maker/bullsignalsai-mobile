@@ -18,6 +18,7 @@ import {
   UIManager,
   FlatList,
   Image,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -25,10 +26,11 @@ import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Swipeable } from "react-native-gesture-handler";
 
-import { auth } from "../firebaseConfig";
 import { API_BASE_URL } from "../config/apiKeys";
 import ToastMessage from "../components/ToastMessage";
 import MoveLabel from "../components/MoveLabel";
+import { useAuthUser } from "../hooks/useAuthUser";
+import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
 import {
   getWatchlistScreen,
   addToWatchlist,
@@ -38,11 +40,84 @@ import {
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 import PortfolioScreen from "./PortfolioScreen";
+import { getPortfolio } from "../firebaseConfig";
 import {
   displayRating,
   signalColor,
   getAuthoritativeSignal,
 } from "../utils/signalUtils";
+// Dot color reflects market period (session); opacity reflects data
+// staleness (item.isStale, from quote_updated_at age) — two
+// independent axes, no longer conflated.
+const SESSION_DOT_COLOR = {
+  LIVE: BRAND.accent,
+  PRE: BRAND.amber,
+  AH: BRAND.amber,
+  CLOSED: BRAND.sub,
+  PENDING: BRAND.sub,
+};
+
+// Friendly labels for displayIntelligence.scoreBreakdown.factors keys.
+// Falls back to a title-cased version of the raw key so a factor the
+// backend adds later never silently disappears from the breakdown.
+const FACTOR_LABELS = {
+  baseSignal: "BullBrain Signal",
+  confidence: "Model Confidence",
+  priceMove: "Price Move Today",
+  catalyst: "News Catalyst",
+  catalystDetail: "Catalyst Strength",
+  candidateType: "Setup Type",
+  trend: "Trend",
+  volume: "Volume",
+  risk: "Risk Level",
+};
+
+const titleCaseFactorKey = (key) =>
+  String(key || "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (c) => c.toUpperCase());
+
+const fmtSignedPts = (v) => {
+  const n = Number(v) || 0;
+  return `${n >= 0 ? "+" : ""}${n}`;
+};
+
+function buildScoreBreakdownInfo(item) {
+  const breakdown = item?.displayIntelligence?.scoreBreakdown;
+  if (!breakdown) return null;
+
+  const base = Number(breakdown.base ?? 50);
+  const factors = breakdown.factors || {};
+  const rawTotal = Number(breakdown.rawTotal ?? base);
+  const clampedBy = Number(breakdown.clampedBy ?? 0);
+  const total = rawTotal + clampedBy;
+
+  const rows = [
+    { label: "Base", value: String(base) },
+    ...Object.entries(factors).map(([key, value]) => ({
+      label: FACTOR_LABELS[key] || titleCaseFactorKey(key),
+      value: fmtSignedPts(value),
+    })),
+    { label: "Total", value: String(total), emphasis: true },
+  ];
+
+  if (clampedBy !== 0) {
+    rows.push({
+      label: "Adjusted",
+      value: `raw ${fmtSignedPts(rawTotal)} kept within 0–100`,
+      note: true,
+    });
+  }
+
+  return {
+    title: `${item.symbol} Rating Breakdown`,
+    whyNow: Array.isArray(item.displayIntelligence?.whyNow)
+      ? item.displayIntelligence.whyNow
+      : [],
+    rows,
+  };
+}
+
 const fmt = (v) =>
   typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "--";
 
@@ -66,21 +141,16 @@ const fmtDateTime = (ts) => {
     return "";
   }
 };
-function getMarketSession(ts) {
-  if (!ts) return null;
-
-  const d = new Date(ts);
-  const h = d.getHours();
-  const m = d.getMinutes();
-
-  if (h < 9 || (h === 9 && m < 30)) return "PRE";
-  if (h >= 16) return "AH";
-  return "LIVE";
-}
-
 const fmtChange = (v) =>
   typeof v === "number" && !Number.isNaN(v)
     ? `${v >= 0 ? "+" : ""}$${Math.abs(v).toFixed(2)}`
+    : "--";
+
+// Lots can be fractional (e.g. dollar-based buys), so trim to 4dp and
+// drop trailing zeros rather than always showing a whole share count.
+const fmtShares = (v) =>
+  typeof v === "number" && !Number.isNaN(v)
+    ? v.toFixed(4).replace(/\.?0+$/, "")
     : "--";
 
 function getPatternColor(winRate) {
@@ -100,9 +170,15 @@ function formatPatternLabel(pattern, winRate) {
 }
 
 export default function WatchlistScreen({ navigation }) {
-  const user = auth.currentUser;
+  const user = useAuthUser();
   const priceFlash = useRef({}).current;
   const prevPrices = useRef({}).current;
+  const searchSeqRef = useRef(0);
+  const pageListRef = useRef(null);
+
+  useResetScrollOnTabPress(navigation, () =>
+    pageListRef.current?.scrollToOffset({ offset: 0, animated: true }),
+  );
   const [viewMode, setViewMode] = useState("watchlist");
   const [items, setItems] = useState([]);
   const [newSymbol, setNewSymbol] = useState("");
@@ -112,6 +188,12 @@ export default function WatchlistScreen({ navigation }) {
   const [sortVisible, setSortVisible] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: "" });
   const [lastSync, setLastSync] = useState(new Date());
+  const [infoModal, setInfoModal] = useState(null);
+
+  // Owned positions (symbol -> {shares, avgCost, ...}), fetched separately
+  // from the watchlist snapshot since lots/avgCost don't change between
+  // 15s price polls — refreshed on focus and pull-to-refresh only.
+  const [positions, setPositions] = useState({});
 
   // Pin + Notes (local UX polish)
   const [pinned, setPinned] = useState({});
@@ -223,28 +305,53 @@ export default function WatchlistScreen({ navigation }) {
     }
   };
 
+  /* ================= LOAD OWNED POSITIONS ================= */
+  const loadPositions = async () => {
+    if (!user) return;
+
+    try {
+      const list = await getPortfolio(user.uid);
+      const bySymbol = {};
+      list.forEach((p) => {
+        if (p.symbol && p.shares > 0) bySymbol[p.symbol] = p;
+      });
+      setPositions(bySymbol);
+    } catch {
+      // Non-critical: watchlist still renders fine without ownership info.
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadWatchlist();
+      loadPositions();
       loadPins();
     }, [user]),
   );
 
   /* ================= SEARCH ================= */
   const handleInputChange = async (text) => {
-    const up = (text || "").toUpperCase();
+    const up = (text || "").toUpperCase().trim();
     setNewSymbol(up);
 
     if (!up.trim()) {
+      searchSeqRef.current += 1; // invalidate any in-flight request
       setSuggestions([]);
       return;
     }
+
+    // Sequence guard: only the most recently issued request is allowed
+    // to commit results, so a slow older response (e.g. a no-match
+    // query) can't overwrite a faster newer one that resolved first.
+    const seq = ++searchSeqRef.current;
 
     try {
       const res = await fetch(
         `${API_BASE_URL}/search?q=${encodeURIComponent(up)}`,
       );
       const json = await res.json();
+
+      if (seq !== searchSeqRef.current) return; // superseded by a newer request
 
       // dedupe by symbol to avoid "duplicate key" warnings
       const raw = (json?.data || []).slice(0, 10);
@@ -259,16 +366,30 @@ export default function WatchlistScreen({ navigation }) {
       }
       setSuggestions(list);
     } catch {
-      setSuggestions([]);
+      if (seq === searchSeqRef.current) setSuggestions([]);
     }
+  };
+
+  const closeSuggestions = () => {
+    if (suggestions.length === 0) return;
+    searchSeqRef.current += 1; // invalidate any in-flight search
+    Keyboard.dismiss();
+    setSuggestions([]);
   };
 
   /* ================= ADD / REMOVE ================= */
   const handleAddTicker = async (sym) => {
-    const s = (sym || newSymbol || "").split(" ")[0].toUpperCase().trim();
-    if (!s || !user) return;
+    const raw = (sym || newSymbol || "").trim();
+    const s = raw.split(" ")[0].toUpperCase();
+    if (!s) return;
+
+    if (!user) {
+      showToast("Please sign in to add tickers");
+      return;
+    }
 
     Keyboard.dismiss();
+    searchSeqRef.current += 1; // invalidate any in-flight search
     setSuggestions([]);
     setNewSymbol("");
 
@@ -277,8 +398,8 @@ export default function WatchlistScreen({ navigation }) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       showToast(`${s} added`);
       await loadWatchlist();
-    } catch {
-      showToast("Failed to add ticker");
+    } catch (err) {
+      showToast(err?.message || "Failed to add ticker");
     }
   };
 
@@ -392,8 +513,12 @@ export default function WatchlistScreen({ navigation }) {
     });
   };
 
-  const timeAgoFrom = (ts) => {
+  const timeAgoFrom = (ts, isStale) => {
     if (!ts) return "";
+    // Same staleness signal as the session dot (quote_updated_at age,
+    // not needs_refresh) — a stale quote is never "Live"/"Ns ago",
+    // no matter how recent its timestamp looks.
+    if (isStale) return "LAST";
     const diff = Date.now() - new Date(ts).getTime();
     const sec = Math.floor(diff / 1000);
     const min = Math.floor(sec / 60);
@@ -544,14 +669,10 @@ export default function WatchlistScreen({ navigation }) {
     const change = item.change;
     const changePct = item.changePct;
 
-    // Prefer backend/session field, fallback to timestamps
-    const session = getMarketSession(
-      item.lastUpdated ||
-        item.quote_updated_at ||
-        item.quoteUpdatedAt ||
-        item.updated_at ||
-        item.timestamp,
-    );
+    // Backend/service-computed session: PRE/LIVE/AH/CLOSED only apply
+    // to a fresh quote; a stale or missing quote is LAST/PENDING.
+    // See watchlistService.js's getMarketPeriod/mergeWatchlistQuotes.
+    const session = item.session;
 
     const isLive = session === "LIVE";
 
@@ -565,12 +686,20 @@ export default function WatchlistScreen({ navigation }) {
     const patternName = item.pattern?.name;
     const patternWinRate = item.pattern?.winRate;
 
-    const sessionDotColor =
-      session === "LIVE"
-        ? BRAND.accent
-        : session === "PRE"
-          ? BRAND.amber
-          : BRAND.sub;
+    const sessionDotStyle = {
+      color: SESSION_DOT_COLOR[session] || BRAND.sub,
+      opacity: item.isStale ? 0.6 : 1,
+    };
+
+    // Owned position for this symbol, if any — shares/avgCost come from
+    // Firestore (loadPositions), gain/loss reuses the live watchlist price
+    // already polled for this card (see PortfolioScreen.js for the same
+    // cost-basis formula applied to the dedicated Portfolio tab).
+    const pos = positions[item.symbol];
+    const ownedPrice = price ?? pos?.avgCost ?? 0;
+    const ownedCost = pos ? pos.shares * pos.avgCost : 0;
+    const ownedGain = pos ? pos.shares * ownedPrice - ownedCost : 0;
+    const ownedGainPct = pos && ownedCost > 0 ? (ownedGain / ownedCost) * 100 : 0;
 
     return (
       <Swipeable
@@ -609,6 +738,12 @@ export default function WatchlistScreen({ navigation }) {
               <View style={styles.symbolRow}>
                 <Text style={styles.symbol}>{item.symbol}</Text>
 
+                {!!pos && (
+                  <View style={styles.ownedPill}>
+                    <Text style={styles.ownedPillText}>Owned</Text>
+                  </View>
+                )}
+
                 <MoveLabel
                   changePct={item.changePct}
                   price={item.price}
@@ -627,22 +762,44 @@ export default function WatchlistScreen({ navigation }) {
                 <View
                   style={[
                     styles.inlineSignalBadge,
-                    { backgroundColor: signalColor(signal) },
+                    {
+                      backgroundColor: item.hasIntelligence
+                        ? signalColor(signal)
+                        : BRAND.sub,
+                    },
                   ]}
                 >
                   <Text style={styles.inlineSignalText}>
-                    {displayRating(signal)}
+                    {item.hasIntelligence
+                      ? displayRating(signal)
+                      : "Analyzing…"}
                   </Text>
                 </View>
 
-                <Text
-                  style={[
-                    styles.inlineConfidence,
-                    { color: signalColor(signal) },
-                  ]}
-                >
-                  {Math.round(item.bullbrain?.confidence ?? 0)}%
-                </Text>
+                {item.hasIntelligence && (
+                  <Text
+                    style={[
+                      styles.inlineConfidence,
+                      { color: signalColor(signal) },
+                    ]}
+                  >
+                    {Math.round(item.bullbrain?.confidence ?? 0)}%
+                  </Text>
+                )}
+
+                {!!item.displayIntelligence?.scoreBreakdown && (
+                  <TouchableOpacity
+                    onPress={() => setInfoModal(buildScoreBreakdownInfo(item))}
+                    style={styles.infoBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name="help-circle-outline"
+                      size={13}
+                      color={BRAND.sub}
+                    />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
@@ -707,13 +864,33 @@ export default function WatchlistScreen({ navigation }) {
                 <View
                   style={[
                     styles.sessionDot,
-                    { backgroundColor: sessionDotColor },
+                    {
+                      backgroundColor: sessionDotStyle.color,
+                      opacity: sessionDotStyle.opacity,
+                    },
                   ]}
                 />
                 <Text style={styles.sessionText}>{session || "LAST"}</Text>
               </View>
             </View>
           </View>
+
+          {/* OWNED POSITION */}
+          {!!pos && (
+            <View style={styles.ownedRow}>
+              <Text style={styles.ownedRowText}>
+                {fmtShares(pos.shares)} sh · Avg {fmt(pos.avgCost)}
+              </Text>
+              <Text
+                style={[
+                  styles.ownedRowGain,
+                  { color: ownedGain >= 0 ? BRAND.accent : BRAND.red },
+                ]}
+              >
+                {fmtChange(ownedGain)} ({fmtPct(ownedGainPct)})
+              </Text>
+            </View>
+          )}
 
           {/* SUMMARY */}
 
@@ -732,7 +909,7 @@ export default function WatchlistScreen({ navigation }) {
               </View>
 
               <Text style={styles.patternTime}>
-                {timeAgoFrom(item.lastUpdated || item.quote_updated_at)}
+                {timeAgoFrom(item.quote_updated_at, item.isStale)}
               </Text>
             </View>
           )}
@@ -907,7 +1084,8 @@ export default function WatchlistScreen({ navigation }) {
       {viewMode === "portfolio" ? (
         <PortfolioScreen navigation={navigation} embedded />
       ) : (
-        <>
+        <TouchableWithoutFeedback onPress={closeSuggestions} accessible={false}>
+        <View style={{ flex: 1 }}>
           <View style={styles.addRow}>
             <Ionicons name="search-outline" size={18} color="#6B7280" />
             <TextInput
@@ -932,6 +1110,15 @@ export default function WatchlistScreen({ navigation }) {
 
           {suggestions.length > 0 && (
             <View style={styles.suggestionsBox}>
+              <View style={styles.suggestionsHeader}>
+                <TouchableOpacity
+                  onPress={closeSuggestions}
+                  style={styles.suggestionsCloseBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="close" size={16} color={BRAND.sub} />
+                </TouchableOpacity>
+              </View>
               {suggestions.map((s, idx) => (
                 <TouchableOpacity
                   key={`${s.symbol}-${idx}`}
@@ -953,6 +1140,7 @@ export default function WatchlistScreen({ navigation }) {
           )}
 
           <FlatList
+            ref={pageListRef}
             data={displayList}
             keyExtractor={(item, index) => `${item.symbol}-${index}`}
             renderItem={renderItem}
@@ -960,7 +1148,10 @@ export default function WatchlistScreen({ navigation }) {
               <RefreshControl
                 tintColor={BRAND.accent}
                 refreshing={refreshing}
-                onRefresh={() => loadWatchlist({ silent: false })}
+                onRefresh={() => {
+                  loadWatchlist({ silent: false });
+                  loadPositions();
+                }}
               />
             }
             contentContainerStyle={{ paddingBottom: 110 }}
@@ -988,7 +1179,8 @@ export default function WatchlistScreen({ navigation }) {
               </View>
             }
           />
-        </>
+        </View>
+        </TouchableWithoutFeedback>
       )}
       <Modal transparent visible={sortVisible} animationType="none">
         <TouchableOpacity
@@ -1114,6 +1306,70 @@ export default function WatchlistScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {infoModal && (
+        <Modal transparent animationType="fade" visible>
+          <View style={styles.infoModalOverlay}>
+            <View style={styles.infoModalCard}>
+              <View style={styles.infoModalHeader}>
+                <Text style={styles.infoModalTitle}>{infoModal.title}</Text>
+                <TouchableOpacity onPress={() => setInfoModal(null)}>
+                  <Ionicons name="close" size={20} color={BRAND.sub} />
+                </TouchableOpacity>
+              </View>
+
+              {!!infoModal.text && (
+                <Text style={styles.infoModalText}>{infoModal.text}</Text>
+              )}
+
+              {infoModal.whyNow?.length > 0 && (
+                <View style={styles.infoModalWhyNow}>
+                  {infoModal.whyNow.map((reason, idx) => (
+                    <Text
+                      key={idx}
+                      style={styles.infoModalWhyNowText}
+                    >
+                      • {reason}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {infoModal.rows?.length > 0 && (
+                <View style={styles.infoModalRows}>
+                  {infoModal.rows.map((row, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.infoModalRow,
+                        row.emphasis && styles.infoModalRowEmphasis,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.infoModalRowLabel,
+                          row.emphasis && styles.infoModalRowLabelEmphasis,
+                        ]}
+                      >
+                        {row.label}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.infoModalRowValue,
+                          row.emphasis && styles.infoModalRowLabelEmphasis,
+                          row.note && styles.infoModalRowNote,
+                        ]}
+                      >
+                        {row.value}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
 
       <ToastMessage
         visible={toast.visible}
@@ -1401,6 +1657,43 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
+  ownedPill: {
+    marginLeft: 7,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(212,166,58,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(212,166,58,0.35)",
+  },
+
+  ownedPillText: {
+    color: "#D4A63A",
+    fontSize: 8.5,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  ownedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
+
+  ownedRowText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  ownedRowGain: {
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
+  },
+
   sectionHeader: {
     marginHorizontal: 12,
     marginTop: 2,
@@ -1428,6 +1721,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
     overflow: "hidden",
+  },
+
+  suggestionsHeader: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 6,
+    paddingTop: 6,
+  },
+
+  suggestionsCloseBtn: {
+    padding: 4,
   },
 
   suggestionRow: {
@@ -1635,6 +1939,11 @@ const styles = StyleSheet.create({
   inlineConfidence: {
     fontSize: 10.2,
     fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  infoBtn: {
+    marginLeft: 4,
+    padding: 3,
   },
   tickerLogoImage: {
     width: 28,
@@ -1845,5 +2154,99 @@ const styles = StyleSheet.create({
   assetsIconPlaceholder: {
     width: 44,
     height: 44,
+  },
+
+  infoModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.68)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  infoModalCard: {
+    width: "100%",
+    backgroundColor: BRAND.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: PREMIUM.border,
+    padding: 16,
+  },
+
+  infoModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  infoModalTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
+    flex: 1,
+    marginRight: 10,
+  },
+
+  infoModalText: {
+    color: BRAND.sub,
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+
+  infoModalWhyNow: {
+    marginBottom: 12,
+  },
+
+  infoModalWhyNowText: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+
+  infoModalRows: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    paddingTop: 8,
+  },
+
+  infoModalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 5,
+  },
+
+  infoModalRowEmphasis: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    marginTop: 4,
+    paddingTop: 8,
+  },
+
+  infoModalRowLabel: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  infoModalRowLabelEmphasis: {
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  infoModalRowValue: {
+    color: BRAND.text,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  infoModalRowNote: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.regular,
+    fontStyle: "italic",
   },
 });

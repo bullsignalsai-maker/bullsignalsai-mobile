@@ -28,6 +28,7 @@ import {
   getHomeScreen,
   getHomeMovers,
   getVerifiedAlpha,
+  fetchHomeQuotes,
 } from "../services/HomeService";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
@@ -37,7 +38,102 @@ import {
   getAuthoritativeSignal,
   signalColor,
 } from "../utils/signalUtils";
+import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
+import { useAuthUser } from "../hooks/useAuthUser";
+import { getPortfolio } from "../firebaseConfig";
+import { fetchWatchlist } from "../services/watchlistService";
 const LOGO = require("../assets/alpha-transparent.png");
+
+const FEAR_INDEX_INFO = {
+  title: "Fear & Greed Index",
+  text: "A 0–100 gauge of overall market sentiment, built from volatility, momentum, and trading behavior across the market. Low readings mean fear is dominating (investors selling, risk-off); high readings mean greed is dominating (investors buying, risk-on). Around 50 is neutral.",
+};
+
+const MARKET_MOVERS_INFO = {
+  title: "Market Movers",
+  text: "Stocks with the largest verified price moves right now. \"Exploding\" means the stock is up on the day; \"Pulling back\" means it's down. This reflects today's price action only, not a forecast of where it goes next.",
+};
+
+// Same thresholds as MomentumMoversScreen.js's MOMENTUM_SCORE_INFO.TIER —
+// reused deliberately so the vocabulary is consistent across screens.
+const CORE_TIER_INFO = {
+  title: "Core Signal Tiers",
+  text: "ELITE, STRONG, and EMERGING are confidence tiers on top of each stock's AI confidence score — ELITE is 85+, STRONG is 70–84, EMERGING is below 70. Meant for a quick scan of which names have the most model conviction, not a separately verified rating.",
+};
+
+const getConfidenceTier = (confidence) => {
+  const c = Number(confidence) || 0;
+  if (c >= 85) return "ELITE";
+  if (c >= 70) return "STRONG";
+  return "EMERGING";
+};
+
+const CORE_TIER_ACCENT = {
+  ELITE: "#D4A63A",
+  STRONG: "rgba(59,130,246,0.45)",
+  EMERGING: "rgba(255,255,255,0.07)",
+};
+
+// Friendly labels for displayIntelligence.scoreBreakdown.factors keys.
+// Falls back to a title-cased version of the raw key so a factor the
+// backend adds later never silently disappears from the breakdown.
+const FACTOR_LABELS = {
+  baseSignal: "BullBrain Signal",
+  confidence: "Model Confidence",
+  priceMove: "Price Move Today",
+  catalyst: "News Catalyst",
+  catalystDetail: "Catalyst Strength",
+  candidateType: "Setup Type",
+  trend: "Trend",
+  volume: "Volume",
+  risk: "Risk Level",
+};
+
+const titleCaseFactorKey = (key) =>
+  String(key || "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (c) => c.toUpperCase());
+
+const fmtSignedPts = (v) => {
+  const n = Number(v) || 0;
+  return `${n >= 0 ? "+" : ""}${n}`;
+};
+
+function buildScoreBreakdownInfo(item) {
+  const breakdown = item?.displayIntelligence?.scoreBreakdown;
+  if (!breakdown) return null;
+
+  const base = Number(breakdown.base ?? 50);
+  const factors = breakdown.factors || {};
+  const rawTotal = Number(breakdown.rawTotal ?? base);
+  const clampedBy = Number(breakdown.clampedBy ?? 0);
+  const total = rawTotal + clampedBy;
+
+  const rows = [
+    { label: "Base", value: String(base) },
+    ...Object.entries(factors).map(([key, value]) => ({
+      label: FACTOR_LABELS[key] || titleCaseFactorKey(key),
+      value: fmtSignedPts(value),
+    })),
+    { label: "Total", value: String(total), emphasis: true },
+  ];
+
+  if (clampedBy !== 0) {
+    rows.push({
+      label: "Adjusted",
+      value: `raw ${fmtSignedPts(rawTotal)} kept within 0–100`,
+      note: true,
+    });
+  }
+
+  return {
+    title: `${item.symbol} Rating Breakdown`,
+    whyNow: Array.isArray(item.displayIntelligence?.whyNow)
+      ? item.displayIntelligence.whyNow
+      : [],
+    rows,
+  };
+}
 
 const getSignal = (item) => getAuthoritativeSignal(item);
 
@@ -84,7 +180,8 @@ const getItemSession = (item) =>
 const getDisplaySession = (item, marketPhase) => {
   if (marketPhase === "OPEN") return "LIVE";
   if (marketPhase === "PREMARKET") return "PRE";
-  return "AH";
+  if (marketPhase === "AFTER_HOURS") return "AH";
+  return "CLOSED";
 };
 
 const getDisplaySessionSuffix = (item, marketPhase) => {
@@ -96,7 +193,9 @@ const getDisplaySessionColor = (item, marketPhase) => {
   const session = getDisplaySession(item, marketPhase);
 
   if (session === "LIVE") return BRAND.accent;
-  if (session === "PRE") return BRAND.amber;
+  // PRE and AH both mean "outside regular session but still actively
+  // tradable" — matches Watchlist's SESSION_DOT_COLOR treatment.
+  if (session === "PRE" || session === "AH") return BRAND.amber;
   return BRAND.sub;
 };
 
@@ -161,10 +260,31 @@ const getShortAlphaReason = (item) => {
 
 export default function HomeScreen({ navigation }) {
   const scrollRef = useRef(null);
+  const pageScrollRef = useRef(null);
 
+  useResetScrollOnTabPress(navigation, () =>
+    pageScrollRef.current?.scrollTo({ y: 0, animated: true }),
+  );
+
+  const user = useAuthUser();
   const [home, setHome] = useState(null);
   const [topMovers, setTopMovers] = useState([]);
   const [verifiedAlpha, setVerifiedAlpha] = useState(null);
+  const [infoModal, setInfoModal] = useState(null);
+  const [coreSortMode, setCoreSortMode] = useState("confidence");
+
+  // Owned positions (symbol -> {shares, avgCost, ...}) and watchlisted
+  // symbols, fetched separately from the 5s home poll below — lots/
+  // avgCost and watchlist membership don't change that often, so these
+  // are refreshed on focus only (same pattern as WatchlistScreen.js's
+  // "Owned" pill work).
+  const [positions, setPositions] = useState({});
+  const [watchlistedSymbols, setWatchlistedSymbols] = useState(new Set());
+  // Live quotes for the union of owned + watchlisted symbols — one
+  // combined quotes-bulk call backing both the Portfolio Today and
+  // Watchlist Performance halves of the "Today" strip.
+  const [todayQuotes, setTodayQuotes] = useState({});
+
   // 🔥 price flash animation per symbol
   const priceFlash = useRef({}).current;
 
@@ -199,6 +319,62 @@ export default function HomeScreen({ navigation }) {
       }).start();
     });
   };
+
+  /* ---------------------------------------------------------
+Owned / Watchlisted lookup + Today-strip quotes (focus only,
+not the 5s poll) — positions and watchlist membership don't
+change that often, and the combined quotes fetch depends on
+knowing both symbol sets first.
+--------------------------------------------------------- */
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!user) return;
+
+      let active = true;
+
+      (async () => {
+        try {
+          const [list, wl] = await Promise.all([
+            getPortfolio(user.uid).catch(() => []),
+            fetchWatchlist(user.uid).catch(() => null),
+          ]);
+          if (!active) return;
+
+          const bySymbol = {};
+          list.forEach((p) => {
+            if (p.symbol && p.shares > 0) bySymbol[p.symbol] = p;
+          });
+          setPositions(bySymbol);
+
+          const wlItems = wl?.watchlist || wl?.items || [];
+          const wlSymbols = new Set(
+            wlItems
+              .map((i) => String(i.symbol || "").toUpperCase())
+              .filter(Boolean),
+          );
+          setWatchlistedSymbols(wlSymbols);
+
+          const unionSymbols = [
+            ...new Set([...Object.keys(bySymbol), ...wlSymbols]),
+          ];
+
+          if (unionSymbols.length) {
+            const quotes = await fetchHomeQuotes(unionSymbols);
+            if (active) setTodayQuotes(quotes);
+          } else {
+            setTodayQuotes({});
+          }
+        } catch {
+          // Non-critical: rest of Home still renders fine without it.
+        }
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [user]),
+  );
+
   /* ---------------------------------------------------------
 Load + Auto Refresh (5s)
 --------------------------------------------------------- */
@@ -484,10 +660,25 @@ Pull To Refresh
     ].filter(Boolean),
   );
 
-  const coreSignalCards = (signals || [])
+  const coreSignalCardsSorted = (signals || [])
     .filter(hasDisplayQuote)
     .filter((item) => !usedHomeSymbols.has(item.symbol))
-    .slice(0, 7);
+    .sort((a, b) => {
+      if (coreSortMode === "az") {
+        return String(a.symbol || "").localeCompare(String(b.symbol || ""));
+      }
+      if (coreSortMode === "change") {
+        return (
+          Math.abs(Number(b.changePct || 0)) - Math.abs(Number(a.changePct || 0))
+        );
+      }
+      // "confidence" (default)
+      return Number(getConfidence(b)) - Number(getConfidence(a));
+    });
+
+  // Sorting happens before the cap so "top 7" actually reflects the
+  // chosen sort, not whatever 7 survived the earlier exclusion filter.
+  const coreSignalCards = coreSignalCardsSorted.slice(0, 7);
 
   const hasVerifiedHero =
     heroItem && verifiedPositiveAlpha.some((x) => x.symbol === heroItem.symbol);
@@ -570,7 +761,7 @@ Pull To Refresh
 
     if (isWeekend) return "CLOSED";
     if (totalMinutes < 9 * 60 + 30) return "PREMARKET";
-    if (totalMinutes >= 16 * 60) return "CLOSED";
+    if (totalMinutes >= 16 * 60) return "AFTER_HOURS";
 
     return "OPEN";
   }
@@ -613,6 +804,42 @@ Pull To Refresh
       setGuideStep((p) => p + 1);
     }
   };
+
+  /* ---------------------------------------------------------
+"Today" strip — Portfolio Today + Watchlist Performance.
+3 states: A) has positions (± watchlist), B) watchlist only,
+C) neither (plain nudge line, no card chrome).
+--------------------------------------------------------- */
+  const ownedSymbols = Object.keys(positions);
+  const hasPositions = ownedSymbols.length > 0;
+  const watchlistSymbolsArr = [...watchlistedSymbols];
+  const hasWatchlist = watchlistSymbolsArr.length > 0;
+
+  const portfolioToday = hasPositions
+    ? ownedSymbols.reduce((sum, sym) => {
+        const pos = positions[sym];
+        const change = Number(todayQuotes[sym]?.change ?? 0);
+        return sum + pos.shares * change;
+      }, 0)
+    : null;
+
+  const watchlistPerformance = hasWatchlist
+    ? watchlistSymbolsArr.reduce(
+        (acc, sym) => {
+          const pct = Number(todayQuotes[sym]?.changePct ?? 0);
+          if (pct >= 0) acc.up += 1;
+          else acc.down += 1;
+          if (
+            acc.leader === null ||
+            Math.abs(pct) > Math.abs(acc.leader.changePct)
+          ) {
+            acc.leader = { symbol: sym, changePct: pct };
+          }
+          return acc;
+        },
+        { up: 0, down: 0, leader: null },
+      )
+    : null;
 
   return (
     <Animated.View style={[styles.container, { opacity: screenFade }]}>
@@ -682,6 +909,23 @@ Pull To Refresh
               : marketStatusLabel}
           </Text>
 
+          {marketPhase !== "PREMARKET" && (
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={(e) => {
+                e.stopPropagation();
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setInfoModal(FEAR_INDEX_INFO);
+              }}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={14}
+                color={BRAND.sub}
+              />
+            </TouchableOpacity>
+          )}
+
           <View style={styles.quickTourWrap}>
             <Ionicons name="compass-outline" size={11} color={ACCENT_GOLD} />
             <Text style={styles.marketGuideHint}>Quick Tour</Text>
@@ -690,6 +934,7 @@ Pull To Refresh
       </View>
 
       <ScrollView
+        ref={pageScrollRef}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -703,6 +948,84 @@ Pull To Refresh
         }
         contentContainerStyle={{ paddingBottom: 50 }}
       >
+        {/* TODAY STRIP — Portfolio Today / Watchlist Performance */}
+        {hasPositions ? (
+          <View style={styles.todayRow}>
+            <View
+              style={[styles.todayCard, hasWatchlist && styles.todayCardHalf]}
+            >
+              <Text style={styles.todayCardLabel}>Portfolio Today</Text>
+              <Text
+                style={[
+                  styles.todayCardValue,
+                  { color: portfolioToday >= 0 ? BRAND.accent : BRAND.red },
+                ]}
+              >
+                {portfolioToday >= 0 ? "+" : "-"}$
+                {Math.abs(portfolioToday).toFixed(2)}
+              </Text>
+              <Text style={styles.todayCardSub}>
+                {ownedSymbols.length} position
+                {ownedSymbols.length === 1 ? "" : "s"}
+              </Text>
+            </View>
+
+            {hasWatchlist && (
+              <View style={[styles.todayCard, styles.todayCardHalf]}>
+                <Text style={styles.todayCardLabel}>
+                  Watchlist Performance
+                </Text>
+                <Text style={styles.todayCardValue}>
+                  <Text style={{ color: BRAND.accent }}>
+                    {watchlistPerformance.up} up
+                  </Text>
+                  <Text style={{ color: BRAND.sub }}> / </Text>
+                  <Text style={{ color: BRAND.red }}>
+                    {watchlistPerformance.down} down
+                  </Text>
+                </Text>
+                {!!watchlistPerformance.leader && (
+                  <Text style={styles.todayCardSub}>
+                    {watchlistPerformance.leader.symbol}{" "}
+                    {watchlistPerformance.leader.changePct >= 0 ? "+" : ""}
+                    {watchlistPerformance.leader.changePct.toFixed(2)}%
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+        ) : hasWatchlist ? (
+          <View style={styles.todayStripWrap}>
+            <View style={styles.todayCard}>
+              <Text style={styles.todayCardLabel}>Watchlist Performance</Text>
+              <Text style={styles.todayCardValue}>
+                <Text style={{ color: BRAND.accent }}>
+                  {watchlistPerformance.up} up
+                </Text>
+                <Text style={{ color: BRAND.sub }}> / </Text>
+                <Text style={{ color: BRAND.red }}>
+                  {watchlistPerformance.down} down
+                </Text>
+              </Text>
+              {!!watchlistPerformance.leader && (
+                <Text style={styles.todayCardSub}>
+                  {watchlistPerformance.leader.symbol}{" "}
+                  {watchlistPerformance.leader.changePct >= 0 ? "+" : ""}
+                  {watchlistPerformance.leader.changePct.toFixed(2)}%
+                </Text>
+              )}
+            </View>
+            <Text style={styles.todayNudgeLine}>
+              Track a position to see your P/L here.
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.todayNudgeLineOnly}>
+            Add a stock to your watchlist to start seeing your daily summary
+            here.
+          </Text>
+        )}
+
         {/* AI OPPORTUNITY WATCH / TOP ALPHA IDEA */}
         {heroItem && (
           <View style={styles.heroWrap}>
@@ -794,17 +1117,45 @@ Pull To Refresh
                         style={[
                           styles.signalBadge,
                           {
-                            backgroundColor: signalColor(getSignal(heroItem)),
+                            backgroundColor:
+                              // hasIntelligence is only set on items sourced
+                              // from buildHomeSignals — verified-alpha/alpha-watch
+                              // items have their own, separately-real signal
+                              // data and should never be forced into "Analyzing…".
+                              heroItem.hasIntelligence === false
+                                ? BRAND.sub
+                                : signalColor(getSignal(heroItem)),
                           },
                         ]}
                       >
                         <Text style={styles.signalText}>
-                          {displayRating(getSignal(heroItem))}
+                          {heroItem.hasIntelligence === false
+                            ? "Analyzing…"
+                            : displayRating(getSignal(heroItem))}
                         </Text>
                       </View>
-                      <Text style={styles.heroMetaText}>
-                        Confidence {Math.round(getConfidence(heroItem))}%
-                      </Text>
+
+                      {heroItem.hasIntelligence !== false && (
+                        <Text style={styles.heroMetaText}>
+                          Confidence {Math.round(getConfidence(heroItem))}%
+                        </Text>
+                      )}
+
+                      {!!heroItem.displayIntelligence?.scoreBreakdown && (
+                        <TouchableOpacity
+                          onPress={() =>
+                            setInfoModal(buildScoreBreakdownInfo(heroItem))
+                          }
+                          style={styles.infoBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons
+                            name="help-circle-outline"
+                            size={13}
+                            color={BRAND.sub}
+                          />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
 
@@ -1025,7 +1376,25 @@ Pull To Refresh
           <View style={styles.homeSectionWrap}>
             <View style={styles.homeSectionHeader}>
               <View>
-                <Text style={styles.sectionTitle}>Market Movers</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <Text style={styles.sectionTitle}>Market Movers</Text>
+                  <TouchableOpacity
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={() => setInfoModal(MARKET_MOVERS_INFO)}
+                  >
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={14}
+                      color={BRAND.sub}
+                    />
+                  </TouchableOpacity>
+                </View>
                 <Text style={styles.sectionSubtitle}>
                   Fast-moving stocks verified by Alphaclara
                 </Text>
@@ -1200,7 +1569,21 @@ Pull To Refresh
             <View style={styles.homeSectionHeader}>
               <View>
                 <Text style={styles.sectionEyebrow}>ALPHACLARA AI</Text>
-                <Text style={styles.sectionTitle}>Core Signals</Text>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                >
+                  <Text style={styles.sectionTitle}>Core Signals</Text>
+                  <TouchableOpacity
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={() => setInfoModal(CORE_TIER_INFO)}
+                  >
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={13}
+                      color={BRAND.sub}
+                    />
+                  </TouchableOpacity>
+                </View>
                 <Text style={styles.sectionSubtitle}>
                   Additional AI-ranked names with signal, confidence, and market
                   context
@@ -1208,11 +1591,52 @@ Pull To Refresh
               </View>
             </View>
 
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.coreSortRow}
+            >
+              {[
+                { key: "confidence", label: "Top Confidence" },
+                { key: "change", label: "Biggest Move" },
+                { key: "az", label: "A–Z" },
+              ].map((opt) => {
+                const active = coreSortMode === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    onPress={() => setCoreSortMode(opt.key)}
+                    style={[
+                      styles.coreSortPill,
+                      active && styles.coreSortPillActive,
+                    ]}
+                    activeOpacity={0.85}
+                  >
+                    <Text
+                      style={[
+                        styles.coreSortPillText,
+                        active && styles.coreSortPillTextActive,
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
             <View style={styles.corePremiumShell}>
               {coreSignalCards.map((item, index) => {
                 const isUp = Number(item.changePct || 0) >= 0;
                 const signal = getSignal(item);
-                const ratingColor = signalColor(signal);
+                const ratingColor = item.hasIntelligence
+                  ? signalColor(signal)
+                  : BRAND.sub;
+                const tier = item.hasIntelligence
+                  ? getConfidenceTier(getConfidence(item))
+                  : null;
+                const pos = positions[item.symbol];
+                const isWatchlisted = watchlistedSymbols.has(item.symbol);
 
                 return (
                   <TouchableOpacity
@@ -1222,6 +1646,10 @@ Pull To Refresh
                       styles.corePremiumRow,
                       index !== coreSignalCards.length - 1 &&
                         styles.corePremiumDivider,
+                      tier && {
+                        borderLeftWidth: 3,
+                        borderLeftColor: CORE_TIER_ACCENT[tier],
+                      },
                     ]}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1258,14 +1686,55 @@ Pull To Refresh
                             { backgroundColor: ratingColor },
                           ]}
                         >
-                          <Text style={styles.coreSignalMiniText}>
-                            {displayRating(signal)}
+                          <Text
+                            style={styles.coreSignalMiniText}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            {item.hasIntelligence
+                              ? displayRating(signal)
+                              : "Analyzing…"}
                           </Text>
                         </View>
+                      </View>
 
-                        <Text style={styles.corePremiumConfidence}>
-                          {Math.round(getConfidence(item))}%
-                        </Text>
+                      <View style={styles.corePremiumMetaLine}>
+                        {!!pos && (
+                          <View style={styles.ownedPill}>
+                            <Text style={styles.ownedPillText}>Owned</Text>
+                          </View>
+                        )}
+
+                        {!pos && isWatchlisted && (
+                          <Ionicons
+                            name="star"
+                            size={11}
+                            color="#D4A63A"
+                            style={{ marginRight: 4 }}
+                          />
+                        )}
+
+                        {item.hasIntelligence && (
+                          <Text style={styles.corePremiumConfidence}>
+                            {tier} {Math.round(getConfidence(item))}%
+                          </Text>
+                        )}
+
+                        {!!item.displayIntelligence?.scoreBreakdown && (
+                          <TouchableOpacity
+                            onPress={() =>
+                              setInfoModal(buildScoreBreakdownInfo(item))
+                            }
+                            style={styles.infoBtn}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Ionicons
+                              name="help-circle-outline"
+                              size={13}
+                              color={BRAND.sub}
+                            />
+                          </TouchableOpacity>
+                        )}
                       </View>
 
                       <Text style={styles.corePremiumCompany} numberOfLines={1}>
@@ -1436,6 +1905,67 @@ Pull To Refresh
           </View>
         </View>
       </Modal>
+
+      {infoModal && (
+        <Modal transparent animationType="fade" visible>
+          <View style={styles.infoModalOverlay}>
+            <View style={styles.infoModalCard}>
+              <View style={styles.infoModalHeader}>
+                <Text style={styles.infoModalTitle}>{infoModal.title}</Text>
+                <TouchableOpacity onPress={() => setInfoModal(null)}>
+                  <Ionicons name="close" size={20} color={BRAND.sub} />
+                </TouchableOpacity>
+              </View>
+
+              {!!infoModal.text && (
+                <Text style={styles.infoModalText}>{infoModal.text}</Text>
+              )}
+
+              {infoModal.whyNow?.length > 0 && (
+                <View style={styles.infoModalWhyNow}>
+                  {infoModal.whyNow.map((reason, idx) => (
+                    <Text key={idx} style={styles.infoModalWhyNowText}>
+                      • {reason}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {infoModal.rows?.length > 0 && (
+                <View style={styles.infoModalRows}>
+                  {infoModal.rows.map((row, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.infoModalRow,
+                        row.emphasis && styles.infoModalRowEmphasis,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.infoModalRowLabel,
+                          row.emphasis && styles.infoModalRowLabelEmphasis,
+                        ]}
+                      >
+                        {row.label}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.infoModalRowValue,
+                          row.emphasis && styles.infoModalRowLabelEmphasis,
+                          row.note && styles.infoModalRowNote,
+                        ]}
+                      >
+                        {row.value}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
     </Animated.View>
   );
 }
@@ -1551,6 +2081,74 @@ const styles = StyleSheet.create({
   /* ==================== SECTIONS ==================== */
   homeSectionWrap: {
     marginBottom: 2,
+  },
+
+  // State A: Portfolio Today + (optional) Watchlist Performance side by
+  // side. flexDirection: row is required here — flex:1 on the child
+  // cards does nothing without a row container to distribute width in.
+  todayRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginHorizontal: 12,
+    marginBottom: 14,
+  },
+
+  // State B: single Watchlist Performance card + nudge line, stacked
+  // vertically — deliberately NOT a row container.
+  todayStripWrap: {
+    marginHorizontal: 12,
+    marginBottom: 14,
+  },
+
+  todayCard: {
+    backgroundColor: PREMIUM.cardSoft,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+
+  todayCardHalf: {
+    flex: 1,
+  },
+
+  todayCardLabel: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+
+  todayCardValue: {
+    fontSize: 20,
+    fontFamily: TYPO.fontFamily.extrabold,
+    marginTop: 4,
+  },
+
+  todayCardSub: {
+    color: BRAND.muted,
+    fontSize: 11,
+    marginTop: 3,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  todayNudgeLine: {
+    color: BRAND.sub,
+    fontSize: 11.5,
+    marginTop: 8,
+    fontFamily: TYPO.fontFamily.medium,
+    textAlign: "center",
+  },
+
+  todayNudgeLineOnly: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    marginHorizontal: 12,
+    marginBottom: 14,
+    fontFamily: TYPO.fontFamily.medium,
+    textAlign: "center",
   },
 
   homeSectionHeader: {
@@ -2427,6 +3025,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
+  corePremiumMetaLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginBottom: 4,
+  },
+
   corePremiumSymbol: {
     color: PREMIUM.textSoft,
     fontSize: 18,
@@ -2436,6 +3041,7 @@ const styles = StyleSheet.create({
   },
 
   coreSignalMiniBadge: {
+    flexShrink: 1,
     borderRadius: 999,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -2452,6 +3058,56 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     marginLeft: 7,
     fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  coreSortRow: {
+    gap: 8,
+    paddingHorizontal: 2,
+    paddingBottom: 10,
+  },
+
+  coreSortPill: {
+    paddingHorizontal: 12,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(17,24,39,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  coreSortPillActive: {
+    backgroundColor: "rgba(0,227,150,0.16)",
+    borderColor: BRAND.accent,
+  },
+
+  coreSortPillText: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  coreSortPillTextActive: {
+    color: BRAND.accent,
+  },
+
+  ownedPill: {
+    marginRight: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(212,166,58,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(212,166,58,0.35)",
+  },
+
+  ownedPillText: {
+    color: "#D4A63A",
+    fontSize: 8.5,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
 
   corePremiumCompany: {
@@ -2538,5 +3194,104 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: TYPO.fontFamily.semibold,
     marginLeft: 10,
+  },
+
+  infoBtn: {
+    marginLeft: 4,
+    padding: 3,
+  },
+
+  infoModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.68)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  infoModalCard: {
+    width: "100%",
+    backgroundColor: BRAND.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: PREMIUM.border,
+    padding: 16,
+  },
+
+  infoModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  infoModalTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
+    flex: 1,
+    marginRight: 10,
+  },
+
+  infoModalText: {
+    color: BRAND.sub,
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+
+  infoModalWhyNow: {
+    marginBottom: 12,
+  },
+
+  infoModalWhyNowText: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+
+  infoModalRows: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    paddingTop: 8,
+  },
+
+  infoModalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 5,
+  },
+
+  infoModalRowEmphasis: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    marginTop: 4,
+    paddingTop: 8,
+  },
+
+  infoModalRowLabel: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  infoModalRowLabelEmphasis: {
+    color: BRAND.text,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  infoModalRowValue: {
+    color: BRAND.text,
+    fontSize: 12.5,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  infoModalRowNote: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.regular,
+    fontStyle: "italic",
   },
 });

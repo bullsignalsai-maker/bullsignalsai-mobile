@@ -23,6 +23,7 @@ import {
 import { LinearGradient as ExpoLinearGradient } from "expo-linear-gradient";
 
 import { getStockDetail } from "../services/stockDetailService";
+import { getMarketPeriod } from "../services/watchlistService";
 import AstraChat from "../components/AstraChat";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import { BRAND } from "../constants/theme";
@@ -32,6 +33,35 @@ import {
   signalColor,
   getAuthoritativeSignal,
 } from "../utils/signalUtils";
+
+// riskLevel/riskFlags only exist on alphaWatchItem (Home's AI Opportunity
+// Watch card, passed via route.params when navigating from there) — a
+// lookup, not a fallback default, so a stock opened any other way never
+// shows a fabricated tier it was never actually assessed for.
+const RISK_LEVEL_COLOR = {
+  Controlled: BRAND.accent,
+  Low: BRAND.accent,
+  Moderate: BRAND.amber,
+  Elevated: BRAND.amber,
+  High: BRAND.red,
+};
+
+// getMarketPeriod (services/watchlistService.js) returns LIVE/PRE/AH/CLOSED
+// from actual America/New_York wall-clock time — replaces a hardcoded
+// "Market Open" label that never reflected real market state.
+const MARKET_SESSION_LABEL = {
+  LIVE: "Market Open",
+  PRE: "Pre-Market",
+  AH: "After Hours",
+  CLOSED: "Market Closed",
+};
+
+const MARKET_SESSION_COLOR = {
+  LIVE: BRAND.accent,
+  PRE: BRAND.amber,
+  AH: BRAND.amber,
+  CLOSED: BRAND.muted,
+};
 
 // -------- Helpers --------
 function timeAgo(tsMs) {
@@ -238,6 +268,7 @@ export default function StockDetailScreen({ route, navigation }) {
     symbol: initialSymbol = "TSLA",
     name: initialName = "Tesla Inc.",
     source, // ✅ ADD THIS
+    alphaWatchItem,
   } = route.params || {};
 
   const [symbol] = useState(initialSymbol);
@@ -270,6 +301,7 @@ export default function StockDetailScreen({ route, navigation }) {
   };
 
   const quote = detail?.quote;
+  const marketPeriod = getMarketPeriod();
   const bullbrain = detail?.bullbrain;
   const patternInsight = detail?.patternInsight || null;
   // ---- SMART PATTERN (from /stockdetail) ----
@@ -385,9 +417,24 @@ export default function StockDetailScreen({ route, navigation }) {
                   </View>
                 </View>
 
-                <View style={styles.marketStatusPill}>
-                  <View style={styles.liveDot} />
-                  <Text style={styles.marketStatusText}>Market Open</Text>
+                <View
+                  style={[
+                    styles.marketStatusPill,
+                    {
+                      backgroundColor: `${MARKET_SESSION_COLOR[marketPeriod]}14`,
+                      borderColor: `${MARKET_SESSION_COLOR[marketPeriod]}33`,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.liveDot,
+                      { backgroundColor: MARKET_SESSION_COLOR[marketPeriod] },
+                    ]}
+                  />
+                  <Text style={styles.marketStatusText}>
+                    {MARKET_SESSION_LABEL[marketPeriod]}
+                  </Text>
                 </View>
               </View>
 
@@ -620,6 +667,55 @@ export default function StockDetailScreen({ route, navigation }) {
               ))}
             </View>
           )}
+
+          {!!alphaWatchItem &&
+            (alphaWatchItem.riskLevel ||
+              alphaWatchItem.riskFlags?.length > 0) && (
+              <View style={styles.alphaWatchRiskNote}>
+                <View style={styles.alphaWatchRiskHeader}>
+                  <Ionicons
+                    name="flag-outline"
+                    size={13}
+                    color={BRAND.sub}
+                  />
+                  <Text style={styles.alphaWatchRiskLabel} numberOfLines={1}>
+                    {alphaWatchItem.setupLabel || "AI Opportunity Watch"}
+                  </Text>
+                  {!!alphaWatchItem.riskLevel && (
+                    <View style={styles.alphaWatchRiskBadge}>
+                      <View
+                        style={[
+                          styles.alphaWatchRiskDot,
+                          {
+                            backgroundColor:
+                              RISK_LEVEL_COLOR[alphaWatchItem.riskLevel] ||
+                              BRAND.sub,
+                          },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.alphaWatchRiskBadgeText,
+                          {
+                            color:
+                              RISK_LEVEL_COLOR[alphaWatchItem.riskLevel] ||
+                              BRAND.sub,
+                          },
+                        ]}
+                      >
+                        {alphaWatchItem.riskLevel}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {alphaWatchItem.riskFlags?.length > 0 && (
+                  <Text style={styles.alphaWatchRiskFlags}>
+                    {alphaWatchItem.riskFlags.join(" • ")}
+                  </Text>
+                )}
+              </View>
+            )}
 
           <TouchableOpacity
             style={styles.aiDetailsButton}
@@ -958,7 +1054,6 @@ export default function StockDetailScreen({ route, navigation }) {
               ].map((item, idx) => {
                 const bias =
                   detail?.probability?.bias ||
-                  detail?.signal?.bias ||
                   probBias ||
                   "Neutral";
 
@@ -1655,6 +1750,54 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.bold,
     marginTop: 8,
     textAlign: "center",
+  },
+
+  alphaWatchRiskNote: {
+    marginTop: 10,
+    borderRadius: 13,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+
+  alphaWatchRiskHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  alphaWatchRiskLabel: {
+    flex: 1,
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+  },
+
+  alphaWatchRiskBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  alphaWatchRiskDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+
+  alphaWatchRiskBadgeText: {
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  alphaWatchRiskFlags: {
+    color: BRAND.text,
+    fontSize: 11,
+    lineHeight: 15,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 6,
   },
 
   /* =========================

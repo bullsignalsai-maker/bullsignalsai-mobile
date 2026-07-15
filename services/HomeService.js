@@ -2,6 +2,30 @@
 import { API_BASE_URL } from "../config/apiKeys";
 
 /* =========================================================
+   TODAY STRIP (Portfolio Today / Watchlist Performance)
+   - One combined quotes-bulk call for whatever symbol union
+     the caller passes in (owned + watchlisted), instead of a
+     separate call per section.
+========================================================= */
+export async function fetchHomeQuotes(symbols = []) {
+  try {
+    const symbolsParam = [...new Set(symbols.filter(Boolean))].join(",");
+    if (!symbolsParam) return {};
+
+    const res = await fetch(
+      `${API_BASE_URL}/quotes-bulk?scope=home&symbols=${symbolsParam}`,
+    );
+    if (!res.ok) return {};
+
+    const json = await res.json();
+    return json?.quotes || {};
+  } catch (err) {
+    console.warn("fetchHomeQuotes error:", err.message);
+    return {};
+  }
+}
+
+/* =========================================================
    PUBLIC API
 ========================================================= */
 export async function getHomeScreen() {
@@ -267,6 +291,13 @@ function buildHomeSignals(stocks = [], quotes = {}) {
 
       signal: s.signal || s.bullbrain?.signal || "HOLD",
       confidence: Number(s.confidence ?? s.bullbrain?.confidence ?? 0),
+      displayIntelligence: s.displayIntelligence || null,
+      // Whether displayIntelligence has actually been computed for
+      // this symbol yet — distinct from bullbrain (an older, separate
+      // signal system) having a value. Gates the badge/confidence so
+      // a freshly-added or not-yet-computed symbol never looks like
+      // it has a real (if unremarkable) rating.
+      hasIntelligence: typeof s.displayIntelligence?.score === "number",
 
       summary: getHomeInsight(s),
       marketAwareness: s.marketAwareness || null,
@@ -300,7 +331,17 @@ function getHomeInsight(s) {
     return s.insight.trim();
   }
 
-  return "Market signal based on trend, price action, and momentum.";
+  // Only the generic catch-all is replaced — s.summary/oneLiner/insight
+  // above are real data from marketAwareness, a separate system from
+  // displayIntelligence, so they're left untouched even when
+  // displayIntelligence itself hasn't been computed yet. But if there's
+  // truly no intelligence at all, don't show a confident-sounding
+  // fabricated sentence — and if intelligence exists but just has no
+  // generated text, don't say "Analyzing…" next to an already-real badge.
+  const hasIntelligence = typeof s.displayIntelligence?.score === "number";
+  return hasIntelligence
+    ? "No additional commentary available."
+    : "Analyzing…";
 }
 
 function buildAlphaWatch(alphaWatch = {}) {

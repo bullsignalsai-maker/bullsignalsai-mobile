@@ -226,12 +226,23 @@ export default function PortfolioScreen({ navigation }) {
   const topPerformer = [...enrichedSorted].sort((a, b) => b.gain - a.gain)[0];
   const worstPerformer = [...enrichedSorted].sort((a, b) => a.gain - b.gain)[0];
 
-  const riskExposure = (() => {
-    const pct = topHolding?.allocationPct ?? 0;
-    if (pct > 40) return { label: "High", color: BRAND.red };
-    if (pct > 20) return { label: "Moderate", color: BRAND.amber };
-    return { label: "Balanced", color: BRAND.green };
-  })();
+  // Herfindahl-Hirschman Index across ALL positions, not just the top
+  // holding — sum of squared allocation percentages (0-10,000 scale).
+  // Thresholds (1500/2500) are the standard DOJ/FTC merger-guideline
+  // concentration breakpoints, not arbitrary cutoffs. riskExposure and
+  // diversificationScore both derive from this same hhi value so they
+  // can never disagree with each other.
+  const hhi = enrichedSorted.reduce(
+    (sum, p) => sum + Math.pow(p.allocationPct || 0, 2),
+    0,
+  );
+
+  const riskExposure =
+    hhi >= 2500
+      ? { label: "High", color: BRAND.red }
+      : hhi >= 1500
+        ? { label: "Moderate", color: BRAND.amber }
+        : { label: "Balanced", color: BRAND.green };
 
   const handleToggleAIInsight = async (symbol, p, totalValueLocal) => {
     setAiState((prev) => {
@@ -342,12 +353,13 @@ export default function PortfolioScreen({ navigation }) {
       ? Math.round((winnersCount / enrichedSorted.length) * 100)
       : 0;
 
-  const diversificationScore =
-    topHolding?.allocationPct > 40
-      ? 58
-      : topHolding?.allocationPct > 25
-        ? 74
-        : 88;
+  // Same hhi/threshold pair as riskExposure above — kept as the
+  // existing 58/74/88 output values since portfolioHealthScore's blend
+  // formula below was already calibrated around them. (A continuous
+  // score was considered and rejected: it wouldn't share riskExposure's
+  // hard cliff at hhi=1500/2500, reintroducing exactly the "High risk
+  // but 83/100 diversified" contradiction this refactor fixes.)
+  const diversificationScore = hhi >= 2500 ? 58 : hhi >= 1500 ? 74 : 88;
 
   const hasHoldings = enrichedSorted.length > 0;
 
@@ -617,7 +629,10 @@ export default function PortfolioScreen({ navigation }) {
               ) : (
                 <>
                   <Text style={styles.healthBullet}>
-                    ✓ {riskExposure.label} exposure profile
+                    ✓ Diversification:{" "}
+                    {hasHoldings
+                      ? `${diversificationScore}/100 (${riskExposure.label})`
+                      : "--"}
                   </Text>
                   <Text style={styles.healthBullet}>
                     ✓ Top holding: {topHolding?.symbol || "--"}

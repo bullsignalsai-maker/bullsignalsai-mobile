@@ -68,27 +68,70 @@ export async function getWatchlistScreen(userId) {
 }
 
 /* =========================================================
+  MARKET PERIOD (PRE / LIVE / AH / CLOSED)
+  - Reflects the current moment, never a quote's own timestamp,
+    so a stale quote can never borrow "now"'s market period.
+  - Uses America/New_York wall-clock time (same technique as
+    HomeScreen.js's market-status check) so this is correct
+    regardless of the device's local timezone.
+========================================================= */
+export function getMarketPeriod(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+    weekday: "short",
+  }).formatToParts(now);
+
+  const hour = Number(parts.find((p) => p.type === "hour")?.value || 0);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value || 0);
+  const weekday = parts.find((p) => p.type === "weekday")?.value;
+
+  const isWeekend = weekday === "Sat" || weekday === "Sun";
+  const totalMinutes = hour * 60 + minute;
+
+  if (isWeekend) return "CLOSED";
+  if (totalMinutes < 9 * 60 + 30) return "PRE";
+  if (totalMinutes >= 16 * 60) return "AH";
+
+  return "LIVE";
+}
+
+const STALE_THRESHOLD_MS = 180 * 1000;
+
+/* =========================================================
   MERGE LOGIC
   - Normalizes quote fields
   - Exposes freshness explicitly
 ========================================================= */
 function mergeWatchlistQuotes(items = [], quotes = {}) {
+  const marketPeriod = getMarketPeriod();
+  const now = Date.now();
+
   return items.map((s) => {
     const sym = (s.symbol || "").toUpperCase();
     const q = quotes?.[sym];
 
     const needsRefresh = q?.needs_refresh === true;
 
-    const price = q?.price ?? s.quote?.price ?? null;
-    const change = q?.change ?? s.quote?.change ?? null;
-    const rawChangePct = q?.changePct ?? s.quote?.changePct ?? null;
+    const price = q?.price ?? null;
+    const change = q?.change ?? null;
+    const rawChangePct = q?.changePct ?? null;
     const changePct =
       rawChangePct !== null && rawChangePct !== undefined
         ? Number(rawChangePct)
         : null;
 
-    const quoteUpdatedAt =
-      q?.updated_at || s.quote_updated_at || s.quote?.updated_at || null;
+    const quoteUpdatedAt = q?.updated_at ?? null;
+
+    // needs_refresh is a backend worker-queue signal (ensure_quote()
+    // re-flags it every 30s regardless of actual data age) — not a
+    // reliable freshness indicator. Staleness is judged purely from
+    // how old quote_updated_at actually is, flat across all sessions.
+    const isStale =
+      !quoteUpdatedAt ||
+      now - new Date(quoteUpdatedAt).getTime() > STALE_THRESHOLD_MS;
 
     const displayIntelligence = s.displayIntelligence || null;
 
@@ -107,6 +150,14 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
           : typeof s.bullbrain?.confidence === "number"
             ? s.bullbrain.confidence
             : 0;
+
+    // Whether displayIntelligence has actually been computed for this
+    // symbol yet — distinct from bullbrain (an older, separate signal
+    // system) having a value. Gates the badge/confidence/summary so a
+    // freshly-added or not-yet-computed symbol never looks like it has
+    // a real (if unremarkable) rating.
+    const hasIntelligence = typeof displayIntelligence?.score === "number";
+
     const baseSummary =
       displayIntelligence?.headline ||
       s.displayHeadline ||
@@ -122,13 +173,19 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
             baseSummary,
           )));
 
-    const watchlistSummary = contradictsLiveMove
-      ? `${sym} is ${
-          changePct >= 0 ? "moving higher" : "under pressure"
-        } today, ${changePct >= 0 ? "up" : "down"} ${Math.abs(
-          changePct,
-        ).toFixed(2)}%.`
-      : baseSummary;
+    // When there's no real intelligence yet, never fall through to
+    // market_awareness/resolve_watchlist_summary content the backend
+    // may still attach to baseSummary — that's exactly the "stale or
+    // misleading previous intelligence" this is meant to avoid.
+    const watchlistSummary = !hasIntelligence
+      ? "Analyzing…"
+      : contradictsLiveMove
+        ? `${sym} is ${
+            changePct >= 0 ? "moving higher" : "under pressure"
+          } today, ${changePct >= 0 ? "up" : "down"} ${Math.abs(
+            changePct,
+          ).toFixed(2)}%.`
+        : baseSummary;
     return {
       symbol: sym,
       companyName: s.companyName || sym,
@@ -139,10 +196,15 @@ function mergeWatchlistQuotes(items = [], quotes = {}) {
       changePct,
       quote_updated_at: quoteUpdatedAt,
       needs_refresh: needsRefresh,
+      isStale,
 
-      session: price ? (needsRefresh ? "LAST" : "LIVE") : "PENDING",
+      // PENDING is the one honest "we have no data" state. Otherwise
+      // always the real market period — staleness no longer fakes a
+      // "LAST" label, it only dims the dot (see isStale above).
+      session: !price ? "PENDING" : marketPeriod,
 
       displayIntelligence,
+      hasIntelligence,
       displayLabel: displayIntelligence?.label || s.displayLabel || null,
       displayHeadline:
         displayIntelligence?.headline || s.displayHeadline || null,
@@ -174,7 +236,16 @@ export async function addToWatchlist(userId, symbol) {
     method: "POST",
   });
   if (!res.ok) throw new Error("Add failed");
-  return res.json();
+
+  const json = await res.json();
+
+  // Backend returns 200 OK even on rejection (status: "error" in the
+  // body, e.g. an unrecognized ticker) — res.ok alone can't see that.
+  if (json?.status !== "ok") {
+    throw new Error(json?.error || "Add failed");
+  }
+
+  return json;
 }
 
 export async function removeFromWatchlist(userId, symbol) {

@@ -17,6 +17,7 @@ import {
   RefreshControl,
   Image,
   Animated,
+  Modal,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -38,8 +39,54 @@ import {
 } from "../services/MomentumService";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
+import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
 
 const AMBER_TAGS = new Set(["AI Conviction", "Sector Strength"]);
+
+// riskLevel only exists on aiSetups/topAISetup items (backend-computed from
+// riskFlags). confirmedMomentum/continuousMovers items never carry it — so
+// this is intentionally a lookup, not a fallback default, to avoid showing
+// a fabricated tier for a stock the backend never actually risk-assessed.
+const RISK_LEVEL_COLOR = {
+  Controlled: BRAND.green,
+  Low: BRAND.green,
+  Moderate: BRAND.amber,
+  Elevated: BRAND.amber,
+  High: BRAND.red,
+};
+
+const MOMENTUM_SCORE_INFO = {
+  MARKET: {
+    title: "Market Momentum",
+    text: "This gauge reflects the breadth of momentum across the whole market right now — how many stocks are showing sustained continuation, how many are pulling back, and how strong the average move is. It's not any single stock's score, and it's scaled to top out around 95 rather than a clean 100.",
+  },
+  STOCK: {
+    title: "Momentum Score",
+    text: "An AI-generated 0–100 score for this stock, built from recent price action, trend persistence, and volume behavior. The exact mix is tailored to the list it appears in (Movers, AI Setups, Confirmed Momentum), so scores aren't directly comparable across sections — read it as how strong and sustained this stock's move looks, not an absolute ranking.",
+  },
+  TIER: {
+    title: "Momentum Score & Tiers",
+    text: "An AI-generated 0–100 score built from recent price action, trend persistence, and volume behavior. ELITE, STRONG, and EMERGING are display tiers on top of that score — ELITE is 85+, STRONG is 70–84, EMERGING is below 70 — meant for a quick scan, not a separately verified rating.",
+  },
+  RISING_FADING: {
+    title: "Rising / Fading",
+    text: "Compares today's move to this stock's own average move over the tracked window. Rising means today is stronger than its average; Fading means today is weaker. This is a same-session signal, not a verified multi-day trend.",
+  },
+  NEW_ENTRANTS: {
+    title: "New Entrants",
+    text: "Stocks that have only recently started showing up in this momentum list (few tracked sessions so far). It reflects how new the stock is to this list, not whether it recently IPO'd or was newly listed.",
+  },
+};
+
+// theme only exists on aiSetups/topAISetup — Sector filtering is scoped to
+// that section for this reason (see MomentumMoversScreen investigation).
+const THEME_LABELS = {
+  AI_Semis: "AI & Semis",
+  Cloud_Software: "Cloud & Software",
+  Consumer_Internet: "Consumer Internet",
+  Financial_Crypto: "Financial & Crypto",
+  Other: "Other",
+};
 
 /* ---------------- Mini sparkline ---------------- */
 function MiniSparkline({
@@ -187,13 +234,20 @@ const normalizeMoverForClara = (raw) => {
 /* ============================================================ */
 export default function MomentumMoversScreen({ navigation }) {
   const [selected, setSelected] = useState("All");
+  const [selectedTheme, setSelectedTheme] = useState("All");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [astraVisible, setAstraVisible] = useState(false);
   const [selectedMover, setSelectedMover] = useState(null);
+  const [infoModal, setInfoModal] = useState(null);
   const priceFlash = useRef({}).current;
   const lastPrices = useRef({}).current;
+  const pageScrollRef = useRef(null);
+
+  useResetScrollOnTabPress(navigation, () =>
+    pageScrollRef.current?.scrollTo({ y: 0, animated: true }),
+  );
   const flashPricesForItems = (items = []) => {
     items.forEach((it) => {
       const symbol = String(it?.symbol || "").toUpperCase();
@@ -334,8 +388,57 @@ export default function MomentumMoversScreen({ navigation }) {
       );
     }
 
+    // Approximation, not a verified multi-day trend — see
+    // MOMENTUM_SCORE_INFO.RISING_FADING. Compares today's move against
+    // this stock's own average move over the tracked window.
+    if (selected === "Rising") {
+      return [...movers]
+        .filter(
+          (x) => Number(x.latestMovePct || 0) > Number(x.avgMovePct || 0),
+        )
+        .sort(
+          (a, b) =>
+            Number(b.latestMovePct || 0) -
+              Number(b.avgMovePct || 0) -
+              (Number(a.latestMovePct || 0) - Number(a.avgMovePct || 0)),
+        );
+    }
+
+    if (selected === "Fading") {
+      return [...movers]
+        .filter(
+          (x) => Number(x.latestMovePct || 0) < Number(x.avgMovePct || 0),
+        )
+        .sort(
+          (a, b) =>
+            Number(a.latestMovePct || 0) -
+              Number(a.avgMovePct || 0) -
+              (Number(b.latestMovePct || 0) - Number(b.avgMovePct || 0)),
+        );
+    }
+
+    // Means "few tracked sessions in this list so far," not "recently
+    // IPO'd" — see MOMENTUM_SCORE_INFO.NEW_ENTRANTS. Threshold picked
+    // from the current appearances distribution (backend already floors
+    // it around 3-4), not a backend-defined cutoff.
+    if (selected === "New") {
+      return [...movers]
+        .filter((x) => Number(x.appearances || 0) <= 5)
+        .sort((a, b) => Number(a.appearances || 0) - Number(b.appearances || 0));
+    }
+
     return movers;
   }, [selected, movers, pullbacks]);
+
+  const visibleAiSetups = useMemo(() => {
+    if (selectedTheme === "All") return aiSetups;
+    return aiSetups.filter((x) => x.theme === selectedTheme);
+  }, [selectedTheme, aiSetups]);
+
+  const aiSetupThemes = useMemo(
+    () => [...new Set(aiSetups.map((x) => x.theme).filter(Boolean))],
+    [aiSetups],
+  );
 
   const leader = confirmed[0] || movers[0] || topAISetup;
 
@@ -354,9 +457,22 @@ export default function MomentumMoversScreen({ navigation }) {
     lookbackSnapshots: data?.lookbackSnapshots,
   };
   const filters = useMemo(
-    () => ["All", "Strongest", "3+ Sessions", "Biggest Move", "Pullbacks"],
+    () => [
+      "All",
+      "Strongest",
+      "3+ Sessions",
+      "Biggest Move",
+      "Rising",
+      "Fading",
+      "New",
+      "Pullbacks",
+    ],
     [],
   );
+
+  // Market Cap filter: skipped — no marketCap/market_cap field exists
+  // anywhere in the /market-momentum response (checked live, all four
+  // sections). Needs a new backend field before this can be built.
 
   if (loading) {
     return (
@@ -384,6 +500,7 @@ export default function MomentumMoversScreen({ navigation }) {
         </Text>
       </View>
       <ScrollView
+        ref={pageScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
         refreshControl={
@@ -419,7 +536,20 @@ export default function MomentumMoversScreen({ navigation }) {
         >
           <View style={styles.pulseLeft}>
             <View style={styles.pulseHeader}>
-              <Text style={styles.sectionCaps}>MARKET MOMENTUM PULSE</Text>
+              <View style={styles.pulseHeaderTitleRow}>
+                <Text style={styles.sectionCaps}>MARKET MOMENTUM PULSE</Text>
+                <TouchableOpacity
+                  onPress={() => setInfoModal(MOMENTUM_SCORE_INFO.MARKET)}
+                  style={styles.infoBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons
+                    name="help-circle-outline"
+                    size={15}
+                    color={BRAND.sub}
+                  />
+                </TouchableOpacity>
+              </View>
               <MaterialCommunityIcons
                 name="pulse"
                 size={22}
@@ -575,7 +705,20 @@ export default function MomentumMoversScreen({ navigation }) {
               <View style={styles.metricDivider} />
 
               <View style={styles.metricBox}>
-                <Text style={styles.metricLabel}>Momentum Score</Text>
+                <View style={styles.metricLabelRow}>
+                  <Text style={styles.metricLabel}>Momentum Score</Text>
+                  <TouchableOpacity
+                    onPress={() => setInfoModal(MOMENTUM_SCORE_INFO.STOCK)}
+                    style={styles.infoBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name="help-circle-outline"
+                      size={13}
+                      color={BRAND.sub}
+                    />
+                  </TouchableOpacity>
+                </View>
                 <Text style={styles.metricValueGreen}>
                   {Math.round(leader?.momentumScore || 92)}/100
                 </Text>
@@ -593,9 +736,24 @@ export default function MomentumMoversScreen({ navigation }) {
                     marginTop: 3,
                   }}
                 >
-                  <View style={styles.dotGreen} />
-                  <Text style={styles.metricValueGreen}>
-                    {leader?.riskLevel || "High"}
+                  <View
+                    style={[
+                      styles.dotGreen,
+                      {
+                        backgroundColor:
+                          RISK_LEVEL_COLOR[leader?.riskLevel] || BRAND.sub,
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.metricValueGreen,
+                      {
+                        color: RISK_LEVEL_COLOR[leader?.riskLevel] || BRAND.sub,
+                      },
+                    ]}
+                  >
+                    {leader?.riskLevel || "Not assessed"}
                   </Text>
                 </View>
               </View>
@@ -668,6 +826,37 @@ export default function MomentumMoversScreen({ navigation }) {
             );
           })}
         </ScrollView>
+
+        {/* Approximation disclosures for the two newest filters — see
+            MOMENTUM_SCORE_INFO.RISING_FADING / NEW_ENTRANTS */}
+        <View style={styles.filterLegendRow}>
+          <TouchableOpacity
+            style={styles.filterLegendItem}
+            onPress={() => setInfoModal(MOMENTUM_SCORE_INFO.RISING_FADING)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons
+              name="information-circle-outline"
+              size={12}
+              color={BRAND.sub}
+            />
+            <Text style={styles.filterLegendText}>Rising/Fading</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.filterLegendItem}
+            onPress={() => setInfoModal(MOMENTUM_SCORE_INFO.NEW_ENTRANTS)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons
+              name="information-circle-outline"
+              size={12}
+              color={BRAND.sub}
+            />
+            <Text style={styles.filterLegendText}>New Entrants</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.moversTableCard}>
           <ScrollView
             horizontal
@@ -689,9 +878,25 @@ export default function MomentumMoversScreen({ navigation }) {
                 <Text style={[styles.tableHeaderText, styles.tableColAppear]}>
                   SESSIONS
                 </Text>
-                <Text style={[styles.tableHeaderText, styles.tableColScore]}>
-                  SCORE
-                </Text>
+                <View
+                  style={[
+                    styles.tableColScore,
+                    { flexDirection: "row", alignItems: "center", gap: 2 },
+                  ]}
+                >
+                  <Text style={styles.tableHeaderText}>SCORE</Text>
+                  <TouchableOpacity
+                    onPress={() => setInfoModal(MOMENTUM_SCORE_INFO.STOCK)}
+                    style={styles.infoBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name="help-circle-outline"
+                      size={12}
+                      color={BRAND.sub}
+                    />
+                  </TouchableOpacity>
+                </View>
                 <Text style={[styles.tableHeaderText, styles.tableColSpark]}>
                   TREND
                 </Text>
@@ -880,10 +1085,6 @@ export default function MomentumMoversScreen({ navigation }) {
             <View style={{ flex: 1 }}>
               <View style={styles.sectionTitleLine}>
                 <Text style={styles.sectionTitle}>AI SETUPS</Text>
-                <View style={styles.sectionLiveDot}>
-                  <View style={styles.sectionLiveDotInner} />
-                  <Text style={styles.sectionLiveText}>LIVE</Text>
-                </View>
               </View>
               <Text style={styles.sectionSub}>
                 Internal AI-ranked opportunities with momentum confirmation
@@ -891,6 +1092,38 @@ export default function MomentumMoversScreen({ navigation }) {
             </View>
           </View>
         </View>
+
+        {aiSetupThemes.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filters}
+          >
+            {["All", ...aiSetupThemes].map((t) => {
+              const active = selectedTheme === t;
+              return (
+                <TouchableOpacity
+                  key={t}
+                  onPress={() => setSelectedTheme(t)}
+                  style={[
+                    styles.filterPill,
+                    active && styles.filterPillActive,
+                  ]}
+                  activeOpacity={0.85}
+                >
+                  <Text
+                    style={[
+                      styles.filterText,
+                      active && styles.filterTextActive,
+                    ]}
+                  >
+                    {t === "All" ? "All" : THEME_LABELS[t] || t}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
 
         <ScrollView
           horizontal
@@ -900,7 +1133,7 @@ export default function MomentumMoversScreen({ navigation }) {
           snapToAlignment="start"
           contentContainerStyle={styles.alphaMemoryScroll}
         >
-          {aiSetups.slice(0, 10).map((item, idx) => {
+          {visibleAiSetups.slice(0, 10).map((item, idx) => {
             const score = Math.round(
               item.momentumScore ||
                 item.opportunityScore ||
@@ -917,6 +1150,13 @@ export default function MomentumMoversScreen({ navigation }) {
                 key={item.symbol}
                 activeOpacity={0.9}
                 style={styles.alphaCard}
+                onPress={() => {
+                  navigation.navigate("StockDetailScreen", {
+                    symbol: item.symbol,
+                    name: item.companyName || item.symbol,
+                    source: "ui",
+                  });
+                }}
               >
                 {/* Base background */}
                 <LinearGradient
@@ -973,6 +1213,17 @@ export default function MomentumMoversScreen({ navigation }) {
                       <View style={styles.alphaTierPill}>
                         <Text style={styles.alphaTierText}>{tier}</Text>
                       </View>
+                      <TouchableOpacity
+                        onPress={() => setInfoModal(MOMENTUM_SCORE_INFO.TIER)}
+                        style={styles.infoBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons
+                          name="help-circle-outline"
+                          size={13}
+                          color={BRAND.sub}
+                        />
+                      </TouchableOpacity>
                     </View>
                     <Text style={styles.alphaSector} numberOfLines={1}>
                       {item.sector || item.companyName || "AI Opportunity"}
@@ -1057,6 +1308,10 @@ export default function MomentumMoversScreen({ navigation }) {
         </ScrollView>
 
         {/* ---------- PULLBACK WATCH - Premium Horizontal Cards ---------- */}
+        {/* No "View All" here on purpose — the horizontal scroll below
+            already renders every fetched pullback item (capped at 12 by
+            MomentumService.js's normalizePullbacks), so there's nothing
+            further to reveal. */}
         <View style={[styles.sectionHeader, { marginTop: 6 }]}>
           <View style={styles.sectionTitleRow}>
             <Ionicons name="trending-down" size={20} color={BRAND.red} />
@@ -1067,12 +1322,6 @@ export default function MomentumMoversScreen({ navigation }) {
               </Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.viewAll}>
-            <Text style={[styles.viewAllText, { color: BRAND.red }]}>
-              View All
-            </Text>
-            <Ionicons name="arrow-forward" size={16} color={BRAND.red} />
-          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -1085,6 +1334,13 @@ export default function MomentumMoversScreen({ navigation }) {
               key={item.symbol}
               activeOpacity={0.86}
               style={styles.pullCard}
+              onPress={() => {
+                navigation.navigate("StockDetailScreen", {
+                  symbol: item.symbol,
+                  name: item.companyName || item.symbol,
+                  source: "ui",
+                });
+              }}
             >
               <LinearGradient
                 colors={["rgba(255,69,96,0.22)", "rgba(15,8,10,0.98)"]}
@@ -1195,6 +1451,22 @@ export default function MomentumMoversScreen({ navigation }) {
         onClose={() => setAstraVisible(false)}
         portfolioData={claraMomentumContext}
       />
+
+      {infoModal && (
+        <Modal transparent animationType="fade" visible>
+          <View style={styles.modalOverlay}>
+            <View style={styles.infoModalCard}>
+              <View style={styles.infoModalHeader}>
+                <Text style={styles.infoModalTitle}>{infoModal.title}</Text>
+                <TouchableOpacity onPress={() => setInfoModal(null)}>
+                  <Ionicons name="close" size={20} color={BRAND.sub} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.infoModalText}>{infoModal.text}</Text>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -1205,7 +1477,10 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    paddingTop: 110,
+    // stickyHeader (title + subtitle + its own padding/border) renders
+    // to ~125px tall; this must clear it or the first card's top edge
+    // (including its border) sits hidden underneath it at rest.
+    paddingTop: 132,
     paddingHorizontal: 8,
     paddingBottom: 34,
   },
@@ -1284,6 +1559,14 @@ const styles = StyleSheet.create({
     gap: 7,
     marginBottom: 7,
   },
+
+  pulseHeaderTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  infoBtn: { paddingHorizontal: 3, paddingVertical: 2 },
 
   sectionCaps: {
     color: BRAND.text,
@@ -1402,6 +1685,24 @@ const styles = StyleSheet.create({
     color: BRAND.green,
   },
 
+  filterLegendRow: {
+    flexDirection: "row",
+    gap: 14,
+    paddingBottom: 8,
+  },
+
+  filterLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  filterLegendText: {
+    color: BRAND.sub,
+    fontSize: 10.5,
+    fontWeight: "700",
+  },
+
   /* Leader card */
   leaderCard: {
     borderRadius: 18,
@@ -1510,6 +1811,12 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     fontSize: 11,
     fontWeight: "700",
+  },
+
+  metricLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
   },
 
   metricValue: {
@@ -1814,32 +2121,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-
-  sectionLiveDot: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: "rgba(254,176,25,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(254,176,25,0.28)",
-  },
-
-  sectionLiveDotInner: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: BRAND.amber,
-  },
-
-  sectionLiveText: {
-    color: BRAND.amber,
-    fontSize: 8.5,
-    fontWeight: "900",
-    letterSpacing: 1,
   },
 
   alphaMemoryScroll: {
@@ -2294,5 +2575,42 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "800",
     marginBottom: 3,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.68)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  infoModalCard: {
+    width: "100%",
+    backgroundColor: BRAND.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    padding: 16,
+  },
+
+  infoModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  infoModalTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  infoModalText: {
+    color: BRAND.sub,
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontFamily: TYPO.fontFamily.regular,
   },
 });
