@@ -142,7 +142,7 @@ const getConfidence = (item) =>
     ? item.bullbrain.confidence
     : typeof item?.confidence === "number"
       ? item.confidence
-      : 0;
+      : null;
 
 const getSummary = (item) =>
   item?.watchlistSummary ||
@@ -1750,9 +1750,11 @@ C) neither (plain nudge line, no card chrome).
                 const ratingColor = item.hasIntelligence
                   ? signalColor(signal)
                   : BRAND.sub;
-                const tier = item.hasIntelligence
-                  ? getConfidenceTier(getConfidence(item))
-                  : null;
+                const confidence = getConfidence(item);
+                const tier =
+                  item.hasIntelligence && confidence != null
+                    ? getConfidenceTier(confidence)
+                    : null;
                 const pos = positions[item.symbol];
                 const isWatchlisted = watchlistedSymbols.has(item.symbol);
 
@@ -1834,7 +1836,9 @@ C) neither (plain nudge line, no card chrome).
 
                         {item.hasIntelligence && (
                           <Text style={styles.corePremiumConfidence}>
-                            {tier} {Math.round(getConfidence(item))}%
+                            {confidence != null
+                              ? `${tier} ${Math.round(confidence)}%`
+                              : "Momentum Signal"}
                           </Text>
                         )}
 
