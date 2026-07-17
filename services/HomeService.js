@@ -290,7 +290,12 @@ function buildHomeSignals(stocks = [], quotes = {}) {
       changePct,
 
       signal: s.signal || s.bullbrain?.signal || "HOLD",
-      confidence: Number(s.confidence ?? s.bullbrain?.confidence ?? 0),
+      confidence:
+        s.confidence != null
+          ? Number(s.confidence)
+          : s.bullbrain?.confidence != null
+            ? Number(s.bullbrain.confidence)
+            : null,
       displayIntelligence: s.displayIntelligence || null,
       // Whether displayIntelligence has actually been computed for
       // this symbol yet — distinct from bullbrain (an older, separate
