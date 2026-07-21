@@ -28,11 +28,14 @@ import {
   getHomeScreen,
   getHomeMovers,
   getVerifiedAlpha,
+  getAlphaclaraTracking,
   fetchHomeQuotes,
 } from "../services/HomeService";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
+import { formatAlphaclaraStatsLine } from "../utils/formatters";
 import MoveLabel from "../components/MoveLabel";
+import AlphaclaraPicksList from "../components/AlphaclaraPicksList";
 import {
   displayRating,
   getAuthoritativeSignal,
@@ -54,24 +57,9 @@ const MARKET_MOVERS_INFO = {
   text: "Stocks with the largest verified price moves right now. \"Exploding\" means the stock is up on the day; \"Pulling back\" means it's down. This reflects today's price action only, not a forecast of where it goes next.",
 };
 
-// Same thresholds as MomentumMoversScreen.js's MOMENTUM_SCORE_INFO.TIER —
-// reused deliberately so the vocabulary is consistent across screens.
-const CORE_TIER_INFO = {
-  title: "Core Signal Tiers",
-  text: "ELITE, STRONG, and EMERGING are confidence tiers on top of each stock's AI confidence score — ELITE is 85+, STRONG is 70–84, EMERGING is below 70. Meant for a quick scan of which names have the most model conviction, not a separately verified rating.",
-};
-
-const getConfidenceTier = (confidence) => {
-  const c = Number(confidence) || 0;
-  if (c >= 85) return "ELITE";
-  if (c >= 70) return "STRONG";
-  return "EMERGING";
-};
-
-const CORE_TIER_ACCENT = {
-  ELITE: "#D4A63A",
-  STRONG: "rgba(59,130,246,0.45)",
-  EMERGING: "rgba(255,255,255,0.07)",
+const ALPHACLARA_PICKS_INFO = {
+  title: "Alphaclara Picks",
+  text: "Alphaclara records its own AI picks and tracks their real price performance for a rolling window — wins and losses shown as-is, nothing filtered or hidden. Once a pick's tracking window closes, it's marked Checked with its final result.",
 };
 
 // Friendly labels for displayIntelligence.scoreBreakdown.factors keys.
@@ -270,8 +258,8 @@ export default function HomeScreen({ navigation }) {
   const [home, setHome] = useState(null);
   const [topMovers, setTopMovers] = useState([]);
   const [verifiedAlpha, setVerifiedAlpha] = useState(null);
+  const [alphaclaraTracking, setAlphaclaraTracking] = useState(null);
   const [infoModal, setInfoModal] = useState(null);
-  const [coreSortMode, setCoreSortMode] = useState("confidence");
 
   // Owned positions (symbol -> {shares, avgCost, ...}) and watchlisted
   // symbols, fetched separately from the 5s home poll below — lots/
@@ -407,6 +395,12 @@ Load + Auto Refresh (5s)
           setVerifiedAlpha(null);
         }
 
+        try {
+          setAlphaclaraTracking(await getAlphaclaraTracking({ limit: 15 }));
+        } catch {
+          setAlphaclaraTracking(null);
+        }
+
         flashPricesForItems([
           ...(data.signals || []),
           ...(moversData || []),
@@ -514,6 +508,12 @@ Pull To Refresh
         setVerifiedAlpha(null);
       }
 
+      try {
+        setAlphaclaraTracking(await getAlphaclaraTracking({ limit: 15 }));
+      } catch {
+        setAlphaclaraTracking(null);
+      }
+
       flashPricesForItems([
         ...(data.signals || []),
         ...(moversData || []),
@@ -567,6 +567,13 @@ Pull To Refresh
       : header.marketMood || "Overview";
 
   const alphaWatchItems = home?.alphaWatch?.items || [];
+
+  const alphaclaraStatsLine = alphaclaraTracking
+    ? formatAlphaclaraStatsLine(
+        alphaclaraTracking.counts,
+        alphaclaraTracking.windowDays,
+      )
+    : null;
 
   const verifiedOpportunities = verifiedAlpha?.opportunities || [];
 
@@ -652,33 +659,6 @@ Pull To Refresh
 
   const displayMovers =
     apiMovers.length > 0 ? apiMovers.slice(0, 5) : internalMovers.slice(0, 5);
-  const usedHomeSymbols = new Set(
-    [
-      heroItem?.symbol,
-      ...alphaCarousel.map((x) => x.symbol),
-      ...displayMovers.map((x) => x.symbol),
-    ].filter(Boolean),
-  );
-
-  const coreSignalCardsSorted = (signals || [])
-    .filter(hasDisplayQuote)
-    .filter((item) => !usedHomeSymbols.has(item.symbol))
-    .sort((a, b) => {
-      if (coreSortMode === "az") {
-        return String(a.symbol || "").localeCompare(String(b.symbol || ""));
-      }
-      if (coreSortMode === "change") {
-        return (
-          Math.abs(Number(b.changePct || 0)) - Math.abs(Number(a.changePct || 0))
-        );
-      }
-      // "confidence" (default)
-      return Number(getConfidence(b)) - Number(getConfidence(a));
-    });
-
-  // Sorting happens before the cap so "top 7" actually reflects the
-  // chosen sort, not whatever 7 survived the earlier exclusion filter.
-  const coreSignalCards = coreSignalCardsSorted.slice(0, 7);
 
   const hasVerifiedHero =
     heroItem && verifiedPositiveAlpha.some((x) => x.symbol === heroItem.symbol);
@@ -708,7 +688,7 @@ Pull To Refresh
     {
       icon: "home-outline",
       title: "Home",
-      text: "Your AI command center. View Top Alpha, AI Setups, Market Movers, and Core Signals ranked by Alphaclara.",
+      text: "Your AI command center. View Top Alpha, AI Setups, Market Movers, and Alphaclara Picks ranked by Alphaclara.",
     },
     {
       icon: "briefcase-outline",
@@ -1681,19 +1661,18 @@ C) neither (plain nudge line, no card chrome).
           </View>
         )}
 
-        {/* CORE SIGNALS */}
-        {coreSignalCards.length > 0 && (
+        {/* ALPHACLARA PICKS */}
+        {alphaclaraTracking && (
           <View style={styles.homeSectionWrap}>
             <View style={styles.homeSectionHeader}>
               <View>
-                <Text style={styles.sectionEyebrow}>ALPHACLARA AI</Text>
                 <View
                   style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
                 >
-                  <Text style={styles.sectionTitle}>Core Signals</Text>
+                  <Text style={styles.sectionTitle}>Alphaclara Picks</Text>
                   <TouchableOpacity
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    onPress={() => setInfoModal(CORE_TIER_INFO)}
+                    onPress={() => setInfoModal(ALPHACLARA_PICKS_INFO)}
                   >
                     <Ionicons
                       name="information-circle-outline"
@@ -1703,250 +1682,34 @@ C) neither (plain nudge line, no card chrome).
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.sectionSubtitle}>
-                  Additional AI-ranked names with signal, confidence, and market
-                  context
+                  AI-picked stocks, tracked live for real results
                 </Text>
+                {!!alphaclaraStatsLine && (
+                  <Text style={styles.sectionStatsLine}>
+                    {alphaclaraStatsLine}
+                  </Text>
+                )}
               </View>
+
+              {alphaclaraTracking.items.length > 0 && (
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  onPress={() => navigation.navigate("AllPicksScreen")}
+                >
+                  <Text style={styles.sectionMeta}>View all ›</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.coreSortRow}
-            >
-              {[
-                { key: "confidence", label: "Top Confidence" },
-                { key: "change", label: "Biggest Move" },
-                { key: "az", label: "A–Z" },
-              ].map((opt) => {
-                const active = coreSortMode === opt.key;
-                return (
-                  <TouchableOpacity
-                    key={opt.key}
-                    onPress={() => setCoreSortMode(opt.key)}
-                    style={[
-                      styles.coreSortPill,
-                      active && styles.coreSortPillActive,
-                    ]}
-                    activeOpacity={0.85}
-                  >
-                    <Text
-                      style={[
-                        styles.coreSortPillText,
-                        active && styles.coreSortPillTextActive,
-                      ]}
-                    >
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            <View style={styles.corePremiumShell}>
-              {coreSignalCards.map((item, index) => {
-                const isUp = Number(item.changePct || 0) >= 0;
-                const signal = getSignal(item);
-                const ratingColor = item.hasIntelligence
-                  ? signalColor(signal)
-                  : BRAND.sub;
-                const confidence = getConfidence(item);
-                const tier =
-                  item.hasIntelligence && confidence != null
-                    ? getConfidenceTier(confidence)
-                    : null;
-                const pos = positions[item.symbol];
-                const isWatchlisted = watchlistedSymbols.has(item.symbol);
-
-                return (
-                  <TouchableOpacity
-                    key={`core-${item.symbol}`}
-                    activeOpacity={0.78}
-                    style={[
-                      styles.corePremiumRow,
-                      index !== coreSignalCards.length - 1 &&
-                        styles.corePremiumDivider,
-                      tier && {
-                        borderLeftWidth: 3,
-                        borderLeftColor: CORE_TIER_ACCENT[tier],
-                      },
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      navigation.navigate("StockDetailScreen", {
-                        symbol: item.symbol,
-                        name: item.companyName || item.symbol,
-                        source: "ui",
-                      });
-                    }}
-                  >
-                    <View style={styles.coreLogoCircle}>
-                      {item.logoUrl ? (
-                        <Image
-                          source={{ uri: item.logoUrl }}
-                          style={styles.tickerLogoImage}
-                          resizeMode="contain"
-                        />
-                      ) : (
-                        <Text style={styles.coreLogoText}>
-                          {String(item.symbol || "").slice(0, 4)}
-                        </Text>
-                      )}
-                    </View>
-
-                    <View style={styles.corePremiumBody}>
-                      <View style={styles.corePremiumTopLine}>
-                        <Text style={styles.corePremiumSymbol}>
-                          {item.symbol}
-                        </Text>
-
-                        <View
-                          style={[
-                            styles.coreSignalMiniBadge,
-                            { backgroundColor: ratingColor },
-                          ]}
-                        >
-                          <Text
-                            style={styles.coreSignalMiniText}
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
-                          >
-                            {item.hasIntelligence
-                              ? displayRating(signal)
-                              : "Analyzing…"}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.corePremiumMetaLine}>
-                        {!!pos && (
-                          <View style={styles.ownedPill}>
-                            <Text style={styles.ownedPillText}>Owned</Text>
-                          </View>
-                        )}
-
-                        {!pos && isWatchlisted && (
-                          <Ionicons
-                            name="star"
-                            size={11}
-                            color="#D4A63A"
-                            style={{ marginRight: 4 }}
-                          />
-                        )}
-
-                        {item.hasIntelligence && (
-                          <Text style={styles.corePremiumConfidence}>
-                            {confidence != null
-                              ? `${tier} ${Math.round(confidence)}%`
-                              : "Momentum Signal"}
-                          </Text>
-                        )}
-
-                        {!!item.displayIntelligence?.scoreBreakdown && (
-                          <TouchableOpacity
-                            onPress={() =>
-                              setInfoModal(buildScoreBreakdownInfo(item))
-                            }
-                            style={styles.infoBtn}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          >
-                            <Ionicons
-                              name="help-circle-outline"
-                              size={13}
-                              color={BRAND.sub}
-                            />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-
-                      <Text style={styles.corePremiumCompany} numberOfLines={1}>
-                        {item.companyName || item.symbol}
-                      </Text>
-
-                      <Text style={styles.corePremiumSummary} numberOfLines={2}>
-                        {compactSummary(getSummary(item), 88)}
-                      </Text>
-                    </View>
-
-                    <View style={styles.corePremiumRight}>
-                      <Animated.Text
-                        style={[
-                          styles.corePremiumPrice,
-                          getPriceSessionStyle(item, marketPhase),
-                          {
-                            backgroundColor: getPriceFlashBg(
-                              item.symbol,
-                              item.changePct,
-                            ),
-                            paddingHorizontal: 5,
-                            borderRadius: 7,
-                          },
-                        ]}
-                      >
-                        {item.price != null
-                          ? `$${Number(item.price).toFixed(2)}`
-                          : "--"}
-                      </Animated.Text>
-
-                      <Text
-                        style={[
-                          styles.corePremiumMove,
-                          getMoveSessionStyle(item, marketPhase, isUp),
-                        ]}
-                      >
-                        {item.changePct != null
-                          ? `${Number(item.changePct) >= 0 ? "+" : ""}${Number(
-                              item.changePct,
-                            ).toFixed(2)}%`
-                          : "--"}
-                      </Text>
-                      <View style={styles.homeSessionRow}>
-                        <Animated.View
-                          style={[
-                            styles.homeSessionDot,
-                            {
-                              backgroundColor: getDisplaySessionColor(
-                                item,
-                                marketPhase,
-                              ),
-                              opacity:
-                                getDisplaySession(item, marketPhase) === "LIVE"
-                                  ? marketPulse
-                                  : 0.75,
-                              transform: [
-                                {
-                                  scale:
-                                    getDisplaySession(item, marketPhase) ===
-                                    "LIVE"
-                                      ? marketPulse.interpolate({
-                                          inputRange: [0.55, 1],
-                                          outputRange: [0.92, 1.12],
-                                        })
-                                      : 1,
-                                },
-                              ],
-                            },
-                          ]}
-                        />
-                        <Text style={styles.homeSessionText}>
-                          {getDisplaySession(item, marketPhase)}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <LinearGradient
-              pointerEvents="none"
-              colors={[
-                "rgba(212,166,58,0.080)",
-                "rgba(212,166,58,0.018)",
-                "rgba(0,0,0,0)",
-              ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.sectionGlow}
+            <AlphaclaraPicksList
+              items={alphaclaraTracking.items}
+              onPressItem={(item) => {
+                navigation.navigate("StockDetailScreen", {
+                  symbol: item.symbol,
+                  name: item.companyName || item.symbol,
+                  source: "ui",
+                });
+              }}
             />
           </View>
         )}
@@ -2337,6 +2100,13 @@ const styles = StyleSheet.create({
     fontSize: 11.2,
     marginTop: 2,
     fontFamily: TYPO.fontFamily.medium,
+  },
+
+  sectionStatsLine: {
+    color: BRAND.muted,
+    fontSize: 10.5,
+    marginTop: 2,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   sectionMeta: {
@@ -3134,76 +2904,11 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.bold,
     fontVariant: ["tabular-nums"],
   },
-  corePremiumShell: {
-    marginHorizontal: 6,
-    backgroundColor: PREMIUM.cardSoft,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: "rgba(59,130,246,0.22)",
-    overflow: "hidden",
-    position: "relative",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    elevation: 7,
-  },
-  corePremiumRow: {
-    minHeight: 72,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  corePremiumDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
-  },
-
-  coreLogoCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: "rgba(255,255,255,0.045)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-
-  coreLogoText: {
-    color: PREMIUM.textSoft,
-    fontSize: 12.5,
-    fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.25,
-  },
-
-  corePremiumBody: {
-    flex: 1,
-    paddingRight: 10,
-  },
-
-  corePremiumTopLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-
   corePremiumMetaLine: {
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
     marginBottom: 4,
-  },
-
-  corePremiumSymbol: {
-    color: PREMIUM.textSoft,
-    fontSize: 18,
-    fontFamily: TYPO.fontFamily.extrabold,
-    letterSpacing: -0.45,
-    marginRight: 7,
   },
 
   coreSignalMiniBadge: {
@@ -3276,13 +2981,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
 
-  corePremiumCompany: {
-    color: BRAND.sub,
-    fontSize: 11.4,
-    marginBottom: 2,
-    fontFamily: TYPO.fontFamily.medium,
-  },
-
   corePremiumSummary: {
     color: "rgba(255,255,255,0.84)",
     fontSize: 11.2,
@@ -3290,24 +2988,6 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.medium,
   },
 
-  corePremiumRight: {
-    width: 92,
-    alignItems: "flex-end",
-  },
-
-  corePremiumPrice: {
-    color: PREMIUM.textSoft,
-    fontSize: 15.8,
-    fontFamily: TYPO.fontFamily.extrabold,
-    fontVariant: ["tabular-nums"],
-  },
-
-  corePremiumMove: {
-    marginTop: 4,
-    fontSize: 11.4,
-    fontFamily: TYPO.fontFamily.bold,
-    fontVariant: ["tabular-nums"],
-  },
   sectionGlow: {
     position: "absolute",
     top: -70,

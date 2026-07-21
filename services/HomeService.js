@@ -245,6 +245,78 @@ function normalizeVerifiedItems(items = []) {
       };
     });
 }
+
+/* =========================================================
+   ALPHACLARA PICKS (replaces Core Signals / core_universe)
+========================================================= */
+export async function getAlphaclaraTracking({ limit, windowDays = 3 } = {}) {
+  try {
+    const params = new URLSearchParams({ window_days: String(windowDays) });
+    if (limit != null) params.set("limit", String(limit));
+
+    const res = await fetch(
+      `${API_BASE_URL}/alphaclara-tracking?${params.toString()}`,
+    );
+    if (!res.ok) return emptyAlphaclaraTracking();
+
+    const json = await res.json();
+
+    return {
+      status: json.status || "empty",
+      windowDays: Number(json.window_days ?? windowDays),
+      counts: {
+        total: Number(json.counts?.total ?? 0),
+        tracking: Number(json.counts?.tracking ?? 0),
+        checked: Number(json.counts?.checked ?? 0),
+        unavailable: Number(json.counts?.unavailable ?? 0),
+      },
+      items: normalizeTrackingItems(json.items),
+    };
+  } catch (err) {
+    console.warn("Alphaclara tracking error:", err.message);
+    return emptyAlphaclaraTracking();
+  }
+}
+
+function emptyAlphaclaraTracking() {
+  return {
+    status: "empty",
+    windowDays: 3,
+    counts: { total: 0, tracking: 0, checked: 0, unavailable: 0 },
+    items: [],
+  };
+}
+
+// Real duplicates are NOT merged — the same symbol can be picked more
+// than once inside the window, and each pick is a distinct fact
+// (different pick_price/date), so every item is kept and keyed on
+// symbol + recorded_at instead of deduped by symbol.
+function normalizeTrackingItems(items = []) {
+  return (Array.isArray(items) ? items : [])
+    .filter((x) => x?.symbol)
+    .map((x, idx) => {
+      const symbol = String(x.symbol || "").toUpperCase();
+
+      return {
+        key: `${symbol}-${x.recorded_at || x.pick_date || idx}`,
+        symbol,
+        companyName: x.companyName || x.company_name || symbol,
+        logoUrl: x.logoUrl || x.profile?.logoUrl || null,
+        pickDate: x.pick_date || null,
+        pickPrice: x.pick_price != null ? Number(x.pick_price) : null,
+        currentPrice:
+          x.current_price != null ? Number(x.current_price) : null,
+        currentPriceUpdatedAt: x.current_price_updated_at || null,
+        livePct: x.livePct != null ? Number(x.livePct) : null,
+        isChecked: x.isChecked === true,
+        checkedReturn:
+          x.checkedReturn != null ? Number(x.checkedReturn) : null,
+        checkedHorizon: x.checkedHorizon ?? null,
+        recordedAt: x.recorded_at || null,
+      };
+    });
+}
+
 /* =========================================================
    HEADER
 ========================================================= */
