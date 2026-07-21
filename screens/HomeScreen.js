@@ -1696,7 +1696,7 @@ C) neither (plain nudge line, no card chrome).
                   activeOpacity={0.75}
                   onPress={() => navigation.navigate("AllPicksScreen")}
                 >
-                  <Text style={styles.sectionMeta}>View all ›</Text>
+                  <Text style={styles.sectionMeta}>More ›</Text>
                 </TouchableOpacity>
               )}
             </View>
