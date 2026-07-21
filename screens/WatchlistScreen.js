@@ -111,6 +111,8 @@ function buildScoreBreakdownInfo(item) {
 
   return {
     title: `${item.symbol} Rating Breakdown`,
+    modelView: item.displayIntelligence?.modelView || null,
+    marketContext: item.displayIntelligence?.marketContext || null,
     whyNow: Array.isArray(item.displayIntelligence?.whyNow)
       ? item.displayIntelligence.whyNow
       : [],
@@ -1318,6 +1320,31 @@ export default function WatchlistScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
 
+              {(!!infoModal.modelView || !!infoModal.marketContext) && (
+                <View style={styles.infoModalSignalsBlock}>
+                  {!!infoModal.modelView && (
+                    <View style={styles.infoModalSignalRow}>
+                      <Text style={styles.infoModalSignalLabel}>
+                        Model's Own View
+                      </Text>
+                      <Text style={styles.infoModalSignalValue}>
+                        {infoModal.modelView}
+                      </Text>
+                    </View>
+                  )}
+                  {!!infoModal.marketContext && (
+                    <View style={styles.infoModalSignalRow}>
+                      <Text style={styles.infoModalSignalLabel}>
+                        Today's Market Context
+                      </Text>
+                      <Text style={styles.infoModalSignalValue}>
+                        {infoModal.marketContext}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
               {!!infoModal.text && (
                 <Text style={styles.infoModalText}>{infoModal.text}</Text>
               )}
@@ -2193,6 +2220,35 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 20,
     fontFamily: TYPO.fontFamily.regular,
+  },
+
+  infoModalSignalsBlock: {
+    marginBottom: 12,
+    gap: 8,
+  },
+
+  infoModalSignalRow: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    padding: 10,
+  },
+
+  infoModalSignalLabel: {
+    color: BRAND.sub,
+    fontSize: 10.5,
+    fontFamily: TYPO.fontFamily.bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 3,
+  },
+
+  infoModalSignalValue: {
+    color: BRAND.text,
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.medium,
+    lineHeight: 18,
   },
 
   infoModalWhyNow: {
