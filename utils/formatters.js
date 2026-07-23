@@ -57,7 +57,19 @@ export function isQuoteStale(updatedAt, thresholdMinutes = 20) {
 export function formatPickedDaysAgo(pickDate) {
   if (!pickDate) return null;
 
-  const picked = new Date(pickDate);
+  // pickDate is a date-only string ("YYYY-MM-DD"). new Date(string) on
+  // a date-only ISO string parses it as UTC midnight, then reading it
+  // back via getFullYear()/getMonth()/getDate() below shifts the
+  // calendar day backward for any timezone behind UTC (all of the US)
+  // — a same-day pick would read as "yesterday." Splitting into
+  // components and using the local-time Date constructor sidesteps the
+  // UTC parse entirely.
+  const parts = String(pickDate).split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
+    return null;
+  }
+  const [year, month, day] = parts;
+  const picked = new Date(year, month - 1, day);
   if (Number.isNaN(picked.getTime())) return null;
 
   const startOfDay = (d) =>
