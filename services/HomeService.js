@@ -313,6 +313,11 @@ function normalizeTrackingItems(items = []) {
         currentPrice:
           x.current_price != null ? Number(x.current_price) : null,
         currentPriceUpdatedAt: x.current_price_updated_at || null,
+        // The price at the moment the horizon closed — checked items
+        // never get current_price populated (only "tracking" items do),
+        // so this is the only real end-price a checked item has.
+        checkedPrice:
+          x.checked_price != null ? Number(x.checked_price) : null,
         livePct: x.livePct != null ? Number(x.livePct) : null,
         // Two distinct performance metrics — do not conflate. Since-first
         // is the real multi-day move since the pick was first flagged;
@@ -326,10 +331,16 @@ function normalizeTrackingItems(items = []) {
           x.livePctSinceLastUpdate != null
             ? Number(x.livePctSinceLastUpdate)
             : null,
-        isChecked: x.isChecked === true,
+        // isChecked/checkedReturn/checkedHorizon previously read fields
+        // (x.isChecked, x.checkedReturn, x.checkedHorizon) that the
+        // backend never actually sends — it sends status/checked_return_
+        // pct/horizon instead. That made isChecked permanently false and
+        // the other two permanently null, latent until the first pick
+        // graduated to checked status. Fixed to read the real fields.
+        isChecked: x.status === "checked",
         checkedReturn:
-          x.checkedReturn != null ? Number(x.checkedReturn) : null,
-        checkedHorizon: x.checkedHorizon ?? null,
+          x.checked_return_pct != null ? Number(x.checked_return_pct) : null,
+        checkedHorizon: x.horizon ?? null,
         recordedAt: x.recorded_at || null,
         tier: x.tier || "tracking",
 

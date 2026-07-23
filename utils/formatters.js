@@ -102,17 +102,22 @@ export function getPickPerformanceDisplay(item) {
   const pctText = formatPickPerformancePct(item);
 
   const firstPickedPrice = item?.firstPickedPrice ?? null;
-  const currentPrice = item?.currentPrice ?? null;
+  // A checked item never gets current_price from the backend — only
+  // checked_price (the price when the horizon closed). This is the one
+  // "final" price a consumer should ever show as the end of the range.
+  const endPrice = isChecked
+    ? (item?.checkedPrice ?? null)
+    : (item?.currentPrice ?? null);
   const priceLine =
-    firstPickedPrice != null && currentPrice != null
+    firstPickedPrice != null && endPrice != null
       ? `$${Number(firstPickedPrice).toFixed(2)} → $${Number(
-          currentPrice,
+          endPrice,
         ).toFixed(2)}`
-      : currentPrice != null
-        ? `$${Number(currentPrice).toFixed(2)}`
+      : endPrice != null
+        ? `$${Number(endPrice).toFixed(2)}`
         : "--";
 
-  return { firstPickedPrice, currentPrice, priceLine, pct, pctText, color };
+  return { firstPickedPrice, endPrice, priceLine, pct, pctText, color };
 }
 
 // The old, misleading number — stays near-zero for a symbol re-recorded

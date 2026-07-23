@@ -18,7 +18,7 @@ export default function PickDetailScreen({ route, navigation }) {
   const item = route?.params?.item || {};
 
   const pickedAgo = formatPickedDaysAgo(item.firstPickedDate);
-  const { priceLine, pctText, color: performanceColor } =
+  const { endPrice, priceLine, pctText, color: performanceColor } =
     getPickPerformanceDisplay(item);
   const quoteStale = isQuoteStale(item.currentPriceUpdatedAt);
   const sinceLastUpdatePct = formatSinceLastUpdatePct(item);
@@ -53,9 +53,7 @@ export default function PickDetailScreen({ route, navigation }) {
 
         <View style={styles.headerRight}>
           <Text style={styles.currentPrice}>
-            {item.currentPrice != null
-              ? `$${Number(item.currentPrice).toFixed(2)}`
-              : "--"}
+            {endPrice != null ? `$${Number(endPrice).toFixed(2)}` : "--"}
           </Text>
         </View>
       </View>

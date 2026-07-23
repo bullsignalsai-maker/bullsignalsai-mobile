@@ -17,7 +17,7 @@ import {
 } from "../utils/formatters";
 
 function PickRow({ item, isLast, onPress }) {
-  const { firstPickedPrice, pctText, color: pctColor } =
+  const { firstPickedPrice, endPrice, pctText, color: pctColor } =
     getPickPerformanceDisplay(item);
   const pickedAgo = formatPickedDaysAgo(item.firstPickedDate);
 
@@ -65,9 +65,7 @@ function PickRow({ item, isLast, onPress }) {
           </Text>
         )}
         <Text style={styles.price} numberOfLines={1}>
-          {item.currentPrice != null
-            ? `$${item.currentPrice.toFixed(2)}`
-            : "--"}
+          {endPrice != null ? `$${endPrice.toFixed(2)}` : "--"}
         </Text>
         <Text
           style={[styles.move, { color: pctColor }]}
