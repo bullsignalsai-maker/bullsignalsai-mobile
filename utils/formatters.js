@@ -127,17 +127,3 @@ export function formatSinceLastUpdatePct(item) {
   const sign = Number(pct) >= 0 ? "+" : "";
   return `${sign}${Number(pct).toFixed(2)}%`;
 }
-
-// Prioritizes "fresh" picks fully before backfilling with "tracking",
-// then "checked" — mirrors the validated-first, backfill-second pattern
-// used elsewhere (Momentum's AI Setups tiering). Used only for Home's
-// capped preview; AllPicksScreen shows every tier in full, uncapped.
-export function selectHomePreviewPicks(items = [], limit = 15) {
-  const fresh = items.filter((i) => i.tier === "fresh");
-  const tracking = items.filter(
-    (i) => i.tier !== "fresh" && i.tier !== "checked",
-  );
-  const checked = items.filter((i) => i.tier === "checked");
-
-  return [...fresh, ...tracking, ...checked].slice(0, limit);
-}

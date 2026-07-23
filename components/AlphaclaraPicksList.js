@@ -82,22 +82,38 @@ function PickRow({ item, isLast, onPress }) {
   );
 }
 
-function TierGroup({ label, dotColor, items, onPressItem, emptyPlaceholder }) {
+function TierGroup({
+  label,
+  dotColor,
+  items,
+  perTierLimit,
+  onPressItem,
+  emptyPlaceholder,
+}) {
+  const totalCount = items.length;
+  const shownItems =
+    perTierLimit != null ? items.slice(0, perTierLimit) : items;
+  const isTruncated = perTierLimit != null && totalCount > perTierLimit;
+  const countLabel = isTruncated
+    ? `(${shownItems.length} of ${totalCount})`
+    : `(${totalCount})`;
+
   return (
     <View style={styles.tierWrap}>
       <View style={styles.tierHeaderRow}>
         <View style={[styles.tierDot, { backgroundColor: dotColor }]} />
         <Text style={styles.tierLabel}>{label}</Text>
+        <Text style={styles.tierCount}>{countLabel}</Text>
       </View>
 
-      {items.length > 0 ? (
+      {shownItems.length > 0 ? (
         <>
           <View style={styles.shell}>
-            {items.map((item, index) => (
+            {shownItems.map((item, index) => (
               <PickRow
                 key={item.key}
                 item={item}
-                isLast={index === items.length - 1}
+                isLast={index === shownItems.length - 1}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   onPressItem?.(item);
@@ -131,44 +147,63 @@ export default function AlphaclaraPicksList({
   items = [],
   onPressItem,
   emptyText = "No recent picks to show — check back soon.",
+  checkedEmptyText = "No completed picks yet — check back soon",
+  perTierLimit = null,
+  hideEmptyCheckedTier = false,
 }) {
-  if (items.length === 0) {
-    return <Text style={styles.emptyText}>{emptyText}</Text>;
-  }
-
   const fresh = items.filter((i) => i.tier === "fresh");
   const tracking = items.filter(
     (i) => i.tier !== "fresh" && i.tier !== "checked",
   );
   const checked = items.filter((i) => i.tier === "checked");
 
+  const showFresh = fresh.length > 0;
+  const showTracking = tracking.length > 0;
+  const showChecked = checked.length > 0 || !hideEmptyCheckedTier;
+
+  // Structural check, not a proxy off the raw items.length — if a future
+  // change ever adds a 4th tier or a gap in the partitioning, this still
+  // catches "nothing will actually render" rather than relying on
+  // today's exhaustive fresh/tracking/checked split to coincidentally
+  // guarantee it.
+  if (!showFresh && !showTracking && !showChecked) {
+    return <Text style={styles.emptyText}>{emptyText}</Text>;
+  }
+
   return (
     <>
-      {fresh.length > 0 && (
+      {showFresh && (
         <TierGroup
           label="Fresh Today"
           dotColor={BRAND.accent}
           items={fresh}
+          perTierLimit={perTierLimit}
           onPressItem={onPressItem}
         />
       )}
 
-      {tracking.length > 0 && (
+      {showTracking && (
         <TierGroup
           label="Still Tracking"
           dotColor={BRAND.amber}
           items={tracking}
+          perTierLimit={perTierLimit}
           onPressItem={onPressItem}
         />
       )}
 
-      <TierGroup
-        label="Checked"
-        dotColor={BRAND.sub}
-        items={checked}
-        onPressItem={onPressItem}
-        emptyPlaceholder="No completed picks yet — check back soon"
-      />
+      {showChecked && (
+        <TierGroup
+          label="Checked"
+          dotColor={BRAND.sub}
+          items={checked}
+          perTierLimit={perTierLimit}
+          onPressItem={onPressItem}
+          emptyPlaceholder={
+            checked.length === 0 ? checkedEmptyText : undefined
+          }
+        />
+      )}
     </>
   );
 }
@@ -197,6 +232,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: TYPO.fontFamily.bold,
     letterSpacing: 0.3,
+  },
+
+  tierCount: {
+    color: BRAND.muted,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.medium,
+    marginLeft: 4,
   },
 
   tierEmptyText: {

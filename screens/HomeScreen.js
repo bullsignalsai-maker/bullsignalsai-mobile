@@ -37,7 +37,6 @@ import {
   formatAlphaclaraStatsLine,
   formatModelViewSplit,
   formatMarketContextLine,
-  selectHomePreviewPicks,
 } from "../utils/formatters";
 import MoveLabel from "../components/MoveLabel";
 import AlphaclaraPicksList from "../components/AlphaclaraPicksList";
@@ -581,10 +580,6 @@ Pull To Refresh
         alphaclaraTracking.windowDays,
       )
     : null;
-
-  const homePreviewPicks = alphaclaraTracking
-    ? selectHomePreviewPicks(alphaclaraTracking.items, 15)
-    : [];
 
   const verifiedOpportunities = verifiedAlpha?.opportunities || [];
 
@@ -1713,7 +1708,9 @@ C) neither (plain nudge line, no card chrome).
             </View>
 
             <AlphaclaraPicksList
-              items={homePreviewPicks}
+              items={alphaclaraTracking.items}
+              perTierLimit={5}
+              hideEmptyCheckedTier
               onPressItem={(item) => {
                 navigation.navigate("PickDetailScreen", { item });
               }}
