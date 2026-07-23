@@ -352,6 +352,11 @@ function normalizeTrackingItems(items = []) {
         pickModelView: x.pick_model_view || null,
         pickMarketContext: x.pick_market_context || null,
         pickPatternStats: x.pick_pattern_stats || null,
+        // Real 0-100 per-factor contribution scores (confirmed against
+        // live data, all 6 keys 100% populated) — not a fractional
+        // weight delta, so bar-fill math is value/100 directly.
+        pickFactorScores: x.pick_factor_scores || null,
+        pickMarketRegime: x.pick_market_regime || null,
       };
     });
 }

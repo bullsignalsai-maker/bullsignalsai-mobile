@@ -1,6 +1,7 @@
 // screens/PickDetailScreen.js
 import React from "react";
 import { View, Text, Image, StyleSheet, ScrollView } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 import AppButton from "../components/AppButton";
@@ -13,6 +14,38 @@ import {
   fmtPct,
   isQuoteStale,
 } from "../utils/formatters";
+
+const FACTOR_BREAKDOWN_ROWS = [
+  { key: "momentum", label: "Momentum" },
+  { key: "pattern", label: "Pattern Quality" },
+  { key: "volume", label: "Volume" },
+  { key: "bullbrain", label: "BullBrain Signal" },
+  { key: "early_expansion", label: "Early Expansion" },
+  { key: "trend", label: "Trend" },
+];
+
+// Fixed, universal thresholds — the same score means the same thing for
+// every factor and every stock, never scaled relative to other symbols
+// or customized per-factor (that would just relocate the same
+// inconsistency this app has been removing all session).
+function factorScoreColor(score) {
+  if (score < 40) return BRAND.amber;
+  if (score <= 70) return BRAND.sub;
+  return BRAND.accent;
+}
+
+const REGIME_LABELS = {
+  RISK_ON: "Risk On",
+  RISK_OFF: "Risk Off",
+  NEUTRAL: "Neutral",
+  HIGH_VOL: "High Volatility",
+};
+
+function regimeColor(regime) {
+  if (regime === "RISK_ON") return BRAND.accent;
+  if (regime === "RISK_OFF") return BRAND.red;
+  return BRAND.amber; // NEUTRAL, HIGH_VOL, or anything unrecognized — caution, not alarm
+}
 
 export default function PickDetailScreen({ route, navigation }) {
   const item = route?.params?.item || {};
@@ -28,40 +61,86 @@ export default function PickDetailScreen({ route, navigation }) {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
     >
-      <View style={styles.header}>
-        <View style={styles.logoCircle}>
-          {item.logoUrl ? (
-            <Image
-              source={{ uri: item.logoUrl }}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          ) : (
-            <Text style={styles.logoText}>
-              {String(item.symbol || "").slice(0, 4)}
+      <View style={styles.heroStyleCard}>
+        <LinearGradient
+          pointerEvents="none"
+          colors={[
+            "rgba(212,166,58,0.08)",
+            "rgba(212,166,58,0.02)",
+            "rgba(0,0,0,0)",
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroStyleGlow}
+        />
+        <View style={styles.header}>
+          <View style={styles.logoCircle}>
+            {item.logoUrl ? (
+              <Image
+                source={{ uri: item.logoUrl }}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            ) : (
+              <Text style={styles.logoText}>
+                {String(item.symbol || "").slice(0, 4)}
+              </Text>
+            )}
+          </View>
+
+          <View style={styles.headerBody}>
+            <Text style={styles.symbol}>{item.symbol}</Text>
+            <Text style={styles.companyName} numberOfLines={1}>
+              {item.companyName || item.symbol}
             </Text>
-          )}
-        </View>
+            <View style={styles.headerMetaRow}>
+              {!!pickedAgo && (
+                <Text style={styles.pickedAgo}>{pickedAgo}</Text>
+              )}
+              {!!item.pickMarketRegime && (
+                <View
+                  style={[
+                    styles.regimePill,
+                    { borderColor: regimeColor(item.pickMarketRegime) },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.regimePillText,
+                      { color: regimeColor(item.pickMarketRegime) },
+                    ]}
+                  >
+                    {REGIME_LABELS[item.pickMarketRegime] ||
+                      item.pickMarketRegime}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
 
-        <View style={styles.headerBody}>
-          <Text style={styles.symbol}>{item.symbol}</Text>
-          <Text style={styles.companyName} numberOfLines={1}>
-            {item.companyName || item.symbol}
-          </Text>
-          {!!pickedAgo && <Text style={styles.pickedAgo}>{pickedAgo}</Text>}
-        </View>
-
-        <View style={styles.headerRight}>
-          <Text style={styles.currentPrice}>
-            {endPrice != null ? `$${Number(endPrice).toFixed(2)}` : "--"}
-          </Text>
+          <View style={styles.headerRight}>
+            <Text style={styles.currentPrice}>
+              {endPrice != null ? `$${Number(endPrice).toFixed(2)}` : "--"}
+            </Text>
+          </View>
         </View>
       </View>
 
       {(!!item.pickSetupLabel ||
         !!item.pickReason ||
         item.pickWhyNow?.length > 0) && (
-        <View style={styles.card}>
+        <View style={styles.heroStyleCard}>
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              "rgba(212,166,58,0.08)",
+              "rgba(212,166,58,0.02)",
+              "rgba(0,0,0,0)",
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroStyleGlow}
+          />
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionAccent} />
             <Text style={styles.sectionTitle}>Why We Picked This</Text>
@@ -118,6 +197,45 @@ export default function PickDetailScreen({ route, navigation }) {
           <Text style={styles.secondaryValue}>
             {formatMarketContextLine(item.pickMarketContext)}
           </Text>
+        </View>
+      )}
+
+      {!!item.pickFactorScores && (
+        <View style={styles.card}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionAccent} />
+            <Text style={styles.sectionTitle}>Factor Breakdown</Text>
+          </View>
+
+          {FACTOR_BREAKDOWN_ROWS.map(({ key, label }, index) => {
+            const raw = item.pickFactorScores[key];
+            if (raw == null) return null;
+            const pct = Math.max(0, Math.min(100, Number(raw)));
+            const color = factorScoreColor(pct);
+            const isLast = index === FACTOR_BREAKDOWN_ROWS.length - 1;
+
+            return (
+              <View
+                key={key}
+                style={[styles.factorRow, isLast && styles.factorRowLast]}
+              >
+                <View style={styles.factorLabelRow}>
+                  <Text style={styles.factorLabel}>{label}</Text>
+                  <Text style={[styles.factorValue, { color }]}>
+                    {pct.toFixed(0)}
+                  </Text>
+                </View>
+                <View style={styles.factorBarTrack}>
+                  <View
+                    style={[
+                      styles.factorBarFill,
+                      { width: `${pct}%`, backgroundColor: color },
+                    ]}
+                  />
+                </View>
+              </View>
+            );
+          })}
         </View>
       )}
 
@@ -239,11 +357,38 @@ const styles = StyleSheet.create({
     paddingTop: 14,
   },
 
+  heroStyleCard: {
+    backgroundColor: "#07111F",
+    borderRadius: 26,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    marginHorizontal: 14,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: "rgba(212,166,58,0.42)",
+    shadowColor: "#D4A63A",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 26,
+    elevation: 14,
+    overflow: "hidden",
+    position: "relative",
+  },
+
+  heroStyleGlow: {
+    position: "absolute",
+    right: -90,
+    top: -100,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    opacity: 0.22,
+  },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 14,
-    marginBottom: 18,
   },
 
   logoCircle: {
@@ -289,11 +434,31 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
+  headerMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 3,
+  },
+
   pickedAgo: {
     color: BRAND.muted,
     fontSize: 11,
     fontFamily: TYPO.fontFamily.medium,
-    marginTop: 3,
+  },
+
+  regimePill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+
+  regimePillText: {
+    fontSize: 9.5,
+    fontFamily: TYPO.fontFamily.bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
   },
 
   headerRight: {
@@ -311,7 +476,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#070D15",
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(59,130,246,0.18)",
+    borderColor: "rgba(212,166,58,0.18)",
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginHorizontal: 14,
@@ -328,7 +493,7 @@ const styles = StyleSheet.create({
     width: 3,
     height: 15,
     borderRadius: 999,
-    backgroundColor: "rgba(59,130,246,0.75)",
+    backgroundColor: "rgba(212,166,58,0.75)",
     marginRight: 8,
   },
 
@@ -383,6 +548,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: TYPO.fontFamily.medium,
     marginTop: 3,
+  },
+
+  factorRow: {
+    marginBottom: 10,
+  },
+
+  factorRowLast: {
+    marginBottom: 0,
+  },
+
+  factorLabelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+
+  factorLabel: {
+    color: BRAND.sub,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  factorValue: {
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
+  },
+
+  factorBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    overflow: "hidden",
+  },
+
+  factorBarFill: {
+    height: 6,
+    borderRadius: 3,
   },
 
   patternDisclaimer: {

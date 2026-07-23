@@ -16,6 +16,27 @@ import {
   getPickPerformanceDisplay,
 } from "../utils/formatters";
 
+// Lighter than the previous flat-gold glow (0.070/0.016 vs 0.080/0.018),
+// and now tinted per-tier — extends the same color each tier's dot
+// already uses, rather than one fixed gold treatment for every tier.
+const TIER_GLOW_COLORS = {
+  fresh: [
+    "rgba(0,227,150,0.070)",
+    "rgba(0,227,150,0.016)",
+    "rgba(0,0,0,0)",
+  ],
+  tracking: [
+    "rgba(250,204,21,0.070)",
+    "rgba(250,204,21,0.016)",
+    "rgba(0,0,0,0)",
+  ],
+  checked: [
+    "rgba(156,163,175,0.070)",
+    "rgba(156,163,175,0.016)",
+    "rgba(0,0,0,0)",
+  ],
+};
+
 function PickRow({ item, isLast, onPress }) {
   const { firstPickedPrice, endPrice, pctText, color: pctColor } =
     getPickPerformanceDisplay(item);
@@ -83,6 +104,7 @@ function PickRow({ item, isLast, onPress }) {
 function TierGroup({
   label,
   dotColor,
+  glowColors,
   items,
   perTierLimit,
   onPressItem,
@@ -106,7 +128,12 @@ function TierGroup({
 
       {shownItems.length > 0 ? (
         <>
-          <View style={styles.shell}>
+          <View
+            style={[
+              styles.shell,
+              { borderLeftWidth: 3, borderLeftColor: dotColor },
+            ]}
+          >
             {shownItems.map((item, index) => (
               <PickRow
                 key={item.key}
@@ -122,11 +149,7 @@ function TierGroup({
 
           <LinearGradient
             pointerEvents="none"
-            colors={[
-              "rgba(212,166,58,0.080)",
-              "rgba(212,166,58,0.018)",
-              "rgba(0,0,0,0)",
-            ]}
+            colors={glowColors}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.glow}
@@ -174,6 +197,7 @@ export default function AlphaclaraPicksList({
         <TierGroup
           label="Fresh Today"
           dotColor={BRAND.accent}
+          glowColors={TIER_GLOW_COLORS.fresh}
           items={fresh}
           perTierLimit={perTierLimit}
           onPressItem={onPressItem}
@@ -184,6 +208,7 @@ export default function AlphaclaraPicksList({
         <TierGroup
           label="Still Tracking"
           dotColor={BRAND.amber}
+          glowColors={TIER_GLOW_COLORS.tracking}
           items={tracking}
           perTierLimit={perTierLimit}
           onPressItem={onPressItem}
@@ -194,6 +219,7 @@ export default function AlphaclaraPicksList({
         <TierGroup
           label="Checked"
           dotColor={BRAND.sub}
+          glowColors={TIER_GLOW_COLORS.checked}
           items={checked}
           perTierLimit={perTierLimit}
           onPressItem={onPressItem}
