@@ -59,11 +59,7 @@ export default function AllPicksScreen({ navigation }) {
         items={tracking?.items || []}
         emptyText="No picks to show for this window."
         onPressItem={(item) => {
-          navigation.navigate("StockDetailScreen", {
-            symbol: item.symbol,
-            name: item.companyName || item.symbol,
-            source: "ui",
-          });
+          navigation.navigate("PickDetailScreen", { item });
         }}
       />
     </ScrollView>

@@ -303,16 +303,44 @@ function normalizeTrackingItems(items = []) {
         companyName: x.companyName || x.company_name || symbol,
         logoUrl: x.logoUrl || x.profile?.logoUrl || null,
         pickDate: x.pick_date || null,
+        // The most recent re-record's date — pick_date gets refreshed
+        // every cron cycle a symbol stays in alpha_watch, so it does NOT
+        // mean "first flagged." Use firstPickedDate for that instead.
+        firstPickedDate: x.first_picked_date || null,
+        firstPickedPrice:
+          x.first_picked_price != null ? Number(x.first_picked_price) : null,
         pickPrice: x.pick_price != null ? Number(x.pick_price) : null,
         currentPrice:
           x.current_price != null ? Number(x.current_price) : null,
         currentPriceUpdatedAt: x.current_price_updated_at || null,
         livePct: x.livePct != null ? Number(x.livePct) : null,
+        // Two distinct performance metrics — do not conflate. Since-first
+        // is the real multi-day move since the pick was first flagged;
+        // since-last-update stays near-zero for symbols re-recorded every
+        // cron cycle and is misleading shown alone (the original bug).
+        livePctSinceFirstPick:
+          x.livePctSinceFirstPick != null
+            ? Number(x.livePctSinceFirstPick)
+            : null,
+        livePctSinceLastUpdate:
+          x.livePctSinceLastUpdate != null
+            ? Number(x.livePctSinceLastUpdate)
+            : null,
         isChecked: x.isChecked === true,
         checkedReturn:
           x.checkedReturn != null ? Number(x.checkedReturn) : null,
         checkedHorizon: x.checkedHorizon ?? null,
         recordedAt: x.recorded_at || null,
+        tier: x.tier || "tracking",
+
+        pickReason: x.pick_reason || null,
+        pickSetupLabel: x.pick_setup_label || null,
+        pickWhyNow: Array.isArray(x.pick_why_now) ? x.pick_why_now : [],
+        // May be null/absent for older picks recorded before these
+        // fields existed — every consumer must degrade gracefully.
+        pickModelView: x.pick_model_view || null,
+        pickMarketContext: x.pick_market_context || null,
+        pickPatternStats: x.pick_pattern_stats || null,
       };
     });
 }

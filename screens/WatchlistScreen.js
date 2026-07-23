@@ -46,6 +46,10 @@ import {
   signalColor,
   getAuthoritativeSignal,
 } from "../utils/signalUtils";
+import {
+  formatModelViewSplit,
+  formatMarketContextLine,
+} from "../utils/formatters";
 // Dot color reflects market period (session); opacity reflects data
 // staleness (item.isStale, from quote_updated_at age) — two
 // independent axes, no longer conflated.
@@ -78,7 +82,7 @@ const titleCaseFactorKey = (key) =>
     .replace(/^./, (c) => c.toUpperCase());
 
 const fmtSignedPts = (v) => {
-  const n = Number(v) || 0;
+  const n = Math.round((Number(v) || 0) * 10) / 10;
   return `${n >= 0 ? "+" : ""}${n}`;
 };
 
@@ -1328,7 +1332,10 @@ export default function WatchlistScreen({ navigation }) {
                         Model's Own View
                       </Text>
                       <Text style={styles.infoModalSignalValue}>
-                        {infoModal.modelView}
+                        {infoModal.modelView.label}
+                      </Text>
+                      <Text style={styles.infoModalSignalMeta}>
+                        {formatModelViewSplit(infoModal.modelView)}
                       </Text>
                     </View>
                   )}
@@ -1338,7 +1345,10 @@ export default function WatchlistScreen({ navigation }) {
                         Today's Market Context
                       </Text>
                       <Text style={styles.infoModalSignalValue}>
-                        {infoModal.marketContext}
+                        {infoModal.marketContext.label}
+                      </Text>
+                      <Text style={styles.infoModalSignalMeta}>
+                        {formatMarketContextLine(infoModal.marketContext)}
                       </Text>
                     </View>
                   )}
@@ -2249,6 +2259,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: TYPO.fontFamily.medium,
     lineHeight: 18,
+  },
+
+  infoModalSignalMeta: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 2,
   },
 
   infoModalWhyNow: {

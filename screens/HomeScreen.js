@@ -33,7 +33,12 @@ import {
 } from "../services/HomeService";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
-import { formatAlphaclaraStatsLine } from "../utils/formatters";
+import {
+  formatAlphaclaraStatsLine,
+  formatModelViewSplit,
+  formatMarketContextLine,
+  selectHomePreviewPicks,
+} from "../utils/formatters";
 import MoveLabel from "../components/MoveLabel";
 import AlphaclaraPicksList from "../components/AlphaclaraPicksList";
 import {
@@ -83,7 +88,7 @@ const titleCaseFactorKey = (key) =>
     .replace(/^./, (c) => c.toUpperCase());
 
 const fmtSignedPts = (v) => {
-  const n = Number(v) || 0;
+  const n = Math.round((Number(v) || 0) * 10) / 10;
   return `${n >= 0 ? "+" : ""}${n}`;
 };
 
@@ -398,7 +403,7 @@ Load + Auto Refresh (5s)
         }
 
         try {
-          setAlphaclaraTracking(await getAlphaclaraTracking({ limit: 15 }));
+          setAlphaclaraTracking(await getAlphaclaraTracking());
         } catch {
           setAlphaclaraTracking(null);
         }
@@ -511,7 +516,7 @@ Pull To Refresh
       }
 
       try {
-        setAlphaclaraTracking(await getAlphaclaraTracking({ limit: 15 }));
+        setAlphaclaraTracking(await getAlphaclaraTracking());
       } catch {
         setAlphaclaraTracking(null);
       }
@@ -576,6 +581,10 @@ Pull To Refresh
         alphaclaraTracking.windowDays,
       )
     : null;
+
+  const homePreviewPicks = alphaclaraTracking
+    ? selectHomePreviewPicks(alphaclaraTracking.items, 15)
+    : [];
 
   const verifiedOpportunities = verifiedAlpha?.opportunities || [];
 
@@ -1704,13 +1713,9 @@ C) neither (plain nudge line, no card chrome).
             </View>
 
             <AlphaclaraPicksList
-              items={alphaclaraTracking.items}
+              items={homePreviewPicks}
               onPressItem={(item) => {
-                navigation.navigate("StockDetailScreen", {
-                  symbol: item.symbol,
-                  name: item.companyName || item.symbol,
-                  source: "ui",
-                });
+                navigation.navigate("PickDetailScreen", { item });
               }}
             />
           </View>
@@ -1812,7 +1817,10 @@ C) neither (plain nudge line, no card chrome).
                         Model's Own View
                       </Text>
                       <Text style={styles.infoModalSignalValue}>
-                        {infoModal.modelView}
+                        {infoModal.modelView.label}
+                      </Text>
+                      <Text style={styles.infoModalSignalMeta}>
+                        {formatModelViewSplit(infoModal.modelView)}
                       </Text>
                     </View>
                   )}
@@ -1822,7 +1830,10 @@ C) neither (plain nudge line, no card chrome).
                         Today's Market Context
                       </Text>
                       <Text style={styles.infoModalSignalValue}>
-                        {infoModal.marketContext}
+                        {infoModal.marketContext.label}
+                      </Text>
+                      <Text style={styles.infoModalSignalMeta}>
+                        {formatMarketContextLine(infoModal.marketContext)}
                       </Text>
                     </View>
                   )}
@@ -3140,6 +3151,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: TYPO.fontFamily.medium,
     lineHeight: 18,
+  },
+
+  infoModalSignalMeta: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 2,
   },
 
   infoModalWhyNow: {

@@ -11,22 +11,121 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
+import {
+  formatPickedDaysAgo,
+  getPickPerformanceDisplay,
+} from "../utils/formatters";
 
-const formatPickedDaysAgo = (pickDate) => {
-  if (!pickDate) return null;
+function PickRow({ item, isLast, onPress }) {
+  const { firstPickedPrice, pctText, color: pctColor } =
+    getPickPerformanceDisplay(item);
+  const pickedAgo = formatPickedDaysAgo(item.firstPickedDate);
 
-  const picked = new Date(pickDate);
-  if (Number.isNaN(picked.getTime())) return null;
+  return (
+    <TouchableOpacity
+      activeOpacity={0.78}
+      style={[styles.row, !isLast && styles.divider]}
+      onPress={onPress}
+    >
+      <View style={styles.logoCircle}>
+        {item.logoUrl ? (
+          <Image
+            source={{ uri: item.logoUrl }}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        ) : (
+          <Text style={styles.logoText}>
+            {String(item.symbol || "").slice(0, 4)}
+          </Text>
+        )}
+      </View>
 
-  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const days = Math.round(
-    (startOfDay(new Date()) - startOfDay(picked)) / 86400000,
+      <View style={styles.body}>
+        <View style={styles.topLine}>
+          <Text style={styles.symbol}>{item.symbol}</Text>
+        </View>
+
+        <Text style={styles.company} numberOfLines={1}>
+          {item.companyName || item.symbol}
+        </Text>
+
+        {!!pickedAgo && <Text style={styles.pickedAgo}>{pickedAgo}</Text>}
+      </View>
+
+      <View style={styles.right}>
+        {firstPickedPrice != null && (
+          <Text
+            style={styles.pickPrice}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {`Picked $${firstPickedPrice.toFixed(2)}`}
+          </Text>
+        )}
+        <Text style={styles.price} numberOfLines={1}>
+          {item.currentPrice != null
+            ? `$${item.currentPrice.toFixed(2)}`
+            : "--"}
+        </Text>
+        <Text
+          style={[styles.move, { color: pctColor }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+        >
+          {pctText}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
+}
 
-  if (days <= 0) return "Picked today";
-  if (days === 1) return "Picked yesterday";
-  return `Picked ${days} days ago`;
-};
+function TierGroup({ label, dotColor, items, onPressItem, emptyPlaceholder }) {
+  return (
+    <View style={styles.tierWrap}>
+      <View style={styles.tierHeaderRow}>
+        <View style={[styles.tierDot, { backgroundColor: dotColor }]} />
+        <Text style={styles.tierLabel}>{label}</Text>
+      </View>
+
+      {items.length > 0 ? (
+        <>
+          <View style={styles.shell}>
+            {items.map((item, index) => (
+              <PickRow
+                key={item.key}
+                item={item}
+                isLast={index === items.length - 1}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onPressItem?.(item);
+                }}
+              />
+            ))}
+          </View>
+
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              "rgba(212,166,58,0.080)",
+              "rgba(212,166,58,0.018)",
+              "rgba(0,0,0,0)",
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.glow}
+          />
+        </>
+      ) : (
+        !!emptyPlaceholder && (
+          <Text style={styles.tierEmptyText}>{emptyPlaceholder}</Text>
+        )
+      )}
+    </View>
+  );
+}
 
 export default function AlphaclaraPicksList({
   items = [],
@@ -37,113 +136,77 @@ export default function AlphaclaraPicksList({
     return <Text style={styles.emptyText}>{emptyText}</Text>;
   }
 
+  const fresh = items.filter((i) => i.tier === "fresh");
+  const tracking = items.filter(
+    (i) => i.tier !== "fresh" && i.tier !== "checked",
+  );
+  const checked = items.filter((i) => i.tier === "checked");
+
   return (
     <>
-      <View style={styles.shell}>
-        {items.map((item, index) => {
-          const displayPct = item.isChecked
-            ? item.checkedReturn
-            : item.livePct;
-          const pctColor =
-            displayPct != null
-              ? Number(displayPct) >= 0
-                ? BRAND.accent
-                : BRAND.red
-              : BRAND.sub;
-          const pctText =
-            displayPct != null
-              ? `${Number(displayPct) >= 0 ? "+" : ""}${Number(
-                  displayPct,
-                ).toFixed(2)}%${
-                  item.isChecked && item.checkedHorizon != null
-                    ? ` · ${item.checkedHorizon}`
-                    : ""
-                }`
-              : "--";
-          const pickedAgo = formatPickedDaysAgo(item.pickDate);
+      {fresh.length > 0 && (
+        <TierGroup
+          label="Fresh Today"
+          dotColor={BRAND.accent}
+          items={fresh}
+          onPressItem={onPressItem}
+        />
+      )}
 
-          return (
-            <TouchableOpacity
-              key={item.key}
-              activeOpacity={0.78}
-              style={[
-                styles.row,
-                index !== items.length - 1 && styles.divider,
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onPressItem?.(item);
-              }}
-            >
-              <View style={styles.logoCircle}>
-                {item.logoUrl ? (
-                  <Image
-                    source={{ uri: item.logoUrl }}
-                    style={styles.logoImage}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <Text style={styles.logoText}>
-                    {String(item.symbol || "").slice(0, 4)}
-                  </Text>
-                )}
-              </View>
+      {tracking.length > 0 && (
+        <TierGroup
+          label="Still Tracking"
+          dotColor={BRAND.amber}
+          items={tracking}
+          onPressItem={onPressItem}
+        />
+      )}
 
-              <View style={styles.body}>
-                <View style={styles.topLine}>
-                  <Text style={styles.symbol}>{item.symbol}</Text>
-                </View>
-
-                <Text style={styles.company} numberOfLines={1}>
-                  {item.companyName || item.symbol}
-                </Text>
-
-                {!!pickedAgo && (
-                  <Text style={styles.pickedAgo}>{pickedAgo}</Text>
-                )}
-              </View>
-
-              <View style={styles.right}>
-                {item.pickPrice != null && (
-                  <Text
-                    style={styles.pickPrice}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.75}
-                  >
-                    {`Picked $${item.pickPrice.toFixed(2)}`}
-                  </Text>
-                )}
-                <Text style={styles.price} numberOfLines={1}>
-                  {item.currentPrice != null
-                    ? `$${item.currentPrice.toFixed(2)}`
-                    : "--"}
-                </Text>
-                <Text style={[styles.move, { color: pctColor }]}>
-                  {pctText}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <LinearGradient
-        pointerEvents="none"
-        colors={[
-          "rgba(212,166,58,0.080)",
-          "rgba(212,166,58,0.018)",
-          "rgba(0,0,0,0)",
-        ]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.glow}
+      <TierGroup
+        label="Checked"
+        dotColor={BRAND.sub}
+        items={checked}
+        onPressItem={onPressItem}
+        emptyPlaceholder="No completed picks yet — check back soon"
       />
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  tierWrap: {
+    marginBottom: 14,
+  },
+
+  tierHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 10,
+    marginBottom: 6,
+  },
+
+  tierDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    marginRight: 6,
+  },
+
+  tierLabel: {
+    color: BRAND.muted,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+    letterSpacing: 0.3,
+  },
+
+  tierEmptyText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    lineHeight: 16,
+    marginHorizontal: 10,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
   shell: {
     marginHorizontal: 6,
     backgroundColor: "#0B1220",

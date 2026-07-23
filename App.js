@@ -35,6 +35,7 @@ import AddPositionScreen from "./screens/AddPositionScreen";
 import FullPatternDetailScreen from "./screens/FullPatternDetailScreen";
 import FullTechnicalDetailScreen from "./screens/FullTechnicalDetailScreen";
 import AllPicksScreen from "./screens/AllPicksScreen";
+import PickDetailScreen from "./screens/PickDetailScreen";
 import MarketMoversScreen from "./screens/MarketMoversScreen";
 import SignalDetailScreen from "./screens/SignalDetailScreen";
 import { registerForPushNotifications } from "./services/pushNotificationService";
@@ -384,6 +385,30 @@ export default function App() {
           options={{
             headerShown: true,
             title: "Alphaclara Picks",
+            headerStyle: {
+              backgroundColor: BRAND.bg,
+              shadowColor: "transparent",
+              elevation: 0,
+            },
+            headerTintColor: BRAND.text,
+            headerBackTitleVisible: false,
+            headerBackTitle: false,
+            headerBackImage: () => (
+              <Ionicons
+                name="chevron-back-outline"
+                size={24}
+                color={BRAND.text}
+                style={{ marginLeft: 10 }}
+              />
+            ),
+          }}
+        />
+        <Stack.Screen
+          name="PickDetailScreen"
+          component={PickDetailScreen}
+          options={{
+            headerShown: true,
+            title: "Pick Detail",
             headerStyle: {
               backgroundColor: BRAND.bg,
               shadowColor: "transparent",
