@@ -83,6 +83,28 @@ export function formatPickedDaysAgo(pickDate) {
   return `Picked ${days} days ago`;
 }
 
+// Same date-only-string parsing as formatPickedDaysAgo above — split
+// into components and construct via the local-time Date constructor,
+// never new Date(string), to avoid the UTC-midnight-parsed-then-read-
+// back-in-local-time shift that reads a same-day date as the day
+// before in any timezone behind UTC.
+export function formatPickDateLong(dateStr) {
+  if (!dateStr) return null;
+  const parts = String(dateStr).split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
+    return null;
+  }
+  const [year, month, day] = parts;
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 // "· {checkedHorizon}" already disambiguates a graduated/final return, so
 // " since pick" is only appended for the still-live case — matches the
 // truncation-safe layout already shipped in AlphaclaraPicksList.

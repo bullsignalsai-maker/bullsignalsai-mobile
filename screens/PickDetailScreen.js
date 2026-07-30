@@ -1,12 +1,15 @@
 // screens/PickDetailScreen.js
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, Image, StyleSheet, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 import AppButton from "../components/AppButton";
+import PickPriceHistoryChart from "../components/PickPriceHistoryChart";
+import { getAlphaclaraPickHistory } from "../services/HomeService";
 import {
   formatPickedDaysAgo,
+  formatPickDateLong,
   formatModelViewSplit,
   formatMarketContextLine,
   formatSinceLastUpdatePct,
@@ -47,6 +50,27 @@ function regimeColor(regime) {
   return BRAND.amber; // NEUTRAL, HIGH_VOL, or anything unrecognized — caution, not alarm
 }
 
+function getPickCountDisplay(pickCount, firstPickedDate) {
+  const count = Number(pickCount) || 0;
+  if (count <= 1) {
+    return {
+      primary: "First pick — Alphaclara has flagged this stock once.",
+      secondary: null,
+    };
+  }
+  const dateLabel = formatPickDateLong(firstPickedDate);
+  return {
+    // The raw count reads as independent buy decisions if it's the
+    // lead fact — it's really the same signal being auto-reconfirmed
+    // every cron cycle. Lead with persistence, demote the count to a
+    // secondary caption that names the actual mechanism.
+    primary: dateLabel
+      ? `Continuously flagged since ${dateLabel}`
+      : "Continuously flagged",
+    secondary: `Re-confirmed every ~15 min · ${count} checks`,
+  };
+}
+
 export default function PickDetailScreen({ route, navigation }) {
   const item = route?.params?.item || {};
 
@@ -55,6 +79,33 @@ export default function PickDetailScreen({ route, navigation }) {
     getPickPerformanceDisplay(item);
   const quoteStale = isQuoteStale(item.currentPriceUpdatedAt);
   const sinceLastUpdatePct = formatSinceLastUpdatePct(item);
+  const pickCountDisplay = getPickCountDisplay(item.pickCount, item.firstPickedDate);
+
+  const [history, setHistory] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function load() {
+      if (!item.symbol) {
+        setHistoryLoading(false);
+        return;
+      }
+      try {
+        const data = await getAlphaclaraPickHistory(item.symbol);
+        if (mounted) setHistory(data);
+      } finally {
+        if (mounted) setHistoryLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, [item.symbol]);
 
   return (
     <ScrollView
@@ -124,6 +175,33 @@ export default function PickDetailScreen({ route, navigation }) {
             </Text>
           </View>
         </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.pickCountText}>{pickCountDisplay.primary}</Text>
+        {!!pickCountDisplay.secondary && (
+          <Text style={styles.pickCountSecondary}>
+            {pickCountDisplay.secondary}
+          </Text>
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionAccent} />
+          <Text style={styles.sectionTitle}>Price History</Text>
+        </View>
+
+        {historyLoading ? (
+          <View style={styles.chartLoadingWrap}>
+            <Text style={styles.chartLoadingText}>Loading price history…</Text>
+          </View>
+        ) : (
+          <PickPriceHistoryChart
+            priceHistory={history?.priceHistory || []}
+            isChecked={item.isChecked === true}
+          />
+        )}
       </View>
 
       {(!!item.pickSetupLabel ||
@@ -239,60 +317,10 @@ export default function PickDetailScreen({ route, navigation }) {
         </View>
       )}
 
-      {!!item.pickPatternStats && (
-        <View style={styles.card}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionAccent} />
-            <Text style={styles.sectionTitle}>
-              Historical Pattern Evidence
-            </Text>
-          </View>
-
-          <Text style={styles.patternDisclaimer}>
-            Based on this pattern's historical occurrences across the
-            market — not a forecast for {item.symbol}'s future price.
-          </Text>
-
-          <View style={styles.statChipRow}>
-            <View style={styles.statChip}>
-              <Text style={styles.statChipLabel}>Win Rate</Text>
-              <Text style={styles.statChipValue}>
-                {item.pickPatternStats.winRate != null
-                  ? `${(Number(item.pickPatternStats.winRate) * 100).toFixed(
-                      1,
-                    )}%`
-                  : "—"}
-              </Text>
-            </View>
-
-            <View style={styles.statChip}>
-              <Text style={styles.statChipLabel}>Avg Return</Text>
-              <Text style={styles.statChipValue}>
-                {/* Assumed already-percentage-scaled (e.g. 3.2 = 3.2%),
-                    matching changePct/livePct convention elsewhere in
-                    this app — verify against a live payload. */}
-                {item.pickPatternStats.avg != null
-                  ? fmtPct(Number(item.pickPatternStats.avg))
-                  : "—"}
-              </Text>
-            </View>
-
-            <View style={styles.statChip}>
-              <Text style={styles.statChipLabel}>Sample Size</Text>
-              <Text style={styles.statChipValue}>
-                {item.pickPatternStats.count != null
-                  ? String(item.pickPatternStats.count)
-                  : "—"}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
-
       <View style={styles.card}>
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionAccent} />
-          <Text style={styles.sectionTitle}>Performance Since Pick</Text>
+          <Text style={styles.sectionTitle}>What Happened</Text>
         </View>
 
         <Text style={styles.performancePriceLine} numberOfLines={1}>
@@ -331,7 +359,91 @@ export default function PickDetailScreen({ route, navigation }) {
         {quoteStale && (
           <Text style={styles.staleNote}>Quote may be delayed</Text>
         )}
+
+        {!item.isChecked && !!item.lastResolvedStatus && (
+          <View style={styles.earlierResultBlock}>
+            <Text style={styles.earlierResultLabel}>
+              Earlier {item.lastResolvedHorizon || ""} Result
+            </Text>
+            {item.lastResolvedStatus === "checked" ? (
+              <Text
+                style={[
+                  styles.earlierResultValue,
+                  {
+                    color:
+                      item.lastResolvedReturnPct != null
+                        ? Number(item.lastResolvedReturnPct) >= 0
+                          ? BRAND.accent
+                          : BRAND.red
+                        : BRAND.sub,
+                  },
+                ]}
+              >
+                {item.lastResolvedReturnPct != null
+                  ? `${Number(item.lastResolvedReturnPct) >= 0 ? "+" : ""}${Number(
+                      item.lastResolvedReturnPct,
+                    ).toFixed(2)}%`
+                  : "—"}
+                {!!item.lastResolvedAt &&
+                  ` · resolved ${formatPickDateLong(
+                    String(item.lastResolvedAt).slice(0, 10),
+                  )}`}
+              </Text>
+            ) : (
+              <Text style={styles.earlierResultValue}>
+                Check unavailable
+              </Text>
+            )}
+          </View>
+        )}
       </View>
+
+      {!!item.pickPatternStats && (
+        <View style={styles.card}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionAccent} />
+            <Text style={styles.sectionTitle}>
+              Historical Pattern Evidence
+            </Text>
+          </View>
+
+          <Text style={styles.patternDisclaimer}>
+            Based on this pattern's historical occurrences across the
+            market — not a forecast for {item.symbol}'s future price.
+          </Text>
+
+          <View style={styles.statChipRow}>
+            <View style={styles.statChip}>
+              <Text style={styles.statChipLabel}>Win Rate</Text>
+              <Text style={styles.statChipValue}>
+                {item.pickPatternStats.winRate != null
+                  ? `${(Number(item.pickPatternStats.winRate) * 100).toFixed(
+                      1,
+                    )}%`
+                  : "—"}
+              </Text>
+            </View>
+
+            <View style={styles.statChip}>
+              <Text style={styles.statChipLabel}>Avg Return</Text>
+              <Text style={styles.statChipValue}>
+                {item.pickPatternStats.avg != null
+                  ? fmtPct(Number(item.pickPatternStats.avg))
+                  : "—"}
+              </Text>
+            </View>
+
+            <View style={styles.statChip}>
+              <Text style={styles.statChipLabel}>Sample Size</Text>
+              <Text style={styles.statChipValue}>
+                {item.pickPatternStats.count != null
+                  ? String(item.pickPatternStats.count)
+                  : "—"}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       <View style={styles.viewStockBtnWrap}>
         <AppButton
@@ -680,6 +792,56 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontFamily: TYPO.fontFamily.medium,
     marginTop: 6,
+  },
+
+  pickCountText: {
+    color: BRAND.text,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  pickCountSecondary: {
+    color: BRAND.muted,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 2,
+  },
+
+  chartLoadingWrap: {
+    height: 80,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  chartLoadingText: {
+    color: BRAND.muted,
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  earlierResultBlock: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
+
+  earlierResultLabel: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    marginBottom: 3,
+  },
+
+  earlierResultValue: {
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
   },
 
   viewStockBtnWrap: {

@@ -287,6 +287,50 @@ function emptyAlphaclaraTracking() {
   };
 }
 
+// Real daily closes for one symbol's tracked pick window — a separate,
+// heavier per-symbol call, only worth paying for on the Pick Detail
+// screen, not for every item in a list response (mirrors the backend's
+// own reasoning for keeping this endpoint distinct from the list one).
+export async function getAlphaclaraPickHistory(symbol, { windowDays = 30 } = {}) {
+  if (!symbol) return emptyPickHistory();
+
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/alphaclara-tracking/${encodeURIComponent(
+        symbol,
+      )}/history?window_days=${windowDays}`,
+    );
+    if (!res.ok) return emptyPickHistory();
+
+    const json = await res.json();
+
+    return {
+      symbol: json.symbol || symbol,
+      pickCount: Number(json.pick_count ?? 0),
+      firstPickedDate: json.first_picked_date || null,
+      endDate: json.end_date || null,
+      priceHistory: Array.isArray(json.price_history)
+        ? json.price_history
+            .map((p) => ({ date: p.date, close: Number(p.close) }))
+            .filter((p) => p.date && Number.isFinite(p.close))
+        : [],
+    };
+  } catch (err) {
+    console.warn("Alphaclara pick history error:", err.message);
+    return emptyPickHistory();
+  }
+}
+
+function emptyPickHistory() {
+  return {
+    symbol: null,
+    pickCount: 0,
+    firstPickedDate: null,
+    endDate: null,
+    priceHistory: [],
+  };
+}
+
 // Real duplicates are NOT merged — the same symbol can be picked more
 // than once inside the window, and each pick is a distinct fact
 // (different pick_price/date), so every item is kept and keyed on
@@ -357,6 +401,29 @@ function normalizeTrackingItems(items = []) {
         // weight delta, so bar-fill math is value/100 directly.
         pickFactorScores: x.pick_factor_scores || null,
         pickMarketRegime: x.pick_market_regime || null,
+        // How many times this symbol has actually been re-recorded
+        // within the window — persistence, not recency. Confirmed on
+        // live data (e.g. F: 751, most: single digits).
+        pickCount: x.pick_count != null ? Number(x.pick_count) : null,
+        // A symbol can be BOTH actively "tracking" (fresh latest record)
+        // AND have a real resolved outcome buried under it from an
+        // earlier record — these two facts are independent and must be
+        // shown separately, never merged into the primary status above.
+        // Only meaningful when isChecked is false; when isChecked is
+        // already true these would just duplicate the primary
+        // checked_* fields, so consumers should skip rendering them
+        // in that case rather than show the same result twice.
+        lastResolvedHorizon: x.last_resolved_horizon ?? null,
+        lastResolvedStatus: x.last_resolved_status ?? null,
+        lastResolvedReturnPct:
+          x.last_resolved_return_pct != null
+            ? Number(x.last_resolved_return_pct)
+            : null,
+        lastResolvedPrice:
+          x.last_resolved_price != null
+            ? Number(x.last_resolved_price)
+            : null,
+        lastResolvedAt: x.last_resolved_at ?? null,
       };
     });
 }
