@@ -165,6 +165,14 @@ export async function getMarketMovers(mode = "preview") {
         sessionType: m.sessionType || null,
         marketSentiment: m.marketSentiment || null,
         dominantTheme: m.dominantTheme || null,
+        // Two honestly separate claims, different timeframes — same-day
+        // volume level vs a 10-day OBV trend. Never combine/imply one
+        // confirms the other; that combination was tested and rejected
+        // as timeframe-mismatched. Same fields Home's getHomeMovers()
+        // already carries through from this same /market-movers
+        // endpoint, just a different mode param.
+        volumeLevel: m.volumeLevel || null,
+        obvTrend: m.obvTrend || null,
       };
     });
 

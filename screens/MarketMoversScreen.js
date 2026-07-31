@@ -60,6 +60,22 @@ function isMeaningfulPattern(name) {
   return up && up !== "NO CLEAR PATTERN";
 }
 
+// Fixed thresholds, same value always means the same color — matches
+// the same convention already used for this on Home and PickDetail's
+// Factor Breakdown, not scaled relative to other movers in the list.
+function volumeLevelColor(level) {
+  if (level === "Well Above Average") return BRAND.green;
+  if (level === "Above Average") return BRAND.amber;
+  if (level === "Below Average") return BRAND.muted;
+  return BRAND.sub; // "Average" or unrecognized
+}
+
+function obvTrendColor(trend) {
+  if (trend === "Accumulation") return BRAND.green;
+  if (trend === "Distribution") return BRAND.red;
+  return BRAND.sub;
+}
+
 function timeAgoFromUtc(iso) {
   if (!iso) return "Just now";
   const d = new Date(iso);
@@ -342,6 +358,42 @@ export default function MarketMoversScreen({ navigation }) {
               </Text>
             );
           })()}
+
+          {(!!item.volumeLevel || !!item.obvTrend) && (
+            <View style={styles.moverSignalBadgeRow}>
+              {!!item.volumeLevel && (
+                <View
+                  style={[
+                    styles.moverVolumeBadge,
+                    { backgroundColor: volumeLevelColor(item.volumeLevel) },
+                  ]}
+                >
+                  <Text style={styles.moverVolumeBadgeText} numberOfLines={1}>
+                    {item.volumeLevel}
+                  </Text>
+                </View>
+              )}
+
+              {!!item.obvTrend && (
+                <View
+                  style={[
+                    styles.moverObvBadge,
+                    { borderColor: obvTrendColor(item.obvTrend) },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.moverObvBadgeText,
+                      { color: obvTrendColor(item.obvTrend) },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    10D {item.obvTrend}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
 
           <View style={styles.rowBottom}>
             <View style={styles.trendWrap}>
@@ -932,6 +984,38 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 10,
     fontFamily: TYPO.fontFamily.medium,
+  },
+
+  moverSignalBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+
+  moverVolumeBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+
+  moverVolumeBadgeText: {
+    color: "#000",
+    fontSize: 9,
+    fontWeight: "900",
+  },
+
+  moverObvBadge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
+  },
+
+  moverObvBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
   },
 
   rowBottom: {
