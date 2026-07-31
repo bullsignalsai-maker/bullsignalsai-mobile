@@ -17,6 +17,7 @@ import {
   Animated,
   RefreshControl,
   Image,
+  Modal,
 } from "react-native";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
@@ -27,6 +28,15 @@ import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 import MoveLabel from "../components/MoveLabel";
 const ALPHACLARA_LOGO = require("../assets/alpha-transparent.png");
+
+const MARKET_MOVERS_SCREEN_INFO = {
+  title: "Market Movers",
+  text: "Stocks with the largest verified price moves right now. \"Exploding\" means the stock is up on the day; \"Pulling back\" means it's down. This reflects today's price action only, not a forecast of where it goes next.",
+  whyNow: [
+    "Volume badge: Shows how much real trading activity is behind this stock's move — a big price move backed by high volume is more meaningful than the same move on quiet, thin trading.",
+    "10D Accumulation/Distribution: A separate signal looking at the last 10 trading days — shows whether volume has been flowing in more on up-days (Accumulation) or down-days (Distribution). This does NOT confirm today's specific move, it's a longer-term trend.",
+  ],
+};
 /* ---------------------------------------------------------
    Utils
 --------------------------------------------------------- */
@@ -121,6 +131,7 @@ export default function MarketMoversScreen({ navigation }) {
   const [errorMessage, setErrorMessage] = useState("");
   const [tab, setTab] = useState("all");
   const [sortBy, setSortBy] = useState("move");
+  const [infoModal, setInfoModal] = useState(null);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const shareCardRef = useRef(null);
@@ -420,7 +431,19 @@ export default function MarketMoversScreen({ navigation }) {
     <View style={styles.headerWrap}>
       <View style={styles.compactTopRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.compactTitle}>Market Movers</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Text style={styles.compactTitle}>Market Movers</Text>
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => setInfoModal(MARKET_MOVERS_SCREEN_INFO)}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={14}
+                color={BRAND.sub}
+              />
+            </TouchableOpacity>
+          </View>
 
           <Text style={styles.compactSub}>
             <Text style={{ color: BRAND.accent, fontWeight: "700" }}>
@@ -717,6 +740,35 @@ export default function MarketMoversScreen({ navigation }) {
           }
         />
       </View>
+
+      {infoModal && (
+        <Modal transparent animationType="fade" visible>
+          <View style={styles.infoModalOverlay}>
+            <View style={styles.infoModalCard}>
+              <View style={styles.infoModalHeader}>
+                <Text style={styles.infoModalTitle}>{infoModal.title}</Text>
+                <TouchableOpacity onPress={() => setInfoModal(null)}>
+                  <Ionicons name="close" size={20} color={BRAND.sub} />
+                </TouchableOpacity>
+              </View>
+
+              {!!infoModal.text && (
+                <Text style={styles.infoModalText}>{infoModal.text}</Text>
+              )}
+
+              {infoModal.whyNow?.length > 0 && (
+                <View style={styles.infoModalWhyNow}>
+                  {infoModal.whyNow.map((reason, idx) => (
+                    <Text key={idx} style={styles.infoModalWhyNowText}>
+                      • {reason}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -1468,5 +1520,55 @@ const styles = StyleSheet.create({
   marketMoverLogo: {
     width: 18,
     height: 18,
+  },
+
+  infoModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.68)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  infoModalCard: {
+    width: "100%",
+    backgroundColor: BRAND.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    padding: 16,
+  },
+
+  infoModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  infoModalTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
+    flex: 1,
+    marginRight: 10,
+  },
+
+  infoModalText: {
+    color: BRAND.sub,
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+
+  infoModalWhyNow: {
+    marginTop: 12,
+  },
+
+  infoModalWhyNowText: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.regular,
   },
 });

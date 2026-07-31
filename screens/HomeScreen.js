@@ -59,6 +59,10 @@ const FEAR_INDEX_INFO = {
 const MARKET_MOVERS_INFO = {
   title: "Market Movers",
   text: "Stocks with the largest verified price moves right now. \"Exploding\" means the stock is up on the day; \"Pulling back\" means it's down. This reflects today's price action only, not a forecast of where it goes next.",
+  whyNow: [
+    "Volume badge: Shows how much real trading activity is behind this stock's move — a big price move backed by high volume is more meaningful than the same move on quiet, thin trading.",
+    "10D Accumulation/Distribution: A separate signal looking at the last 10 trading days — shows whether volume has been flowing in more on up-days (Accumulation) or down-days (Distribution). This does NOT confirm today's specific move, it's a longer-term trend.",
+  ],
 };
 
 const ALPHACLARA_PICKS_INFO = {
