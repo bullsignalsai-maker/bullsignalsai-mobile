@@ -204,6 +204,22 @@ const compactSummary = (text, max = 92) => {
   return `${clean.slice(0, max).trim()}…`;
 };
 
+// Fixed thresholds, same value always means the same color — matches
+// the Factor Breakdown convention on PickDetailScreen, not scaled
+// relative to other movers in the same list.
+const volumeLevelColor = (level) => {
+  if (level === "Well Above Average") return BRAND.accent;
+  if (level === "Above Average") return BRAND.amber;
+  if (level === "Below Average") return BRAND.muted;
+  return BRAND.sub; // "Average" or unrecognized
+};
+
+const obvTrendColor = (trend) => {
+  if (trend === "Accumulation") return BRAND.accent;
+  if (trend === "Distribution") return BRAND.red;
+  return BRAND.sub;
+};
+
 const getDisplayPriceSessionStyle = (item, marketPhase) => {
   const isLive = getDisplaySession(item, marketPhase) === "LIVE";
 
@@ -1579,6 +1595,45 @@ C) neither (plain nudge line, no card chrome).
                         </View>
                       </View>
 
+                      {(!!m.volumeLevel || !!m.obvTrend) && (
+                        <View style={styles.moverSignalBadgeRow}>
+                          {!!m.volumeLevel && (
+                            <View
+                              style={[
+                                styles.moverVolumeBadge,
+                                { backgroundColor: volumeLevelColor(m.volumeLevel) },
+                              ]}
+                            >
+                              <Text
+                                style={styles.moverVolumeBadgeText}
+                                numberOfLines={1}
+                              >
+                                {m.volumeLevel}
+                              </Text>
+                            </View>
+                          )}
+
+                          {!!m.obvTrend && (
+                            <View
+                              style={[
+                                styles.moverObvBadge,
+                                { borderColor: obvTrendColor(m.obvTrend) },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.moverObvBadgeText,
+                                  { color: obvTrendColor(m.obvTrend) },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                10D {m.obvTrend}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+
                       <Text style={styles.moverPremiumReason} numberOfLines={2}>
                         {compactSummary(
                           m.primaryCatalystFirst ||
@@ -2922,6 +2977,38 @@ const styles = StyleSheet.create({
     fontSize: 11.4,
     lineHeight: 13.5,
     fontFamily: TYPO.fontFamily.medium,
+  },
+
+  moverSignalBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 4,
+  },
+
+  moverVolumeBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+
+  moverVolumeBadgeText: {
+    color: "#000",
+    fontSize: 9,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  moverObvBadge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
+  },
+
+  moverObvBadgeText: {
+    fontSize: 9,
+    fontFamily: TYPO.fontFamily.bold,
   },
 
   moverPremiumRight: {

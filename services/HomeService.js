@@ -117,6 +117,12 @@ export async function getHomeMovers() {
         candidateType: m.candidateType || null,
         riskLevel: m.riskLevel || null,
         sessionType: m.sessionType || null,
+        // Two honestly separate claims, different timeframes — same-day
+        // volume level vs a 10-day OBV trend. Never combine/imply one
+        // confirms the other; that combination was tested and rejected
+        // as timeframe-mismatched.
+        volumeLevel: m.volumeLevel || null,
+        obvTrend: m.obvTrend || null,
       }));
   } catch (err) {
     console.warn("Home movers error:", err.message);
