@@ -54,23 +54,28 @@ export function isQuoteStale(updatedAt, thresholdMinutes = 20) {
   return Date.now() - updated > thresholdMinutes * 60 * 1000;
 }
 
-export function formatPickedDaysAgo(pickDate) {
-  if (!pickDate) return null;
-
-  // pickDate is a date-only string ("YYYY-MM-DD"). new Date(string) on
-  // a date-only ISO string parses it as UTC midnight, then reading it
-  // back via getFullYear()/getMonth()/getDate() below shifts the
-  // calendar day backward for any timezone behind UTC (all of the US)
-  // — a same-day pick would read as "yesterday." Splitting into
-  // components and using the local-time Date constructor sidesteps the
-  // UTC parse entirely.
-  const parts = String(pickDate).split("-").map(Number);
+// Date-only strings ("YYYY-MM-DD") parsed via new Date(string) are read
+// as UTC midnight, then shift a calendar day backward when read back via
+// local getFullYear()/getMonth()/getDate() in any timezone behind UTC —
+// a same-day pick would read as "yesterday." Splitting into components
+// and using the local-time Date constructor sidesteps the UTC parse
+// entirely. Single source of truth for every date-only parse in this
+// file — do not reintroduce new Date(dateOnlyString) elsewhere.
+function parseLocalDateStr(dateStr) {
+  const parts = String(dateStr).split("-").map(Number);
   if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
     return null;
   }
   const [year, month, day] = parts;
-  const picked = new Date(year, month - 1, day);
-  if (Number.isNaN(picked.getTime())) return null;
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function formatPickedDaysAgo(pickDate) {
+  if (!pickDate) return null;
+
+  const picked = parseLocalDateStr(pickDate);
+  if (!picked) return null;
 
   const startOfDay = (d) =>
     new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -83,26 +88,53 @@ export function formatPickedDaysAgo(pickDate) {
   return `Picked ${days} days ago`;
 }
 
-// Same date-only-string parsing as formatPickedDaysAgo above — split
-// into components and construct via the local-time Date constructor,
-// never new Date(string), to avoid the UTC-midnight-parsed-then-read-
-// back-in-local-time shift that reads a same-day date as the day
-// before in any timezone behind UTC.
 export function formatPickDateLong(dateStr) {
-  if (!dateStr) return null;
-  const parts = String(dateStr).split("-").map(Number);
-  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
-    return null;
-  }
-  const [year, month, day] = parts;
-  const date = new Date(year, month - 1, day);
-  if (Number.isNaN(date.getTime())) return null;
-
+  const date = parseLocalDateStr(dateStr);
+  if (!date) return null;
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+}
+
+// "Jul 17 – Jul 23, 2026" (single trailing year) when both dates fall in
+// the same year; "Jul 17, 2025 – Jan 3, 2026" when they don't.
+export function formatPickDateRange(minStr, maxStr) {
+  const min = parseLocalDateStr(minStr);
+  const max = parseLocalDateStr(maxStr);
+  if (!min || !max) return null;
+
+  const sameYear = min.getFullYear() === max.getFullYear();
+  const minLabel = min.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: sameYear ? undefined : "numeric",
+  });
+  const maxLabel = max.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `${minLabel} – ${maxLabel}`;
+}
+
+// Renders nothing (returns null) rather than a placeholder when the
+// report is missing — same "never show broken/blank text" precedent as
+// formatAlphaclaraStatsLine above.
+export function formatAccuracyDisclosure(report) {
+  if (!report) return null;
+  const { n, horizon, pctPositive, meanReturnPct, rangeMin, rangeMax } =
+    report;
+  if (!n || pctPositive == null || meanReturnPct == null) return null;
+
+  const rangeLabel = formatPickDateRange(rangeMin, rangeMax);
+  const horizonLabel = horizon ? `${horizon} outcomes` : "tracked outcomes";
+  const parenPart = rangeLabel
+    ? `${horizonLabel}, ${rangeLabel}`
+    : horizonLabel;
+
+  return `Based on ${n} tracked picks (${parenPart}), ${pctPositive.toFixed(1)}% were positive with an average return of ${meanReturnPct.toFixed(2)}%.`;
 }
 
 // "· {checkedHorizon}" already disambiguates a graduated/final return, so

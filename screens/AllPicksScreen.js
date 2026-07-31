@@ -8,9 +8,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { getAlphaclaraTracking } from "../services/HomeService";
+import {
+  getAlphaclaraTracking,
+  getAlphaclaraAccuracyReport,
+} from "../services/HomeService";
 import {
   formatAlphaclaraStatsLine,
+  formatAccuracyDisclosure,
   getPickPerformanceDisplay,
 } from "../utils/formatters";
 import AlphaclaraPicksList from "../components/AlphaclaraPicksList";
@@ -47,6 +51,7 @@ function matchesTierFilter(item, tierFilter) {
 
 export default function AllPicksScreen({ navigation }) {
   const [tracking, setTracking] = useState(null);
+  const [accuracyReport, setAccuracyReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tierFilter, setTierFilter] = useState("all");
   const [directionFilter, setDirectionFilter] = useState("all");
@@ -71,6 +76,16 @@ export default function AllPicksScreen({ navigation }) {
     };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    getAlphaclaraAccuracyReport().then((report) => {
+      if (mounted) setAccuracyReport(report);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   if (loading && !tracking) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -83,6 +98,8 @@ export default function AllPicksScreen({ navigation }) {
   const statsLine = tracking
     ? formatAlphaclaraStatsLine(tracking.counts, tracking.windowDays)
     : null;
+
+  const accuracyText = formatAccuracyDisclosure(accuracyReport);
 
   const isFilterActive = tierFilter !== "all" || directionFilter !== "all";
 
@@ -137,6 +154,9 @@ export default function AllPicksScreen({ navigation }) {
         AI-picked stocks, tracked live for real results
       </Text>
       {!!statsLine && <Text style={styles.statsLine}>{statsLine}</Text>}
+      {!!accuracyText && (
+        <Text style={styles.accuracyLine}>{accuracyText}</Text>
+      )}
 
       <ScrollView
         horizontal
@@ -272,6 +292,16 @@ const styles = StyleSheet.create({
     color: BRAND.muted,
     fontSize: 11.5,
     fontFamily: TYPO.fontFamily.semibold,
+    marginHorizontal: 12,
+    marginBottom: 4,
+  },
+
+  accuracyLine: {
+    color: BRAND.sub,
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontFamily: TYPO.fontFamily.regular,
+    fontStyle: "italic",
     marginHorizontal: 12,
     marginBottom: 16,
   },

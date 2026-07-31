@@ -447,6 +447,7 @@ Load + Auto Refresh (5s)
       };
     }, []),
   );
+
   useEffect(() => {
     const checkGuide = async () => {
       try {

@@ -1,5 +1,6 @@
 // services/HomeService.js
 import { API_BASE_URL } from "../config/apiKeys";
+import { getCache, saveCache } from "./CacheManager";
 
 /* =========================================================
    TODAY STRIP (Portfolio Today / Watchlist Performance)
@@ -335,6 +336,45 @@ function emptyPickHistory() {
     endDate: null,
     priceHistory: [],
   };
+}
+
+const ACCURACY_REPORT_CACHE_KEY = "alphaclara_accuracy_report";
+const ACCURACY_REPORT_TTL_SECONDS = 60 * 60; // 1hr — a slow-moving
+// all-time aggregate, not live data; doesn't belong in the 5s poll loop
+// alongside getAlphaclaraTracking.
+
+export async function getAlphaclaraAccuracyReport() {
+  const cached = await getCache(ACCURACY_REPORT_CACHE_KEY);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/alphaclara-accuracy-report`);
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    const s = json?.summary;
+    if (!s || typeof s.n !== "number" || s.n <= 0) return null;
+
+    const report = {
+      n: s.n,
+      horizon: s.horizon || null,
+      pctPositive: typeof s.pct_positive === "number" ? s.pct_positive : null,
+      meanReturnPct:
+        typeof s.mean_return_pct === "number" ? s.mean_return_pct : null,
+      rangeMin: s.pick_date_range?.min || null,
+      rangeMax: s.pick_date_range?.max || null,
+    };
+
+    await saveCache(
+      ACCURACY_REPORT_CACHE_KEY,
+      report,
+      ACCURACY_REPORT_TTL_SECONDS,
+    );
+    return report;
+  } catch (err) {
+    console.warn("Alphaclara accuracy report error:", err.message);
+    return null;
+  }
 }
 
 // Real duplicates are NOT merged — the same symbol can be picked more
