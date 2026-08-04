@@ -33,6 +33,19 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
     const isMarketMode = portfolioData?.contextType === "market";
     const isStockDetailMode = portfolioData?.contextType === "stock_detail";
     const isMomentumMode = portfolioData?.contextType === "momentum_movers";
+    const isPicksMode =
+      portfolioData?.contextType === "alphaclara_picks_overview";
+    if (isPicksMode) {
+      return [
+        { id: "picks_accuracy", label: "How accurate have we been?" },
+        { id: "picks_pending", label: "What's still pending?" },
+        { id: "picks_new_today", label: "What's new today?" },
+        {
+          id: "picks_best_performer",
+          label: "What's our best performer right now?",
+        },
+      ];
+    }
     if (isMomentumMode) {
       const sym = portfolioData?.selectedMover?.symbol || "this mover";
 
@@ -110,7 +123,14 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
   const hasAsked = askedIds.length > 0;
   const askedSet = new Set(askedIds);
   const remainingChips = allChips.filter((c) => !askedSet.has(c.id));
-  const moreChips = remainingChips.filter((c) => !starterIds.has(c.id));
+  const isPicksMode =
+    portfolioData?.contextType === "alphaclara_picks_overview";
+  // Only 4 real questions exist for this context — draw follow-ups from
+  // the full unasked pool, not just the non-starter overflow (which
+  // would only ever surface 1 of the 3 starter questions as a follow-up).
+  const moreChips = isPicksMode
+    ? remainingChips
+    : remainingChips.filter((c) => !starterIds.has(c.id));
 
   const scrollToEnd = () => {
     setTimeout(() => {
@@ -126,13 +146,15 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
         id: "welcome",
         from: "astra",
         text:
-          portfolioData?.contextType === "momentum_movers"
-            ? "Ask Clara why movers are running, whether the move looks real, key risks, and which momentum setups stand out."
-            : portfolioData?.contextType === "market"
-              ? "Ask Clara about market context, risk sentiment, movers, news, crypto, and major indexes."
-              : portfolioData?.contextType === "stock_detail"
-                ? `Ask Clara about ${portfolioData?.symbol || "this stock"} — market view, pattern, technicals, and risks.`
-                : "Ask Clara about your portfolio, holdings, risk exposure, and performance context.",
+          portfolioData?.contextType === "alphaclara_picks_overview"
+            ? "Ask Clara how accurate our picks have been, what's new today, what's still tracking, and which pick is performing best."
+            : portfolioData?.contextType === "momentum_movers"
+              ? "Ask Clara why movers are running, whether the move looks real, key risks, and which momentum setups stand out."
+              : portfolioData?.contextType === "market"
+                ? "Ask Clara about market context, risk sentiment, movers, news, crypto, and major indexes."
+                : portfolioData?.contextType === "stock_detail"
+                  ? `Ask Clara about ${portfolioData?.symbol || "this stock"} — market view, pattern, technicals, and risks.`
+                  : "Ask Clara about your portfolio, holdings, risk exposure, and performance context.",
       },
     ]);
 
@@ -150,11 +172,14 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
     const isStockDetailMode = portfolioData?.contextType === "stock_detail";
     const isMarketMode = portfolioData?.contextType === "market";
     const isMomentumMode = portfolioData?.contextType === "momentum_movers";
+    const isPicksMode =
+      portfolioData?.contextType === "alphaclara_picks_overview";
 
     if (
       !isStockDetailMode &&
       !isMarketMode &&
       !isMomentumMode &&
+      !isPicksMode &&
       (!portfolioData ||
         !portfolioData.positions ||
         portfolioData.positions.length === 0)
@@ -228,7 +253,12 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
         },
       ]);
 
-      setSuggestedFollowups(result.suggestedFollowups || []);
+      // Backend has no alphaclara_picks_overview branch in its
+      // suggested-followups builder yet, so it returns generic
+      // portfolio-fallback text ("What is my biggest risk?") for this
+      // context — ignore it here and let moreChips (scoped to our real
+      // 4-question pool) drive follow-ups instead.
+      setSuggestedFollowups(isPicksMode ? [] : result.suggestedFollowups || []);
       scrollToEnd();
     } catch (err) {
       console.warn("ClaraChat error:", err);
@@ -261,13 +291,15 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
         id: "welcome",
         from: "astra",
         text:
-          portfolioData?.contextType === "momentum_movers"
-            ? "Ask Clara why movers are running, whether the move looks real, key risks, and which momentum setups stand out."
-            : portfolioData?.contextType === "market"
-              ? "Ask Clara about market context, risk sentiment, movers, news, crypto, and major indexes."
-              : portfolioData?.contextType === "stock_detail"
-                ? `Ask Clara about ${portfolioData?.symbol || "this stock"} — market view, pattern, technicals, and risks.`
-                : "Ask Clara about your portfolio, holdings, risk exposure, and performance context.",
+          portfolioData?.contextType === "alphaclara_picks_overview"
+            ? "Ask Clara how accurate our picks have been, what's new today, what's still tracking, and which pick is performing best."
+            : portfolioData?.contextType === "momentum_movers"
+              ? "Ask Clara why movers are running, whether the move looks real, key risks, and which momentum setups stand out."
+              : portfolioData?.contextType === "market"
+                ? "Ask Clara about market context, risk sentiment, movers, news, crypto, and major indexes."
+                : portfolioData?.contextType === "stock_detail"
+                  ? `Ask Clara about ${portfolioData?.symbol || "this stock"} — market view, pattern, technicals, and risks.`
+                  : "Ask Clara about your portfolio, holdings, risk exposure, and performance context.",
       },
     ]);
 

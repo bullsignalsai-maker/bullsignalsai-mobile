@@ -18,6 +18,8 @@ import {
   getPickPerformanceDisplay,
 } from "../utils/formatters";
 import AlphaclaraPicksList from "../components/AlphaclaraPicksList";
+import AstraChat from "../components/AstraChat";
+import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 
@@ -52,6 +54,7 @@ function matchesTierFilter(item, tierFilter) {
 export default function AllPicksScreen({ navigation }) {
   const [tracking, setTracking] = useState(null);
   const [accuracyReport, setAccuracyReport] = useState(null);
+  const [astraVisible, setAstraVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tierFilter, setTierFilter] = useState("all");
   const [directionFilter, setDirectionFilter] = useState("all");
@@ -101,6 +104,18 @@ export default function AllPicksScreen({ navigation }) {
 
   const accuracyText = formatAccuracyDisclosure(accuracyReport);
 
+  // Backend fetches its own accuracy report + tiered picks list +
+  // rankings server-side for this contextType (same pattern as
+  // "market") — this payload deliberately doesn't bundle `tracking`/
+  // `accuracyReport` state, since the backend ignores it anyway.
+  const claraPicksContext = {
+    contextType: "alphaclara_picks_overview",
+    total_value: 0,
+    total_gain: 0,
+    today_gain: 0,
+    positions: [],
+  };
+
   const isFilterActive = tierFilter !== "all" || directionFilter !== "all";
 
   const filteredItems = (tracking?.items || []).filter((item) => {
@@ -146,6 +161,7 @@ export default function AllPicksScreen({ navigation }) {
       : "No completed picks yet — check back soon";
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
@@ -259,6 +275,21 @@ export default function AllPicksScreen({ navigation }) {
         </Text>
       </View>
     </ScrollView>
+
+    <TouchableOpacity
+      style={styles.astraWrap}
+      activeOpacity={0.9}
+      onPress={() => setAstraVisible(true)}
+    >
+      <AstraAnimatedIcon size={52} />
+    </TouchableOpacity>
+
+    <AstraChat
+      visible={astraVisible}
+      onClose={() => setAstraVisible(false)}
+      portfolioData={claraPicksContext}
+    />
+    </>
   );
 }
 
@@ -348,6 +379,13 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.14)",
     alignSelf: "center",
     marginHorizontal: 2,
+  },
+
+  astraWrap: {
+    position: "absolute",
+    left: 20,
+    bottom: 25,
+    zIndex: 50,
   },
 
   footerWrap: {
