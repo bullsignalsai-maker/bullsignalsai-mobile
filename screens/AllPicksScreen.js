@@ -7,23 +7,38 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import {
   getAlphaclaraTracking,
   getAlphaclaraAccuracyReport,
 } from "../services/HomeService";
 import {
   formatAlphaclaraStatsLine,
-  formatAccuracyDisclosure,
   getPickPerformanceDisplay,
 } from "../utils/formatters";
 import AlphaclaraPicksList from "../components/AlphaclaraPicksList";
+import PicksStatRow from "../components/PicksStatRow";
 import AstraChat from "../components/AstraChat";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 
 const WINDOW_DAYS = 30;
+
+// Same copy as Home's ALPHACLARA_PICKS_INFO — kept as a local duplicate
+// per this codebase's per-screen convention (see MARKET_MOVERS_INFO on
+// MarketMoversScreen), not imported cross-file.
+const ALPHACLARA_PICKS_INFO = {
+  title: "Alphaclara Picks",
+  text: "Alphaclara records its own AI picks and tracks their real price performance for a rolling window — wins and losses shown as-is, nothing filtered or hidden. Once a pick's tracking window closes, it's marked Checked with its final result. This reflects a limited, recent tracking window — not a long-term track record, and not a guarantee of future results.",
+  whyNow: [
+    "Total Picks: how many distinct picks have completed at least one tracked outcome in this window.",
+    "Win Rate: the share of those outcomes that were positive.",
+    "Avg Return: the average price move across all tracked outcomes, wins and losses combined.",
+  ],
+};
 
 const TIER_FILTERS = [
   { value: "all", label: "All Tiers" },
@@ -55,6 +70,7 @@ export default function AllPicksScreen({ navigation }) {
   const [tracking, setTracking] = useState(null);
   const [accuracyReport, setAccuracyReport] = useState(null);
   const [astraVisible, setAstraVisible] = useState(false);
+  const [infoModal, setInfoModal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tierFilter, setTierFilter] = useState("all");
   const [directionFilter, setDirectionFilter] = useState("all");
@@ -101,8 +117,6 @@ export default function AllPicksScreen({ navigation }) {
   const statsLine = tracking
     ? formatAlphaclaraStatsLine(tracking.counts, tracking.windowDays)
     : null;
-
-  const accuracyText = formatAccuracyDisclosure(accuracyReport);
 
   // Backend fetches its own accuracy report + tiered picks list +
   // rankings server-side for this contextType (same pattern as
@@ -166,13 +180,24 @@ export default function AllPicksScreen({ navigation }) {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
     >
+      <View style={styles.titleRow}>
+        <Text style={styles.screenTitle}>Alphaclara Picks</Text>
+        <TouchableOpacity
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => setInfoModal(ALPHACLARA_PICKS_INFO)}
+        >
+          <Ionicons
+            name="information-circle-outline"
+            size={13}
+            color={BRAND.sub}
+          />
+        </TouchableOpacity>
+      </View>
       <Text style={styles.description}>
         AI-picked stocks, tracked live for real results
       </Text>
       {!!statsLine && <Text style={styles.statsLine}>{statsLine}</Text>}
-      {!!accuracyText && (
-        <Text style={styles.accuracyLine}>{accuracyText}</Text>
-      )}
+      <PicksStatRow accuracyReport={accuracyReport} />
 
       <ScrollView
         horizontal
@@ -289,6 +314,35 @@ export default function AllPicksScreen({ navigation }) {
       onClose={() => setAstraVisible(false)}
       portfolioData={claraPicksContext}
     />
+
+    {infoModal && (
+      <Modal transparent animationType="fade" visible>
+        <View style={styles.infoModalOverlay}>
+          <View style={styles.infoModalCard}>
+            <View style={styles.infoModalHeader}>
+              <Text style={styles.infoModalTitle}>{infoModal.title}</Text>
+              <TouchableOpacity onPress={() => setInfoModal(null)}>
+                <Ionicons name="close" size={20} color={BRAND.sub} />
+              </TouchableOpacity>
+            </View>
+
+            {!!infoModal.text && (
+              <Text style={styles.infoModalText}>{infoModal.text}</Text>
+            )}
+
+            {infoModal.whyNow?.length > 0 && (
+              <View style={styles.infoModalWhyNow}>
+                {infoModal.whyNow.map((reason, idx) => (
+                  <Text key={idx} style={styles.infoModalWhyNowText}>
+                    • {reason}
+                  </Text>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+    )}
     </>
   );
 }
@@ -311,11 +365,26 @@ const styles = StyleSheet.create({
     fontFamily: TYPO.fontFamily.medium,
   },
 
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginHorizontal: 12,
+  },
+
+  screenTitle: {
+    color: BRAND.text,
+    fontSize: 17,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.35,
+  },
+
   description: {
     color: BRAND.muted,
     fontSize: 13,
     fontFamily: TYPO.fontFamily.medium,
     marginHorizontal: 12,
+    marginTop: 2,
     marginBottom: 4,
   },
 
@@ -327,15 +396,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  accuracyLine: {
-    color: BRAND.sub,
-    fontSize: 10.5,
-    lineHeight: 14,
-    fontFamily: TYPO.fontFamily.regular,
-    fontStyle: "italic",
-    marginHorizontal: 12,
-    marginBottom: 16,
-  },
 
   filterRow: {
     gap: 8,
@@ -386,6 +446,56 @@ const styles = StyleSheet.create({
     left: 20,
     bottom: 25,
     zIndex: 50,
+  },
+
+  infoModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.68)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  infoModalCard: {
+    width: "100%",
+    backgroundColor: BRAND.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    padding: 16,
+  },
+
+  infoModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  infoModalTitle: {
+    color: BRAND.text,
+    fontSize: 16,
+    fontFamily: TYPO.fontFamily.extrabold,
+    flex: 1,
+    marginRight: 10,
+  },
+
+  infoModalText: {
+    color: BRAND.sub,
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontFamily: TYPO.fontFamily.regular,
+  },
+
+  infoModalWhyNow: {
+    marginTop: 12,
+  },
+
+  infoModalWhyNowText: {
+    color: BRAND.sub,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.regular,
   },
 
   footerWrap: {

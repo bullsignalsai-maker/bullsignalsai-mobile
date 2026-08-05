@@ -29,6 +29,7 @@ import {
   getHomeMovers,
   getVerifiedAlpha,
   getAlphaclaraTracking,
+  getAlphaclaraAccuracyReport,
   fetchHomeQuotes,
 } from "../services/HomeService";
 import { BRAND } from "../constants/theme";
@@ -40,6 +41,7 @@ import {
 } from "../utils/formatters";
 import MoveLabel from "../components/MoveLabel";
 import AlphaclaraPicksList from "../components/AlphaclaraPicksList";
+import PicksStatRow from "../components/PicksStatRow";
 import {
   displayRating,
   getAuthoritativeSignal,
@@ -67,7 +69,12 @@ const MARKET_MOVERS_INFO = {
 
 const ALPHACLARA_PICKS_INFO = {
   title: "Alphaclara Picks",
-  text: "Alphaclara records its own AI picks and tracks their real price performance for a rolling window — wins and losses shown as-is, nothing filtered or hidden. Once a pick's tracking window closes, it's marked Checked with its final result.",
+  text: "Alphaclara records its own AI picks and tracks their real price performance for a rolling window — wins and losses shown as-is, nothing filtered or hidden. Once a pick's tracking window closes, it's marked Checked with its final result. This reflects a limited, recent tracking window — not a long-term track record, and not a guarantee of future results.",
+  whyNow: [
+    "Total Picks: how many distinct picks have completed at least one tracked outcome in this window.",
+    "Win Rate: the share of those outcomes that were positive.",
+    "Avg Return: the average price move across all tracked outcomes, wins and losses combined.",
+  ],
 };
 
 // Friendly labels for displayIntelligence.scoreBreakdown.factors keys.
@@ -285,6 +292,7 @@ export default function HomeScreen({ navigation }) {
   const [topMovers, setTopMovers] = useState([]);
   const [verifiedAlpha, setVerifiedAlpha] = useState(null);
   const [alphaclaraTracking, setAlphaclaraTracking] = useState(null);
+  const [accuracyReport, setAccuracyReport] = useState(null);
   const [infoModal, setInfoModal] = useState(null);
 
   // Owned positions (symbol -> {shares, avgCost, ...}) and watchlisted
@@ -444,6 +452,20 @@ Load + Auto Refresh (5s)
       return () => {
         active = false;
         clearInterval(interval);
+      };
+    }, []),
+  );
+
+  // Slow-moving all-time aggregate, not live data — fetched once per
+  // focus (CacheManager-backed, 1hr TTL) rather than the 5s poll above.
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      getAlphaclaraAccuracyReport().then((report) => {
+        if (active) setAccuracyReport(report);
+      });
+      return () => {
+        active = false;
       };
     }, []),
   );
@@ -1766,6 +1788,8 @@ C) neither (plain nudge line, no card chrome).
                 </TouchableOpacity>
               )}
             </View>
+
+            <PicksStatRow accuracyReport={accuracyReport} />
 
             <AlphaclaraPicksList
               items={alphaclaraTracking.items}
