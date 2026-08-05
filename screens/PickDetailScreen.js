@@ -1,6 +1,14 @@
 // screens/PickDetailScreen.js
 import React, { useState, useEffect } from "react";
-import { View, Text, Image, StyleSheet, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Linking,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
@@ -232,6 +240,20 @@ export default function PickDetailScreen({ route, navigation }) {
 
           {!!item.pickReason && (
             <Text style={styles.reasonText}>{item.pickReason}</Text>
+          )}
+
+          {!!item.pickNewsUrl && (
+            <TouchableOpacity
+              activeOpacity={0.75}
+              style={styles.newsLink}
+              onPress={() => Linking.openURL(item.pickNewsUrl)}
+            >
+              <Text style={styles.newsLinkText} numberOfLines={2}>
+                📰{" "}
+                {item.pickNewsSource ? `${item.pickNewsSource} — ` : ""}
+                {item.pickNewsHeadline || "Read the source"}
+              </Text>
+            </TouchableOpacity>
           )}
 
           {item.pickWhyNow?.length > 0 && (
@@ -650,6 +672,18 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 19,
     fontFamily: TYPO.fontFamily.medium,
+  },
+
+  newsLink: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+
+  newsLinkText: {
+    color: BRAND.accent,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   whyNowList: {

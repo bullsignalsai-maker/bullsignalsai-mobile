@@ -435,6 +435,14 @@ function normalizeTrackingItems(items = []) {
         tier: x.tier || "tracking",
 
         pickReason: x.pick_reason || null,
+        // Real, verifiable source for pickReason when it genuinely
+        // traces to one (backend's _build_pick_record()) — honestly null
+        // for the generic price/pattern fallback case and for picks
+        // recorded before this field existed, never fabricated.
+        pickNewsUrl: x.pick_news_url || null,
+        pickNewsSource: x.pick_news_source || null,
+        pickNewsHeadline: x.pick_news_headline || null,
+        pickNewsDatetime: x.pick_news_datetime || null,
         pickSetupLabel: x.pick_setup_label || null,
         pickWhyNow: Array.isArray(x.pick_why_now) ? x.pick_why_now : [],
         // May be null/absent for older picks recorded before these
