@@ -32,12 +32,9 @@ import NotificationsScreen from "./screens/NotificationsScreen";
 import EditPositionScreen from "./screens/EditPositionScreen";
 import PortfolioScreen from "./screens/PortfolioScreen";
 import AddPositionScreen from "./screens/AddPositionScreen";
-import FullPatternDetailScreen from "./screens/FullPatternDetailScreen";
-import FullTechnicalDetailScreen from "./screens/FullTechnicalDetailScreen";
 import AllPicksScreen from "./screens/AllPicksScreen";
 import PickDetailScreen from "./screens/PickDetailScreen";
 import MarketMoversScreen from "./screens/MarketMoversScreen";
-import SignalDetailScreen from "./screens/SignalDetailScreen";
 import { registerForPushNotifications } from "./services/pushNotificationService";
 import { auth } from "./firebaseConfig";
 import FullChartScreen from "./screens/FullChartScreen";
@@ -308,59 +305,11 @@ export default function App() {
         />
 
         <Stack.Screen
-          name="FullPatternDetailScreen"
-          component={FullPatternDetailScreen}
-          options={{
-            headerShown: true,
-            title: "Pattern Details",
-            headerStyle: {
-              backgroundColor: BRAND.bg,
-              shadowColor: "transparent",
-              elevation: 0,
-            },
-            headerTintColor: BRAND.text,
-            headerBackTitleVisible: false,
-            headerBackTitle: false,
-            headerBackImage: () => (
-              <Ionicons
-                name="chevron-back-outline"
-                size={24}
-                color={BRAND.text}
-                style={{ marginLeft: 10 }}
-              />
-            ),
-          }}
-        />
-        <Stack.Screen
           name="AddAlertScreen"
           component={AddAlertScreen}
           options={{
             headerShown: true,
             title: "Add Alert",
-            headerStyle: {
-              backgroundColor: BRAND.bg,
-              shadowColor: "transparent",
-              elevation: 0,
-            },
-            headerTintColor: BRAND.text,
-            headerBackTitleVisible: false,
-            headerBackTitle: false,
-            headerBackImage: () => (
-              <Ionicons
-                name="chevron-back-outline"
-                size={24}
-                color={BRAND.text}
-                style={{ marginLeft: 10 }}
-              />
-            ),
-          }}
-        />
-        <Stack.Screen
-          name="FullTechnicalDetailScreen"
-          component={FullTechnicalDetailScreen}
-          options={{
-            headerShown: true,
-            title: "Technical Details",
             headerStyle: {
               backgroundColor: BRAND.bg,
               shadowColor: "transparent",
@@ -427,31 +376,6 @@ export default function App() {
             ),
           }}
         />
-        <Stack.Screen
-          name="FullDecisionDetailScreen"
-          component={SignalDetailScreen}
-          options={{
-            headerShown: true,
-            title: "Rating Details",
-            headerStyle: {
-              backgroundColor: BRAND.bg,
-              shadowColor: "transparent",
-              elevation: 0,
-            },
-            headerTintColor: BRAND.text,
-            headerBackTitleVisible: false,
-            headerBackTitle: false,
-            headerBackImage: () => (
-              <Ionicons
-                name="chevron-back-outline"
-                size={24}
-                color={BRAND.text}
-                style={{ marginLeft: 10 }}
-              />
-            ),
-          }}
-        />
-
         <Stack.Screen
           name="MarketMoversScreen"
           component={MarketMoversScreen}

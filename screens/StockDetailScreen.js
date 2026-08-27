@@ -717,29 +717,6 @@ export default function StockDetailScreen({ route, navigation }) {
               </View>
             )}
 
-          <TouchableOpacity
-            style={styles.aiDetailsButton}
-            activeOpacity={0.85}
-            onPress={() =>
-              navigation.navigate("FullDecisionDetailScreen", {
-                symbol: detail.symbol,
-                companyName: detail.companyName,
-                logoUrl: detail?.logoUrl || null,
-                quote: detail.quote,
-                hybridSignal: finalAISignal,
-                hybridScore: finalAIConfidence,
-                displayIntelligence: displayIntel,
-                bullbrain: detail.bullbrain,
-                technical: detail.technical,
-                pattern: detail.pattern,
-                isPremium: true,
-              })
-            }
-          >
-            <Text style={styles.aiDetailsButtonText}>Why This Rating?</Text>
-            <Ionicons name="chevron-forward" size={17} color={BRAND.accent} />
-          </TouchableOpacity>
-
           <Text style={styles.aiSmallDisclaimer}>
             Informational only. Not investment advice.
           </Text>
@@ -853,28 +830,6 @@ export default function StockDetailScreen({ route, navigation }) {
               </View>
             )}
 
-            <TouchableOpacity
-              style={styles.patternPremiumButton}
-              activeOpacity={0.85}
-              onPress={() =>
-                navigation.navigate("FullPatternDetailScreen", {
-                  symbol: detail.symbol,
-                  companyName: detail.companyName,
-                  logoUrl: detail?.logoUrl || null,
-                  quote: detail.quote,
-                  patternInsight: detail.patternInsight,
-                  smartPattern: detail.smartPattern,
-                  patternStats: detail.patternStats,
-                  probabilityCone: detail.probabilityCone,
-                  isPremium: true,
-                })
-              }
-            >
-              <Text style={styles.patternPremiumButtonText}>
-                View Pattern Details
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={BRAND.accent} />
-            </TouchableOpacity>
           </View>
         )}
 
@@ -1000,25 +955,6 @@ export default function StockDetailScreen({ route, navigation }) {
               })}
             </View>
 
-            <TouchableOpacity
-              style={styles.techPremiumButton}
-              activeOpacity={0.85}
-              onPress={() =>
-                navigation.navigate("FullTechnicalDetailScreen", {
-                  symbol: detail.symbol,
-                  companyName: detail.companyName,
-                  logoUrl: detail?.logoUrl || null,
-                  quote: detail.quote,
-                  technical: detail.technical,
-                  featuresMeta: detail.featuresMeta,
-                })
-              }
-            >
-              <Text style={styles.techPremiumButtonText}>
-                View Technical Details
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={BRAND.accent} />
-            </TouchableOpacity>
           </View>
         )}
         {/* PREMIUM COMPACT MARKET OUTLOOK */}
