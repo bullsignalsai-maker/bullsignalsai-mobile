@@ -256,10 +256,15 @@ function normalizeVerifiedItems(items = []) {
 /* =========================================================
    ALPHACLARA PICKS (replaces Core Signals / core_universe)
 ========================================================= */
-export async function getAlphaclaraTracking({ limit, windowDays = 3 } = {}) {
+export async function getAlphaclaraTracking({
+  limit,
+  windowDays = 3,
+  tier,
+} = {}) {
   try {
     const params = new URLSearchParams({ window_days: String(windowDays) });
     if (limit != null) params.set("limit", String(limit));
+    if (tier != null) params.set("tier", tier);
 
     const res = await fetch(
       `${API_BASE_URL}/alphaclara-tracking?${params.toString()}`,
@@ -277,6 +282,14 @@ export async function getAlphaclaraTracking({ limit, windowDays = 3 } = {}) {
         checked: Number(json.counts?.checked ?? 0),
         unavailable: Number(json.counts?.unavailable ?? 0),
       },
+      // Always all 3 tier values regardless of the `tier` scope requested —
+      // lets a scoped fetch still populate accurate badge counts for the
+      // other two tabs without a separate request per tab.
+      tierCounts: {
+        fresh: Number(json.tier_counts?.fresh ?? 0),
+        tracking: Number(json.tier_counts?.tracking ?? 0),
+        checked: Number(json.tier_counts?.checked ?? 0),
+      },
       items: normalizeTrackingItems(json.items),
     };
   } catch (err) {
@@ -290,6 +303,7 @@ function emptyAlphaclaraTracking() {
     status: "empty",
     windowDays: 3,
     counts: { total: 0, tracking: 0, checked: 0, unavailable: 0 },
+    tierCounts: { fresh: 0, tracking: 0, checked: 0 },
     items: [],
   };
 }

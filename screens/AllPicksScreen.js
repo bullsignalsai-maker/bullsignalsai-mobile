@@ -40,8 +40,11 @@ const ALPHACLARA_PICKS_INFO = {
   ],
 };
 
-const TIER_FILTERS = [
-  { value: "all", label: "All Tiers" },
+// No "all" option — the backend's tier param is scoped to exactly one of
+// these 3 values, and fetching stays scoped to whichever tab is active
+// (see the fetch effect below) rather than falling back to an unscoped
+// fetch for a 4th "All Tiers" option.
+const TIER_TABS = [
   { value: "fresh", label: "Fresh Today" },
   { value: "tracking", label: "Still Tracking" },
   { value: "checked", label: "Checked" },
@@ -58,33 +61,54 @@ const SORT_MODES = [
   { value: "change", label: "% Change" },
 ];
 
-function matchesTierFilter(item, tierFilter) {
-  if (tierFilter === "all") return true;
-  if (tierFilter === "tracking") {
-    return item.tier !== "fresh" && item.tier !== "checked";
-  }
-  return item.tier === tierFilter;
-}
-
 export default function AllPicksScreen({ navigation }) {
-  const [tracking, setTracking] = useState(null);
   const [accuracyReport, setAccuracyReport] = useState(null);
   const [astraVisible, setAstraVisible] = useState(false);
   const [infoModal, setInfoModal] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [tierFilter, setTierFilter] = useState("all");
+  const [activeTier, setActiveTier] = useState("tracking");
   const [directionFilter, setDirectionFilter] = useState("all");
   const [sortMode, setSortMode] = useState("recent");
+
+  // One scoped fetch per tier, cached for the lifetime of this screen —
+  // flipping between tabs re-reads the cache instead of re-fetching. No
+  // TTL/invalidation: this screen already had no refresh mechanism before
+  // this change (fetch-once-on-mount), so a session-lifetime cache adds no
+  // new staleness beyond what was already true here.
+  const [tierCache, setTierCache] = useState({
+    fresh: null,
+    tracking: null,
+    checked: null,
+  });
+  const [tierCounts, setTierCounts] = useState({
+    fresh: 0,
+    tracking: 0,
+    checked: 0,
+  });
+  const [tierLoading, setTierLoading] = useState(true);
+
+  const tracking = tierCache[activeTier];
 
   useEffect(() => {
     let mounted = true;
 
+    if (tierCache[activeTier]) {
+      setTierLoading(false);
+      return undefined;
+    }
+
+    setTierLoading(true);
+
     async function load() {
       try {
-        const data = await getAlphaclaraTracking({ windowDays: WINDOW_DAYS });
-        if (mounted) setTracking(data);
+        const data = await getAlphaclaraTracking({
+          windowDays: WINDOW_DAYS,
+          tier: activeTier,
+        });
+        if (!mounted) return;
+        setTierCache((prev) => ({ ...prev, [activeTier]: data }));
+        setTierCounts(data.tierCounts);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) setTierLoading(false);
       }
     }
 
@@ -93,7 +117,10 @@ export default function AllPicksScreen({ navigation }) {
     return () => {
       mounted = false;
     };
-  }, []);
+    // tierCache intentionally excluded — reading it here decides whether to
+    // skip the fetch, but it must not retrigger this effect on every cache
+    // write or every tier would refetch itself immediately after caching.
+  }, [activeTier]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let mounted = true;
@@ -104,15 +131,6 @@ export default function AllPicksScreen({ navigation }) {
       mounted = false;
     };
   }, []);
-
-  if (loading && !tracking) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator color={BRAND.accent} />
-        <Text style={styles.loadingText}>Loading picks...</Text>
-      </View>
-    );
-  }
 
   const statsLine = tracking
     ? formatAlphaclaraStatsLine(tracking.counts, tracking.windowDays)
@@ -130,11 +148,11 @@ export default function AllPicksScreen({ navigation }) {
     positions: [],
   };
 
-  const isFilterActive = tierFilter !== "all" || directionFilter !== "all";
+  const isFilterActive = directionFilter !== "all";
 
+  // Tier is no longer filtered here — the fetch itself is already scoped
+  // to activeTier, so every item in tracking.items already belongs to it.
   const filteredItems = (tracking?.items || []).filter((item) => {
-    if (!matchesTierFilter(item, tierFilter)) return false;
-
     if (directionFilter !== "all") {
       const { pct } = getPickPerformanceDisplay(item);
       if (pct == null) return false;
@@ -155,20 +173,19 @@ export default function AllPicksScreen({ navigation }) {
         })
       : filteredItems;
 
-  // Isolating to a specific tier other than Checked means Checked will
-  // always be empty in this view as a side effect of the filter, not
-  // because there's genuinely nothing checked yet — hide it rather than
-  // showing a placeholder that would misrepresent which case this is.
-  const hideEmptyCheckedTier = tierFilter !== "all" && tierFilter !== "checked";
+  // Viewing a tab other than Checked means the Checked bucket is always
+  // empty here as a side effect of which tier was fetched, not because
+  // there's genuinely nothing checked yet — hide it rather than showing a
+  // placeholder that would misrepresent which case this is.
+  const hideEmptyCheckedTier = activeTier !== "checked";
 
   const emptyText = isFilterActive
     ? "No picks match these filters."
     : "No picks to show for this window.";
 
-  // Isolating tierFilter to "checked" doesn't exclude any checked items —
-  // it just narrows which other sections render. Only directionFilter can
-  // actually cause an otherwise-real checked item to disappear, so that's
-  // the only thing that should trigger the "filtered" wording here.
+  // Only directionFilter can cause an otherwise-real checked item to
+  // disappear from this tab, so that's the only thing that should trigger
+  // the "filtered" wording here.
   const checkedEmptyText =
     directionFilter !== "all"
       ? "No checked picks match this filter."
@@ -204,12 +221,12 @@ export default function AllPicksScreen({ navigation }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}
       >
-        {TIER_FILTERS.map((f) => {
-          const active = tierFilter === f.value;
+        {TIER_TABS.map((tab) => {
+          const active = activeTier === tab.value;
           return (
             <TouchableOpacity
-              key={f.value}
-              onPress={() => setTierFilter(f.value)}
+              key={tab.value}
+              onPress={() => setActiveTier(tab.value)}
               style={[styles.filterPill, active && styles.filterPillActive]}
               activeOpacity={0.85}
             >
@@ -219,7 +236,7 @@ export default function AllPicksScreen({ navigation }) {
                   active && styles.filterTextActive,
                 ]}
               >
-                {f.label}
+                {tab.label} ({tierCounts[tab.value]})
               </Text>
             </TouchableOpacity>
           );
@@ -276,15 +293,22 @@ export default function AllPicksScreen({ navigation }) {
         })}
       </ScrollView>
 
-      <AlphaclaraPicksList
-        items={displayedItems}
-        emptyText={emptyText}
-        checkedEmptyText={checkedEmptyText}
-        hideEmptyCheckedTier={hideEmptyCheckedTier}
-        onPressItem={(item) => {
-          navigation.navigate("PickDetailScreen", { item });
-        }}
-      />
+      {tierLoading && !tracking ? (
+        <View style={styles.tierLoadingWrap}>
+          <ActivityIndicator color={BRAND.accent} />
+          <Text style={styles.loadingText}>Loading picks...</Text>
+        </View>
+      ) : (
+        <AlphaclaraPicksList
+          items={displayedItems}
+          emptyText={emptyText}
+          checkedEmptyText={checkedEmptyText}
+          hideEmptyCheckedTier={hideEmptyCheckedTier}
+          onPressItem={(item) => {
+            navigation.navigate("PickDetailScreen", { item });
+          }}
+        />
+      )}
 
       <View style={styles.footerWrap}>
         <Text style={styles.footerText}>
@@ -363,6 +387,12 @@ const styles = StyleSheet.create({
     color: BRAND.sub,
     marginTop: 10,
     fontFamily: TYPO.fontFamily.medium,
+  },
+
+  tierLoadingWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
   },
 
   titleRow: {
