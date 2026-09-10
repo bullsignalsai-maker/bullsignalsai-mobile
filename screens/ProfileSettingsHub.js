@@ -19,6 +19,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path, Circle } from "react-native-svg";
 import { useFocusEffect } from "@react-navigation/native";
+import Constants from "expo-constants";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth, db } from "../firebaseConfig";
@@ -562,7 +563,9 @@ export default function ProfileSettingsHub({ navigation }) {
             Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
           </Text>
 
-          <Text style={styles.footerMeta}>Market Intelligence · v1.0.1</Text>
+          <Text style={styles.footerMeta}>
+            Market Intelligence · v{Constants.expoConfig?.version}
+          </Text>
 
           <Text style={styles.disclaimer}>
             Information provided is for educational and informational purposes

@@ -10,6 +10,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path, Circle } from "react-native-svg";
+import Constants from "expo-constants";
 import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 
@@ -169,7 +170,9 @@ export default function AboutScreen({ navigation }) {
           Powered by <Text style={styles.footerBrand}>Alphaclara</Text>
         </Text>
 
-        <Text style={styles.footerMeta}>Market Intelligence · v1.0.1</Text>
+        <Text style={styles.footerMeta}>
+          Market Intelligence · v{Constants.expoConfig?.version}
+        </Text>
 
         <Text style={styles.disclaimer}>
           Information provided is for educational and informational purposes

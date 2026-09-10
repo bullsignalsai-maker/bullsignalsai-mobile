@@ -7,6 +7,7 @@ export default {
     slug: "bullsignalsai",
     owner: "bullsignalsai",
     scheme: "alphaclara",
+    // Bump this before every release — see RELEASE_CHECKLIST.md
     version: "1.0.2",
     orientation: "portrait",
     icon: "./assets/icon.png",
