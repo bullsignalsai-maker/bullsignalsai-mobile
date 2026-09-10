@@ -14,9 +14,11 @@ import {
   getAlphaclaraTracking,
   getAlphaclaraAccuracyReport,
   getAccuracyTrend,
+  getHypotheticalPortfolio,
 } from "../services/HomeService";
 import {
   formatPicksCurrentStatusLine,
+  formatPickDateRange,
   getPickPerformanceDisplay,
 } from "../utils/formatters";
 import AlphaclaraPicksList from "../components/AlphaclaraPicksList";
@@ -66,6 +68,7 @@ const SORT_MODES = [
 export default function AllPicksScreen({ navigation }) {
   const [accuracyReport, setAccuracyReport] = useState(null);
   const [accuracyTrend, setAccuracyTrend] = useState(null);
+  const [hypotheticalPortfolio, setHypotheticalPortfolio] = useState(null);
   const [astraVisible, setAstraVisible] = useState(false);
   const [infoModal, setInfoModal] = useState(null);
   const [activeTier, setActiveTier] = useState("tracking");
@@ -139,6 +142,16 @@ export default function AllPicksScreen({ navigation }) {
     let mounted = true;
     getAccuracyTrend().then((trend) => {
       if (mounted) setAccuracyTrend(trend);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    getHypotheticalPortfolio().then((portfolio) => {
+      if (mounted) setHypotheticalPortfolio(portfolio);
     });
     return () => {
       mounted = false;
@@ -247,6 +260,84 @@ export default function AllPicksScreen({ navigation }) {
               points={accuracyTrend.points}
               horizon={accuracyTrend.horizon}
             />
+          )}
+        </View>
+      )}
+
+      {!!hypotheticalPortfolio && (
+        <View style={styles.trendCard}>
+          <View style={styles.trendSectionHeaderRow}>
+            <View style={styles.trendSectionAccent} />
+            <Text style={styles.trendSectionTitle}>
+              Hypothetical $
+              {hypotheticalPortfolio.startingAmount.toLocaleString()}{" "}
+              Portfolio
+            </Text>
+          </View>
+
+          <View style={styles.hypoHeadlineRow}>
+            <Text style={styles.hypoHeadlineValue}>
+              ${hypotheticalPortfolio.currentValue.toFixed(2)}
+            </Text>
+            {hypotheticalPortfolio.totalReturnPct != null && (
+              <Text
+                style={[
+                  styles.hypoHeadlineSub,
+                  {
+                    color:
+                      hypotheticalPortfolio.totalReturnPct >= 0
+                        ? BRAND.accent
+                        : BRAND.red,
+                  },
+                ]}
+              >
+                {hypotheticalPortfolio.totalReturnPct >= 0 ? "+" : ""}
+                {hypotheticalPortfolio.totalReturnPct.toFixed(2)}%
+              </Text>
+            )}
+          </View>
+
+          <Text style={styles.hypoContextLine}>
+            Equal split across {hypotheticalPortfolio.nIncluded} picks
+            {(() => {
+              const range = formatPickDateRange(
+                hypotheticalPortfolio.rangeMin,
+                hypotheticalPortfolio.rangeMax,
+              );
+              return range ? ` · ${range}` : "";
+            })()}
+          </Text>
+
+          {!!hypotheticalPortfolio.disclaimer && (
+            <Text style={styles.edgeDisclaimerText}>
+              {hypotheticalPortfolio.disclaimer}
+            </Text>
+          )}
+
+          {hypotheticalPortfolio.nExcluded > 0 && (
+            <Text style={styles.hypoExclusionLine}>
+              {hypotheticalPortfolio.nExcluded} pick
+              {hypotheticalPortfolio.nExcluded === 1 ? "" : "s"} excluded from
+              this calculation ({hypotheticalPortfolio.nExcludedPriceUnavailable}{" "}
+              price unavailable,{" "}
+              {hypotheticalPortfolio.nExcludedInvalidPickPrice} invalid pick
+              price).
+            </Text>
+          )}
+
+          {!!hypotheticalPortfolio.longDisclaimer && (
+            <TouchableOpacity
+              activeOpacity={0.75}
+              style={styles.hypoLearnMoreBtn}
+              onPress={() =>
+                setInfoModal({
+                  title: "Hypothetical Portfolio — How This Works",
+                  text: hypotheticalPortfolio.longDisclaimer,
+                })
+              }
+            >
+              <Text style={styles.hypoLearnMoreText}>Learn more ›</Text>
+            </TouchableOpacity>
           )}
         </View>
       )}
@@ -504,6 +595,65 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontFamily: TYPO.fontFamily.medium,
+  },
+
+  hypoHeadlineRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
+    marginBottom: 4,
+  },
+
+  hypoHeadlineValue: {
+    color: BRAND.text,
+    fontSize: 24,
+    fontFamily: TYPO.fontFamily.extrabold,
+    fontVariant: ["tabular-nums"],
+  },
+
+  hypoHeadlineSub: {
+    fontSize: 15,
+    fontFamily: TYPO.fontFamily.bold,
+    fontVariant: ["tabular-nums"],
+  },
+
+  hypoContextLine: {
+    color: BRAND.muted,
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.medium,
+    marginBottom: 8,
+  },
+
+  // Same full-strength, non-fine-print treatment as PickDetailScreen's
+  // edgeDisclaimer — the "never optional" rule applies here too.
+  edgeDisclaimerText: {
+    color: BRAND.text,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 4,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
+
+  hypoExclusionLine: {
+    color: BRAND.amber,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 8,
+  },
+
+  hypoLearnMoreBtn: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+  },
+
+  hypoLearnMoreText: {
+    color: BRAND.accent,
+    fontSize: 12,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   filterRow: {

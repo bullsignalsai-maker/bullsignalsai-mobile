@@ -502,6 +502,63 @@ function emptyAccuracyTrend() {
   };
 }
 
+const HYPOTHETICAL_PORTFOLIO_CACHE_KEY = "alphaclara_hypothetical_portfolio";
+const HYPOTHETICAL_PORTFOLIO_TTL_SECONDS = 5 * 60; // 5min, not the 1hr
+// convention used by accuracy-report/accuracy-trend — those are cron
+// snapshots written once/day, this prices off each symbol's current
+// quote today, so a long cache would go stale without any indicator.
+
+export async function getHypotheticalPortfolio() {
+  const cached = await getCache(HYPOTHETICAL_PORTFOLIO_CACHE_KEY);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/alphaclara-hypothetical-portfolio`,
+    );
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    if (typeof json.hypothetical_current_value !== "number") return null;
+
+    const portfolio = {
+      startingAmount: Number(json.starting_amount ?? 1000),
+      nIncluded: Number(json.n_included ?? 0),
+      nExcluded: Number(json.n_excluded ?? 0),
+      nExcludedPriceUnavailable: Number(
+        json.n_excluded_price_unavailable ?? 0,
+      ),
+      nExcludedInvalidPickPrice: Number(
+        json.n_excluded_invalid_pick_price ?? 0,
+      ),
+      currentValue: json.hypothetical_current_value,
+      totalReturnPct:
+        typeof json.hypothetical_total_return_pct === "number"
+          ? json.hypothetical_total_return_pct
+          : null,
+      rangeMin: json.pick_date_range?.min || null,
+      rangeMax: json.pick_date_range?.max || null,
+      // Backend's own complete disclosure surface — rendered verbatim,
+      // never rephrased/composed ourselves. Any survivorship-bias
+      // caveat the backend adds when n_excluded > 0 lives inside these
+      // strings; the exclusion-count line below is built independently
+      // from the raw counts, not a guess at a dedicated field name.
+      disclaimer: json.disclaimer || null,
+      longDisclaimer: json.long_disclaimer || null,
+    };
+
+    await saveCache(
+      HYPOTHETICAL_PORTFOLIO_CACHE_KEY,
+      portfolio,
+      HYPOTHETICAL_PORTFOLIO_TTL_SECONDS,
+    );
+    return portfolio;
+  } catch (err) {
+    console.warn("Hypothetical portfolio error:", err.message);
+    return null;
+  }
+}
+
 // Real duplicates are NOT merged — the same symbol can be picked more
 // than once inside the window, and each pick is a distinct fact
 // (different pick_price/date), so every item is kept and keyed on
