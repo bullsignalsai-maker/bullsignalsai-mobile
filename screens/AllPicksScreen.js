@@ -24,6 +24,7 @@ import {
 import AlphaclaraPicksList from "../components/AlphaclaraPicksList";
 import PicksStatRow from "../components/PicksStatRow";
 import AccuracyTrendChart from "../components/AccuracyTrendChart";
+import PortfolioGrowthChart from "../components/PortfolioGrowthChart";
 import AstraChat from "../components/AstraChat";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import { BRAND } from "../constants/theme";
@@ -162,6 +163,15 @@ export default function AllPicksScreen({ navigation }) {
     ? formatPicksCurrentStatusLine(tierCounts, WINDOW_DAYS)
     : null;
 
+  // hypothetical_value/spy_hypothetical_value are null until real history
+  // accumulates (backend records going forward, no backfill) — gated
+  // independently of accuracyTrend.insufficientHistory, since that flag
+  // tracks win-rate snapshot history, not this specific pair of fields.
+  const portfolioGrowthPoints = (accuracyTrend?.points || []).filter(
+    (p) => p.hypotheticalValue != null && p.spyHypotheticalValue != null,
+  );
+  const portfolioGrowthInsufficient = portfolioGrowthPoints.length < 2;
+
   // Backend fetches its own accuracy report + tiered picks list +
   // rankings server-side for this contextType (same pattern as
   // "market") — this payload deliberately doesn't bundle `tracking`/
@@ -264,7 +274,7 @@ export default function AllPicksScreen({ navigation }) {
         </View>
       )}
 
-      {!!hypotheticalPortfolio && (
+      {!!hypotheticalPortfolio && !portfolioGrowthInsufficient && (
         <View style={styles.trendCard}>
           <View style={styles.trendSectionHeaderRow}>
             <View style={styles.trendSectionAccent} />
@@ -273,28 +283,6 @@ export default function AllPicksScreen({ navigation }) {
               {hypotheticalPortfolio.startingAmount.toLocaleString()}{" "}
               Portfolio
             </Text>
-          </View>
-
-          <View style={styles.hypoHeadlineRow}>
-            <Text style={styles.hypoHeadlineValue}>
-              ${hypotheticalPortfolio.currentValue.toFixed(2)}
-            </Text>
-            {hypotheticalPortfolio.totalReturnPct != null && (
-              <Text
-                style={[
-                  styles.hypoHeadlineSub,
-                  {
-                    color:
-                      hypotheticalPortfolio.totalReturnPct >= 0
-                        ? BRAND.accent
-                        : BRAND.red,
-                  },
-                ]}
-              >
-                {hypotheticalPortfolio.totalReturnPct >= 0 ? "+" : ""}
-                {hypotheticalPortfolio.totalReturnPct.toFixed(2)}%
-              </Text>
-            )}
           </View>
 
           <Text style={styles.hypoContextLine}>
@@ -307,6 +295,8 @@ export default function AllPicksScreen({ navigation }) {
               return range ? ` · ${range}` : "";
             })()}
           </Text>
+
+          <PortfolioGrowthChart points={portfolioGrowthPoints} />
 
           {!!hypotheticalPortfolio.disclaimer && (
             <Text style={styles.edgeDisclaimerText}>
@@ -595,26 +585,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontFamily: TYPO.fontFamily.medium,
-  },
-
-  hypoHeadlineRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
-    marginBottom: 4,
-  },
-
-  hypoHeadlineValue: {
-    color: BRAND.text,
-    fontSize: 24,
-    fontFamily: TYPO.fontFamily.extrabold,
-    fontVariant: ["tabular-nums"],
-  },
-
-  hypoHeadlineSub: {
-    fontSize: 15,
-    fontFamily: TYPO.fontFamily.bold,
-    fontVariant: ["tabular-nums"],
   },
 
   hypoContextLine: {

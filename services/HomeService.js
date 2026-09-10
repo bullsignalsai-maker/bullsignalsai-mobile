@@ -474,6 +474,22 @@ export async function getAccuracyTrend() {
                 typeof p.pct_positive === "number" ? p.pct_positive : null,
               spyReturnPct:
                 typeof p.spy_return_pct === "number" ? p.spy_return_pct : null,
+              // Null until real history accumulates (backend started
+              // recording these going forward, no backfill) — filtered
+              // down to non-null pairs by the Hypothetical Portfolio
+              // growth chart before it ever sees these points.
+              hypotheticalValue:
+                typeof p.hypothetical_value === "number"
+                  ? p.hypothetical_value
+                  : null,
+              hypotheticalTotalReturnPct:
+                typeof p.hypothetical_total_return_pct === "number"
+                  ? p.hypothetical_total_return_pct
+                  : null,
+              spyHypotheticalValue:
+                typeof p.spy_hypothetical_value === "number"
+                  ? p.spy_hypothetical_value
+                  : null,
             }))
             .filter((p) => p.date && p.pctPositive != null)
         : [],
