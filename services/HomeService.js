@@ -391,7 +391,25 @@ export async function getAlphaclaraAccuracyReport() {
   }
 }
 
+const HISTORICAL_EDGE_TTL_SECONDS = 60 * 60; // 1hr — same reasoning as
+// ACCURACY_REPORT_TTL_SECONDS above: the underlying stat (win rate for
+// this setup_label + market_regime combo) is driven by the once/day
+// cron-computed accuracy report, not live data, so a 1hr cache can't
+// serve anything stale relative to how often the number actually moves.
+// Keyed per (setupLabel, marketRegime, horizon) — unlike the single flat
+// accuracy-report cache, PickDetailScreen requests a different combo per
+// pick, so each combo needs its own independent cache entry, not one
+// shared key.
+
+function historicalEdgeCacheKey(setupLabel, marketRegime, horizon) {
+  return `alphaclara_historical_edge_${setupLabel}_${marketRegime}_${horizon}`;
+}
+
 export async function getHistoricalEdge(setupLabel, marketRegime, horizon) {
+  const cacheKey = historicalEdgeCacheKey(setupLabel, marketRegime, horizon);
+  const cached = await getCache(cacheKey);
+  if (cached) return cached;
+
   try {
     const params = new URLSearchParams();
     if (setupLabel) params.set("setup_label", setupLabel);
@@ -405,7 +423,7 @@ export async function getHistoricalEdge(setupLabel, marketRegime, horizon) {
 
     const json = await res.json();
 
-    return {
+    const edge = {
       // Backend nests the actual figures under stats/confounding_guard,
       // not top-level — confirmed against the live endpoint.
       pctPositive:
@@ -426,6 +444,14 @@ export async function getHistoricalEdge(setupLabel, marketRegime, horizon) {
       regimeDisplay: json.regime_display || null,
       disclaimer: json.disclaimer || null,
     };
+
+    // Cache the real result even when insufficient_data/low_confidence —
+    // that's still a genuine, current fact about this combo, not a
+    // failure. Only the catch block below (network/parse failure) is
+    // left uncached, so a transient error never suppresses real data on
+    // the next attempt.
+    await saveCache(cacheKey, edge, HISTORICAL_EDGE_TTL_SECONDS);
+    return edge;
   } catch (err) {
     console.warn("Historical edge error:", err.message);
     return emptyHistoricalEdge();
