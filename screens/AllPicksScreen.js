@@ -32,6 +32,15 @@ import { TYPO } from "../constants/typography";
 
 const WINDOW_DAYS = 30;
 
+const WIN_RATE_TREND_INFO = {
+  title: "Win Rate Trend vs S&P 500",
+  text: "This chart tracks two running numbers over time, both starting from when we began recording:",
+  whyNow: [
+    "Win Rate (5d): the cumulative percentage of 5-day-resolved picks that were positive, as of each date shown — not that day's single result, but the running win rate up to that point. It naturally moves slowly and smooths out day-to-day noise.",
+    "S&P 500 (Cumulative): how much $1 invested in the S&P 500 on the first day of this chart would be worth by each date shown, as a running return — for comparison against our picks' performance over the same real period.",
+  ],
+};
+
 // Same copy as Home's ALPHACLARA_PICKS_INFO — kept as a local duplicate
 // per this codebase's per-screen convention (see MARKET_MOVERS_INFO on
 // MarketMoversScreen), not imported cross-file.
@@ -258,6 +267,17 @@ export default function AllPicksScreen({ navigation }) {
             <Text style={styles.trendSectionTitle}>
               Win Rate Trend vs S&P 500
             </Text>
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.trendInfoIconBtn}
+              onPress={() => setInfoModal(WIN_RATE_TREND_INFO)}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={13}
+                color={BRAND.sub}
+              />
+            </TouchableOpacity>
           </View>
 
           {accuracyTrend.insufficientHistory ? (
@@ -563,6 +583,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 8,
+  },
+
+  trendInfoIconBtn: {
+    marginLeft: 4,
   },
 
   trendSectionAccent: {
