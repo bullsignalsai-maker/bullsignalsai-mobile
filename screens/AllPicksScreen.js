@@ -146,7 +146,7 @@ export default function AllPicksScreen({ navigation }) {
   }, []);
 
   const currentStatusLine = tracking
-    ? formatPicksCurrentStatusLine(tracking.counts, tracking.windowDays)
+    ? formatPicksCurrentStatusLine(tierCounts, WINDOW_DAYS)
     : null;
 
   // Backend fetches its own accuracy report + tiered picks list +
