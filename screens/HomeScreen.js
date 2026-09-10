@@ -71,7 +71,7 @@ const ALPHACLARA_PICKS_INFO = {
   title: "Alphaclara Picks",
   text: "Alphaclara records its own AI picks and tracks their real price performance for a rolling window — wins and losses shown as-is, nothing filtered or hidden. Once a pick's tracking window closes, it's marked Checked with its final result. This reflects a limited, recent tracking window — not a long-term track record, and not a guarantee of future results.",
   whyNow: [
-    "Total Picks: how many distinct picks have completed at least one tracked outcome in this window.",
+    "Graded Outcomes: every pick-horizon result Alphaclara has ever resolved, going back to when tracking began — not the same 30-day window as the Fresh/Tracking/Checked counts below, which only show current status.",
     "Win Rate: the share of those outcomes that were positive.",
     "Avg Return: the average price move across all tracked outcomes, wins and losses combined.",
   ],

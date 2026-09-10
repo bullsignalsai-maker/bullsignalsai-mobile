@@ -13,13 +13,15 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   getAlphaclaraTracking,
   getAlphaclaraAccuracyReport,
+  getAccuracyTrend,
 } from "../services/HomeService";
 import {
-  formatAlphaclaraStatsLine,
+  formatPicksCurrentStatusLine,
   getPickPerformanceDisplay,
 } from "../utils/formatters";
 import AlphaclaraPicksList from "../components/AlphaclaraPicksList";
 import PicksStatRow from "../components/PicksStatRow";
+import AccuracyTrendChart from "../components/AccuracyTrendChart";
 import AstraChat from "../components/AstraChat";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import { BRAND } from "../constants/theme";
@@ -34,7 +36,7 @@ const ALPHACLARA_PICKS_INFO = {
   title: "Alphaclara Picks",
   text: "Alphaclara records its own AI picks and tracks their real price performance for a rolling window — wins and losses shown as-is, nothing filtered or hidden. Once a pick's tracking window closes, it's marked Checked with its final result. This reflects a limited, recent tracking window — not a long-term track record, and not a guarantee of future results.",
   whyNow: [
-    "Total Picks: how many distinct picks have completed at least one tracked outcome in this window.",
+    "Graded Outcomes: every pick-horizon result Alphaclara has ever resolved, going back to when tracking began — not the same 30-day window as the Fresh/Tracking/Checked counts below, which only show current status.",
     "Win Rate: the share of those outcomes that were positive.",
     "Avg Return: the average price move across all tracked outcomes, wins and losses combined.",
   ],
@@ -63,6 +65,7 @@ const SORT_MODES = [
 
 export default function AllPicksScreen({ navigation }) {
   const [accuracyReport, setAccuracyReport] = useState(null);
+  const [accuracyTrend, setAccuracyTrend] = useState(null);
   const [astraVisible, setAstraVisible] = useState(false);
   const [infoModal, setInfoModal] = useState(null);
   const [activeTier, setActiveTier] = useState("tracking");
@@ -132,8 +135,18 @@ export default function AllPicksScreen({ navigation }) {
     };
   }, []);
 
-  const statsLine = tracking
-    ? formatAlphaclaraStatsLine(tracking.counts, tracking.windowDays)
+  useEffect(() => {
+    let mounted = true;
+    getAccuracyTrend().then((trend) => {
+      if (mounted) setAccuracyTrend(trend);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const currentStatusLine = tracking
+    ? formatPicksCurrentStatusLine(tracking.counts, tracking.windowDays)
     : null;
 
   // Backend fetches its own accuracy report + tiered picks list +
@@ -213,8 +226,34 @@ export default function AllPicksScreen({ navigation }) {
       <Text style={styles.description}>
         AI-picked stocks, tracked live for real results
       </Text>
-      {!!statsLine && <Text style={styles.statsLine}>{statsLine}</Text>}
       <PicksStatRow accuracyReport={accuracyReport} />
+
+      {!!accuracyTrend && (
+        <View style={styles.trendCard}>
+          <View style={styles.trendSectionHeaderRow}>
+            <View style={styles.trendSectionAccent} />
+            <Text style={styles.trendSectionTitle}>
+              Win Rate Trend vs S&P 500
+            </Text>
+          </View>
+
+          {accuracyTrend.insufficientHistory ? (
+            <Text style={styles.trendMutedMessage}>
+              {accuracyTrend.historyMessage ||
+                "Not enough trend history yet — check back in a few weeks."}
+            </Text>
+          ) : (
+            <AccuracyTrendChart
+              points={accuracyTrend.points}
+              horizon={accuracyTrend.horizon}
+            />
+          )}
+        </View>
+      )}
+
+      {!!currentStatusLine && (
+        <Text style={styles.currentStatusLine}>{currentStatusLine}</Text>
+      )}
 
       <ScrollView
         horizontal
@@ -418,14 +457,54 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  statsLine: {
+  currentStatusLine: {
     color: BRAND.muted,
     fontSize: 11.5,
     fontFamily: TYPO.fontFamily.semibold,
     marginHorizontal: 12,
-    marginBottom: 4,
+    marginTop: -2,
+    marginBottom: 6,
   },
 
+
+  trendCard: {
+    backgroundColor: BRAND.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BRAND.softBorder,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginHorizontal: 12,
+    marginBottom: 10,
+  },
+
+  trendSectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  trendSectionAccent: {
+    width: 3,
+    height: 15,
+    borderRadius: 999,
+    backgroundColor: "rgba(212,166,58,0.75)",
+    marginRight: 8,
+  },
+
+  trendSectionTitle: {
+    color: BRAND.text,
+    fontSize: 13.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.15,
+  },
+
+  trendMutedMessage: {
+    color: BRAND.sub,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.medium,
+  },
 
   filterRow: {
     gap: 8,

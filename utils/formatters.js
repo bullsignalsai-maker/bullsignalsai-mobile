@@ -25,6 +25,22 @@ export function formatAlphaclaraStatsLine(counts, windowDays) {
   return `${parts.join(" · ")} over ${days} day${days === 1 ? "" : "s"}`;
 }
 
+// "Current status" framing, not "Total" — deliberately reads as the
+// live/windowed axis, distinct from PicksStatRow's Graded Outcomes
+// (all-time) figure. Same "never render '0 checked'" guard as
+// formatAlphaclaraStatsLine.
+export function formatPicksCurrentStatusLine(counts, windowDays) {
+  const tracking = Number(counts?.tracking || 0);
+  const checked = Number(counts?.checked || 0);
+  if (tracking === 0 && checked === 0) return null;
+
+  const parts = [`${tracking} live`];
+  if (checked > 0) parts.push(`${checked} checked`);
+
+  const days = Number(windowDays) || 0;
+  return `Current status, last ${days} day${days === 1 ? "" : "s"}: ${parts.join(" · ")}`;
+}
+
 // modelView.up/.down are fractions (0-1), not percentages — matches
 // the shape confirmed live from displayIntelligence.modelView.
 export function formatModelViewSplit(modelView) {

@@ -26,7 +26,7 @@ export default function PicksStatRow({ accuracyReport }) {
   return (
     <View style={styles.row}>
       <View style={styles.card}>
-        <Text style={styles.label}>Total Picks</Text>
+        <Text style={styles.label}>Graded Outcomes</Text>
         <Text style={[styles.value, { color: BRAND.text }]}>{n}</Text>
       </View>
 

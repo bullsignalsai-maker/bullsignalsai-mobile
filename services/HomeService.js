@@ -446,6 +446,62 @@ function emptyHistoricalEdge() {
   };
 }
 
+const ACCURACY_TREND_CACHE_KEY = "alphaclara_accuracy_trend";
+const ACCURACY_TREND_TTL_SECONDS = 60 * 60; // 1hr — snapshots are written
+// once/trading day by the backend cron, same slow-moving-aggregate
+// reasoning as ACCURACY_REPORT_TTL_SECONDS above.
+
+export async function getAccuracyTrend() {
+  const cached = await getCache(ACCURACY_TREND_CACHE_KEY);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/alphaclara-accuracy-trend`);
+    if (!res.ok) return emptyAccuracyTrend();
+
+    const json = await res.json();
+
+    const trend = {
+      horizon: json.horizon || null,
+      // spy_return_pct is a daily 1-day return, not cumulative — null on
+      // any day the quote was unavailable. Compounding into a cumulative
+      // curve happens client-side in AccuracyTrendChart, not here.
+      points: Array.isArray(json.points)
+        ? json.points
+            .map((p) => ({
+              date: p.date,
+              pctPositive:
+                typeof p.pct_positive === "number" ? p.pct_positive : null,
+              spyReturnPct:
+                typeof p.spy_return_pct === "number" ? p.spy_return_pct : null,
+            }))
+            .filter((p) => p.date && p.pctPositive != null)
+        : [],
+      insufficientHistory: json.history?.insufficient_history === true,
+      historyMessage: json.history?.message || null,
+    };
+
+    await saveCache(
+      ACCURACY_TREND_CACHE_KEY,
+      trend,
+      ACCURACY_TREND_TTL_SECONDS,
+    );
+    return trend;
+  } catch (err) {
+    console.warn("Accuracy trend error:", err.message);
+    return emptyAccuracyTrend();
+  }
+}
+
+function emptyAccuracyTrend() {
+  return {
+    horizon: null,
+    points: [],
+    insufficientHistory: true,
+    historyMessage: null,
+  };
+}
+
 // Real duplicates are NOT merged — the same symbol can be picked more
 // than once inside the window, and each pick is a distinct fact
 // (different pick_price/date), so every item is kept and keyed on
