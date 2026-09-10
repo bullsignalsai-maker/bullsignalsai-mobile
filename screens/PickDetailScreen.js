@@ -17,7 +17,10 @@ import { BRAND } from "../constants/theme";
 import { TYPO } from "../constants/typography";
 import AppButton from "../components/AppButton";
 import PickPriceHistoryChart from "../components/PickPriceHistoryChart";
-import { getAlphaclaraPickHistory } from "../services/HomeService";
+import {
+  getAlphaclaraPickHistory,
+  getHistoricalEdge,
+} from "../services/HomeService";
 import {
   formatPickedDaysAgo,
   formatPickDateLong,
@@ -121,6 +124,23 @@ function getPickCountDisplay(pickCount, firstPickedDate) {
   };
 }
 
+function getHistoricalEdgeDisplay(edge) {
+  if (!edge || edge.insufficientData || edge.pctPositive == null) {
+    return { state: "insufficient" };
+  }
+  if (edge.lowConfidence) {
+    return { state: "lowConfidence", n: edge.n };
+  }
+  return {
+    state: "confident",
+    pctPositive: edge.pctPositive,
+    meanReturnPct: edge.meanReturnPct,
+    n: edge.n,
+    distinctSymbols: edge.distinctSymbols,
+    distinctPickDates: edge.distinctPickDates,
+  };
+}
+
 export default function PickDetailScreen({ route, navigation }) {
   const item = route?.params?.item || {};
 
@@ -184,6 +204,32 @@ export default function PickDetailScreen({ route, navigation }) {
       mounted = false;
     };
   }, [item.symbol]);
+
+  const [historicalEdge, setHistoricalEdge] = useState(null);
+  const [edgeLoading, setEdgeLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadEdge() {
+      try {
+        const data = await getHistoricalEdge(
+          item.pickSetupLabel,
+          item.pickMarketRegime,
+          item.checkedHorizon,
+        );
+        if (mounted) setHistoricalEdge(data);
+      } finally {
+        if (mounted) setEdgeLoading(false);
+      }
+    }
+
+    loadEdge();
+
+    return () => {
+      mounted = false;
+    };
+  }, [item.pickSetupLabel, item.pickMarketRegime, item.checkedHorizon]);
 
   return (
     <ScrollView
@@ -641,6 +687,89 @@ export default function PickDetailScreen({ route, navigation }) {
         </View>
       )}
 
+      {!edgeLoading && (() => {
+        const edgeDisplay = getHistoricalEdgeDisplay(historicalEdge);
+        const contextLine = [
+          item.pickSetupLabel,
+          historicalEdge?.regimeDisplay ||
+            REGIME_LABELS[item.pickMarketRegime] ||
+            null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
+        return (
+          <View
+            style={[
+              styles.card,
+              edgeDisplay.state !== "confident" && styles.cardMuted,
+            ]}
+          >
+            <View style={styles.sectionHeaderRow}>
+              <View
+                style={[
+                  styles.sectionAccent,
+                  edgeDisplay.state !== "confident" &&
+                    styles.sectionAccentMuted,
+                ]}
+              />
+              <Text style={styles.sectionTitle}>Historical Edge</Text>
+            </View>
+
+            {!!contextLine && (
+              <Text style={styles.edgeContextLine}>{contextLine}</Text>
+            )}
+
+            {edgeDisplay.state === "confident" && (
+              <>
+                <View style={styles.edgeHeadlineRow}>
+                  <Text
+                    style={[
+                      styles.edgeHeadlineValue,
+                      {
+                        color:
+                          edgeDisplay.pctPositive >= 50
+                            ? BRAND.accent
+                            : BRAND.red,
+                      },
+                    ]}
+                  >
+                    {edgeDisplay.pctPositive.toFixed(1)}% positive
+                  </Text>
+                  <Text style={styles.edgeHeadlineSub}>
+                    avg {edgeDisplay.meanReturnPct >= 0 ? "+" : ""}
+                    {edgeDisplay.meanReturnPct.toFixed(2)}%
+                  </Text>
+                </View>
+                <Text style={styles.edgeSampleLine}>
+                  n={edgeDisplay.n} · symbols={edgeDisplay.distinctSymbols} ·
+                  over {edgeDisplay.distinctPickDates} days
+                </Text>
+              </>
+            )}
+
+            {edgeDisplay.state === "lowConfidence" && (
+              <Text style={styles.edgeMutedMessage}>
+                Small sample so far (n={edgeDisplay.n}) — not enough
+                resolved picks yet to call this a reliable edge.
+              </Text>
+            )}
+
+            {edgeDisplay.state === "insufficient" && (
+              <Text style={styles.edgeMutedMessage}>
+                No resolved picks yet for this setup/regime combination.
+              </Text>
+            )}
+
+            {!!historicalEdge?.disclaimer && (
+              <Text style={styles.edgeDisclaimer}>
+                {historicalEdge.disclaimer}
+              </Text>
+            )}
+          </View>
+        );
+      })()}
+
       <View style={styles.viewStockBtnWrap}>
         <AppButton
           title="View Stock Details"
@@ -1050,6 +1179,63 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: TYPO.fontFamily.bold,
     fontVariant: ["tabular-nums"],
+  },
+
+  cardMuted: {
+    opacity: 0.82,
+  },
+
+  sectionAccentMuted: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+
+  edgeContextLine: {
+    color: BRAND.muted,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.medium,
+    marginBottom: 8,
+  },
+
+  edgeHeadlineRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
+  },
+
+  edgeHeadlineValue: {
+    fontSize: 20,
+    fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  edgeHeadlineSub: {
+    color: BRAND.sub,
+    fontSize: 13,
+    fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  edgeSampleLine: {
+    color: BRAND.muted,
+    fontSize: 11.5,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 4,
+  },
+
+  edgeMutedMessage: {
+    color: BRAND.sub,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  edgeDisclaimer: {
+    color: BRAND.text,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
   },
 
   viewStockBtnWrap: {

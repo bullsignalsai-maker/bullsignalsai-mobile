@@ -391,6 +391,61 @@ export async function getAlphaclaraAccuracyReport() {
   }
 }
 
+export async function getHistoricalEdge(setupLabel, marketRegime, horizon) {
+  try {
+    const params = new URLSearchParams();
+    if (setupLabel) params.set("setup_label", setupLabel);
+    if (marketRegime) params.set("market_regime", marketRegime);
+    if (horizon) params.set("horizon", horizon);
+
+    const res = await fetch(
+      `${API_BASE_URL}/alphaclara-historical-edge?${params.toString()}`,
+    );
+    if (!res.ok) return emptyHistoricalEdge();
+
+    const json = await res.json();
+
+    return {
+      // Backend nests the actual figures under stats/confounding_guard,
+      // not top-level — confirmed against the live endpoint.
+      pctPositive:
+        typeof json.stats?.pct_positive === "number"
+          ? json.stats.pct_positive
+          : null,
+      meanReturnPct:
+        typeof json.stats?.mean_return_pct === "number"
+          ? json.stats.mean_return_pct
+          : null,
+      n: Number(json.stats?.n ?? 0),
+      distinctSymbols: Number(json.confounding_guard?.distinct_symbols ?? 0),
+      distinctPickDates: Number(
+        json.confounding_guard?.distinct_pick_dates ?? 0,
+      ),
+      lowConfidence: json.low_confidence === true,
+      insufficientData: json.insufficient_data === true,
+      regimeDisplay: json.regime_display || null,
+      disclaimer: json.disclaimer || null,
+    };
+  } catch (err) {
+    console.warn("Historical edge error:", err.message);
+    return emptyHistoricalEdge();
+  }
+}
+
+function emptyHistoricalEdge() {
+  return {
+    pctPositive: null,
+    meanReturnPct: null,
+    n: 0,
+    distinctSymbols: 0,
+    distinctPickDates: 0,
+    lowConfidence: false,
+    insufficientData: true,
+    regimeDisplay: null,
+    disclaimer: null,
+  };
+}
+
 // Real duplicates are NOT merged — the same symbol can be picked more
 // than once inside the window, and each pick is a distinct fact
 // (different pick_price/date), so every item is kept and keyed on
