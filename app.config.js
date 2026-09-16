@@ -8,7 +8,7 @@ export default {
     owner: "bullsignalsai",
     scheme: "alphaclara",
     // Bump this before every release — see RELEASE_CHECKLIST.md
-    version: "1.0.2",
+    version: "1.1.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "dark",
