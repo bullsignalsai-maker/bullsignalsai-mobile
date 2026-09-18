@@ -57,7 +57,7 @@ export async function registerForPushNotifications(userId) {
       });
     }
 
-    await fetch(`${API_BASE_URL}/push/register`, {
+    const res = await fetch(`${API_BASE_URL}/push/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -68,6 +68,18 @@ export async function registerForPushNotifications(userId) {
         platform: Platform.OS,
       }),
     });
+
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => "<unreadable body>");
+      console.warn(
+        `Push registration FAILED: /push/register returned ${res.status} ${res.statusText} — body: ${bodyText}`,
+      );
+      return null;
+    }
+
+    console.log(
+      `Push registration OK: token registered for user ${userId} (${Platform.OS})`,
+    );
 
     return expoPushToken;
   } catch (e) {
