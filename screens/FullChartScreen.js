@@ -600,7 +600,7 @@ export default function FullChartScreen({ route, navigation }) {
                 >
                   {displayRating(signal)}
                   {confidence != null
-                    ? ` • ${Number(confidence).toFixed(1)}%`
+                    ? ` • ${Number(confidence).toFixed(1)}% momentum`
                     : ""}
                 </Text>
               </View>
