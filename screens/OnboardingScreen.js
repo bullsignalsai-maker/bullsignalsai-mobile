@@ -21,12 +21,17 @@ const slides = [
   {
     key: "2",
     title: "AI-Powered Market Insights",
-    text: "Analyze price action, technical patterns, momentum, and market context to support your own analysis.",
+    text: "BullBrain analyzes price action, momentum, and technical patterns — and Clara, our AI assistant, explains it all in plain English, whenever you ask.",
   },
   {
     key: "3",
-    title: "Stay Informed",
-    text: "Track symbols, set price alerts, and explore contextual market information designed for clarity and learning.",
+    title: "Stay Informed, Stay in Control",
+    text: "Track symbols, set alerts, and follow market movers — with real-time context designed for clarity, not noise.",
+  },
+  {
+    key: "4",
+    title: "We Show Our Track Record",
+    text: "Every AI-flagged pick is tracked automatically — wins and losses both, with no cherry-picking. See our real, honest results, updated live.",
   },
 ];
 
