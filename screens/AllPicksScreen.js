@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -84,6 +85,7 @@ export default function AllPicksScreen({ navigation }) {
   const [activeTier, setActiveTier] = useState("tracking");
   const [directionFilter, setDirectionFilter] = useState("all");
   const [sortMode, setSortMode] = useState("recent");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // One scoped fetch per tier, cached for the lifetime of this screen —
   // flipping between tabs re-reads the cache instead of re-fetching. No
@@ -204,6 +206,13 @@ export default function AllPicksScreen({ navigation }) {
       const isUp = Number(pct) >= 0;
       if (directionFilter === "up" && !isUp) return false;
       if (directionFilter === "down" && isUp) return false;
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const symbolMatch = (item.symbol || "").toLowerCase().includes(q);
+      const nameMatch = (item.companyName || "").toLowerCase().includes(q);
+      if (!symbolMatch && !nameMatch) return false;
     }
 
     return true;
@@ -355,6 +364,20 @@ export default function AllPicksScreen({ navigation }) {
       {!!currentStatusLine && (
         <Text style={styles.currentStatusLine}>{currentStatusLine}</Text>
       )}
+
+      <View style={styles.searchRow}>
+        <Ionicons name="search-outline" size={16} color="#6B7280" />
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search symbol or company"
+          placeholderTextColor="#6B7280"
+          autoCapitalize="none"
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+        />
+      </View>
 
       <ScrollView
         horizontal
@@ -648,6 +671,28 @@ const styles = StyleSheet.create({
     color: BRAND.accent,
     fontSize: 12,
     fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    marginHorizontal: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    minHeight: 40,
+  },
+
+  searchInput: {
+    flex: 1,
+    color: BRAND.text,
+    fontSize: 14,
+    paddingVertical: 11,
+    marginLeft: 10,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   filterRow: {
