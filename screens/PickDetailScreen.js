@@ -21,6 +21,7 @@ import {
   getAlphaclaraPickHistory,
   getHistoricalEdge,
 } from "../services/HomeService";
+import { getCalibrationCheck } from "../services/calibrationService";
 import {
   formatPickedDaysAgo,
   formatPickDateLong,
@@ -230,6 +231,36 @@ export default function PickDetailScreen({ route, navigation }) {
       mounted = false;
     };
   }, [item.pickSetupLabel, item.pickMarketRegime, item.checkedHorizon]);
+
+  const [calibration, setCalibration] = useState(null);
+  const [calibrationLoading, setCalibrationLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadCalibration() {
+      try {
+        const data = await getCalibrationCheck(
+          item.pickModelView?.up,
+          item.pickModelView?.down,
+          item.checkedHorizon || "5d",
+        );
+        if (mounted) setCalibration(data);
+      } finally {
+        if (mounted) setCalibrationLoading(false);
+      }
+    }
+
+    if (item.pickModelView) {
+      loadCalibration();
+    } else {
+      setCalibrationLoading(false);
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [item.pickModelView?.up, item.pickModelView?.down, item.checkedHorizon]);
 
   return (
     <ScrollView
@@ -499,6 +530,58 @@ export default function PickDetailScreen({ route, navigation }) {
           <Text style={styles.secondaryValue}>
             {formatModelViewSplit(item.pickModelView)}
           </Text>
+        </View>
+      )}
+
+      {!calibrationLoading && !!item.pickModelView && (
+        <View
+          style={[
+            styles.card,
+            (!calibration ||
+              calibration.insufficientData ||
+              calibration.lowConfidence) &&
+              styles.cardMuted,
+          ]}
+        >
+          <View style={styles.sectionHeaderRow}>
+            <View
+              style={[
+                styles.sectionAccent,
+                (!calibration ||
+                  calibration.insufficientData ||
+                  calibration.lowConfidence) &&
+                  styles.sectionAccentMuted,
+              ]}
+            />
+            <Text style={styles.sectionTitle}>Calibration Check</Text>
+          </View>
+
+          {!calibration || calibration.insufficientData ? (
+            <Text style={styles.edgeMutedMessage}>
+              Not enough resolved history yet to check this model view's
+              track record.
+            </Text>
+          ) : calibration.lowConfidence ? (
+            <Text style={styles.edgeMutedMessage}>
+              Small sample so far (n={calibration.n} in the{" "}
+              {calibration.bucket} range) — not enough resolved picks yet to
+              call this calibration reliable.
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.primaryValue}>{calibration.headline}</Text>
+              {!!calibration.caveat && (
+                <Text style={styles.edgeMutedMessage}>
+                  {calibration.caveat}
+                </Text>
+              )}
+              {!!calibration.disclaimer && (
+                <Text style={styles.edgeDisclaimer}>
+                  {calibration.disclaimer}
+                </Text>
+              )}
+            </>
+          )}
         </View>
       )}
 

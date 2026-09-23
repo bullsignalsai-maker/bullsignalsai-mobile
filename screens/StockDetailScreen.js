@@ -24,6 +24,7 @@ import { LinearGradient as ExpoLinearGradient } from "expo-linear-gradient";
 
 import { getStockDetail } from "../services/stockDetailService";
 import { getMarketPeriod } from "../services/watchlistService";
+import { getCalibrationCheck } from "../services/calibrationService";
 import AstraChat from "../components/AstraChat";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import { BRAND } from "../constants/theme";
@@ -278,6 +279,9 @@ export default function StockDetailScreen({ route, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [astraVisible, setAstraVisible] = useState(false);
 
+  const [calibration, setCalibration] = useState(null);
+  const [calibrationLoading, setCalibrationLoading] = useState(true);
+
   const loadAll = useCallback(
     async (forceGrok = false) => {
       setLoadingDetail(true);
@@ -348,6 +352,33 @@ export default function StockDetailScreen({ route, navigation }) {
     detail?.content?.probability?.down ?? (probUp != null ? 1 - probUp : null);
 
   const probBias = detail?.probability?.bias || "Neutral";
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadCalibration() {
+      try {
+        const data = await getCalibrationCheck(
+          displayIntel?.modelView?.up,
+          displayIntel?.modelView?.down,
+        );
+        if (mounted) setCalibration(data);
+      } finally {
+        if (mounted) setCalibrationLoading(false);
+      }
+    }
+
+    if (displayIntel?.modelView) {
+      loadCalibration();
+    } else {
+      setCalibrationLoading(false);
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [displayIntel?.modelView?.up, displayIntel?.modelView?.down]);
+
   const hybridUpdatedTs = structuredGrok?.updatedAt
     ? new Date(structuredGrok.updatedAt).getTime()
     : null;
@@ -727,6 +758,46 @@ export default function StockDetailScreen({ route, navigation }) {
             Informational only. Not investment advice.
           </Text>
         </View>
+
+        {!calibrationLoading && !!displayIntel?.modelView && (
+          <View style={styles.calibrationCard}>
+            <View style={styles.calibrationHeader}>
+              <Text style={styles.calibrationTitle}>Calibration Check</Text>
+              <Text style={styles.calibrationSub}>
+                How reliable this model view has historically been
+              </Text>
+            </View>
+
+            {!calibration || calibration.insufficientData ? (
+              <Text style={styles.calibrationMutedText}>
+                Not enough resolved history yet to check this model view's
+                track record.
+              </Text>
+            ) : calibration.lowConfidence ? (
+              <Text style={styles.calibrationMutedText}>
+                Small sample so far (n={calibration.n} in the{" "}
+                {calibration.bucket} range) — not enough resolved picks yet to
+                call this calibration reliable.
+              </Text>
+            ) : (
+              <>
+                <Text style={styles.calibrationHeadline}>
+                  {calibration.headline}
+                </Text>
+                {!!calibration.caveat && (
+                  <Text style={styles.calibrationCaveat}>
+                    {calibration.caveat}
+                  </Text>
+                )}
+                {!!calibration.disclaimer && (
+                  <Text style={styles.calibrationDisclaimer}>
+                    {calibration.disclaimer}
+                  </Text>
+                )}
+              </>
+            )}
+          </View>
+        )}
 
         {/* PREMIUM PATTERN CONTEXT */}
         {patternInsight && (
@@ -1749,6 +1820,71 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     fontFamily: TYPO.fontFamily.medium,
     marginTop: 6,
+  },
+
+  /* =========================
+     CALIBRATION CHECK CARD
+  ========================= */
+  calibrationCard: {
+    marginTop: 8,
+    borderRadius: 22,
+    padding: 13,
+    backgroundColor: "#0A0F1A",
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.20)",
+    shadowColor: "#94A3B8",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+
+  calibrationHeader: {
+    marginBottom: 8,
+  },
+
+  calibrationTitle: {
+    color: BRAND.text,
+    fontSize: 16.5,
+    fontFamily: TYPO.fontFamily.extrabold,
+    letterSpacing: -0.2,
+  },
+
+  calibrationSub: {
+    color: BRAND.sub,
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 2,
+  },
+
+  calibrationHeadline: {
+    color: BRAND.text,
+    fontSize: 13.5,
+    lineHeight: 19,
+    fontFamily: TYPO.fontFamily.medium,
+  },
+
+  calibrationCaveat: {
+    color: BRAND.amber,
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 6,
+  },
+
+  calibrationDisclaimer: {
+    color: BRAND.muted,
+    fontSize: 10,
+    fontFamily: TYPO.fontFamily.bold,
+    marginTop: 8,
+    textAlign: "center",
+  },
+
+  calibrationMutedText: {
+    color: BRAND.sub,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: TYPO.fontFamily.medium,
   },
 
   /* =========================
