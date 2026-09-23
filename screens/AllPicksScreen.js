@@ -76,13 +76,15 @@ const SORT_MODES = [
   { value: "change", label: "% Change" },
 ];
 
-export default function AllPicksScreen({ navigation }) {
+export default function AllPicksScreen({ navigation, route }) {
   const [accuracyReport, setAccuracyReport] = useState(null);
   const [accuracyTrend, setAccuracyTrend] = useState(null);
   const [hypotheticalPortfolio, setHypotheticalPortfolio] = useState(null);
   const [astraVisible, setAstraVisible] = useState(false);
   const [infoModal, setInfoModal] = useState(null);
-  const [activeTier, setActiveTier] = useState("tracking");
+  const [activeTier, setActiveTier] = useState(
+    route?.params?.tier ?? "tracking",
+  );
   const [directionFilter, setDirectionFilter] = useState("all");
   const [sortMode, setSortMode] = useState("recent");
   const [searchQuery, setSearchQuery] = useState("");

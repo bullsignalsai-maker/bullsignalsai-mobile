@@ -1808,6 +1808,9 @@ C) neither (plain nudge line, no card chrome).
               onPressItem={(item) => {
                 navigation.navigate("PickDetailScreen", { item });
               }}
+              onPressTierMore={(tier) =>
+                navigation.navigate("AllPicksScreen", { tier })
+              }
             />
           </View>
         )}

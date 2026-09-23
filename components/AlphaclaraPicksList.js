@@ -108,6 +108,7 @@ function TierGroup({
   items,
   perTierLimit,
   onPressItem,
+  onPressMore,
   emptyPlaceholder,
 }) {
   const totalCount = items.length;
@@ -121,9 +122,23 @@ function TierGroup({
   return (
     <View style={styles.tierWrap}>
       <View style={styles.tierHeaderRow}>
-        <View style={[styles.tierDot, { backgroundColor: dotColor }]} />
-        <Text style={styles.tierLabel}>{label}</Text>
-        <Text style={styles.tierCount}>{countLabel}</Text>
+        <View style={styles.tierHeaderLeft}>
+          <View style={[styles.tierDot, { backgroundColor: dotColor }]} />
+          <Text style={styles.tierLabel}>{label}</Text>
+          <Text style={styles.tierCount}>{countLabel}</Text>
+        </View>
+
+        {!!onPressMore && totalCount > 0 && (
+          <TouchableOpacity
+            activeOpacity={0.75}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={onPressMore}
+          >
+            <Text style={[styles.tierMoreText, { color: dotColor }]}>
+              More ›
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {shownItems.length > 0 ? (
@@ -167,6 +182,7 @@ function TierGroup({
 export default function AlphaclaraPicksList({
   items = [],
   onPressItem,
+  onPressTierMore,
   emptyText = "No recent picks to show — check back soon.",
   checkedEmptyText = "No completed picks yet — check back soon",
   perTierLimit = null,
@@ -201,6 +217,9 @@ export default function AlphaclaraPicksList({
           items={fresh}
           perTierLimit={perTierLimit}
           onPressItem={onPressItem}
+          onPressMore={
+            onPressTierMore ? () => onPressTierMore("fresh") : undefined
+          }
         />
       )}
 
@@ -212,6 +231,9 @@ export default function AlphaclaraPicksList({
           items={tracking}
           perTierLimit={perTierLimit}
           onPressItem={onPressItem}
+          onPressMore={
+            onPressTierMore ? () => onPressTierMore("tracking") : undefined
+          }
         />
       )}
 
@@ -223,6 +245,9 @@ export default function AlphaclaraPicksList({
           items={checked}
           perTierLimit={perTierLimit}
           onPressItem={onPressItem}
+          onPressMore={
+            onPressTierMore ? () => onPressTierMore("checked") : undefined
+          }
           emptyPlaceholder={
             checked.length === 0 ? checkedEmptyText : undefined
           }
@@ -240,8 +265,19 @@ const styles = StyleSheet.create({
   tierHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     marginHorizontal: 10,
     marginBottom: 6,
+  },
+
+  tierHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  tierMoreText: {
+    fontSize: 11,
+    fontFamily: TYPO.fontFamily.semibold,
   },
 
   tierDot: {
