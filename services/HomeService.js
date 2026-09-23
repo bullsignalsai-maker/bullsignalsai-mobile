@@ -852,6 +852,8 @@ function buildAlphaWatch(alphaWatch = {}) {
         marketRegime: x.marketRegime || alphaWatch.market_regime || null,
         lastUpdated:
           x.quote_updated_at || x.computed_at || alphaWatch.updated_at || null,
+        displayIntelligence: x.displayIntelligence || null,
+        hasIntelligence: typeof x.displayIntelligence?.score === "number",
       })),
   };
 }

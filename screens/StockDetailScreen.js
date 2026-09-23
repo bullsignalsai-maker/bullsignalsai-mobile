@@ -347,7 +347,7 @@ export default function StockDetailScreen({ route, navigation }) {
   const probDown =
     detail?.content?.probability?.down ?? (probUp != null ? 1 - probUp : null);
 
-  const probBias = detail?.content?.probability?.bias || "Neutral";
+  const probBias = detail?.probability?.bias || "Neutral";
   const hybridUpdatedTs = structuredGrok?.updatedAt
     ? new Date(structuredGrok.updatedAt).getTime()
     : null;
@@ -623,6 +623,12 @@ export default function StockDetailScreen({ route, navigation }) {
                   </View>
                 )}
               </View>
+
+              {!!displayIntel?.reconciliationNote && (
+                <Text style={styles.aiReconciliationNote}>
+                  {displayIntel.reconciliationNote}
+                </Text>
+              )}
 
               <View style={styles.aiProbabilityTop}>
                 <Text style={styles.aiProbLabel}>Upside Probability</Text>
@@ -1586,6 +1592,15 @@ const styles = StyleSheet.create({
   aiBiasText: {
     fontSize: 10,
     fontFamily: TYPO.fontFamily.extrabold,
+  },
+
+  aiReconciliationNote: {
+    color: BRAND.sub,
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 6,
+    marginBottom: 2,
   },
 
   aiProbabilityTop: {

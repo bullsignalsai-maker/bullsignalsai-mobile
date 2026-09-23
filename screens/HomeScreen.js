@@ -1284,7 +1284,8 @@ C) neither (plain nudge line, no card chrome).
 
                       {heroItem.hasIntelligence !== false && (
                         <Text style={styles.heroMetaText}>
-                          Confidence {Math.round(getConfidence(heroItem))}%
+                          Momentum Confidence{" "}
+                          {Math.round(getConfidence(heroItem))}%
                         </Text>
                       )}
 
@@ -1304,6 +1305,15 @@ C) neither (plain nudge line, no card chrome).
                         </TouchableOpacity>
                       )}
                     </View>
+
+                    {!!heroItem.displayIntelligence?.reconciliationNote && (
+                      <Text
+                        style={styles.heroReconciliationNote}
+                        numberOfLines={2}
+                      >
+                        {heroItem.displayIntelligence.reconciliationNote}
+                      </Text>
+                    )}
                   </View>
 
                   <View style={styles.heroPriceBlock}>
@@ -3194,6 +3204,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: TYPO.fontFamily.semibold,
     marginLeft: 10,
+  },
+
+  heroReconciliationNote: {
+    color: BRAND.amber,
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 4,
   },
 
   infoBtn: {

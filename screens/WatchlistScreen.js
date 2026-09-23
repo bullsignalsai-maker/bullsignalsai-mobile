@@ -789,7 +789,7 @@ export default function WatchlistScreen({ navigation }) {
                       { color: signalColor(signal) },
                     ]}
                   >
-                    {Math.round(item.bullbrain?.confidence ?? 0)}%
+                    {Math.round(item.bullbrain?.confidence ?? 0)}% momentum
                   </Text>
                 )}
 
@@ -807,6 +807,12 @@ export default function WatchlistScreen({ navigation }) {
                   </TouchableOpacity>
                 )}
               </View>
+
+              {!!item.displayIntelligence?.reconciliationNote && (
+                <Text style={styles.reconciliationNote} numberOfLines={2}>
+                  {item.displayIntelligence.reconciliationNote}
+                </Text>
+              )}
             </View>
 
             {/* {/* RIGHT — Price + Change */}
@@ -1976,6 +1982,14 @@ const styles = StyleSheet.create({
   inlineConfidence: {
     fontSize: 10.2,
     fontFamily: TYPO.fontFamily.semibold,
+  },
+
+  reconciliationNote: {
+    color: BRAND.amber,
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontFamily: TYPO.fontFamily.medium,
+    marginTop: 3,
   },
 
   infoBtn: {
