@@ -42,9 +42,6 @@ export async function getMarketMomentum() {
 }
 function collectMomentumSymbols(data = {}) {
   return [
-    data.topAISetup,
-    ...(data.aiSetups || []),
-    ...(data.confirmedMomentum || []),
     ...(data.continuousMovers || []),
     ...(data.pullbackWatch || []),
   ]
@@ -75,11 +72,6 @@ function mergeQuoteIntoItem(item, quotes = {}) {
 function mergeMomentumLiveQuotes(data, quotes = {}) {
   return {
     ...data,
-    topAISetup: mergeQuoteIntoItem(data.topAISetup, quotes),
-    aiSetups: (data.aiSetups || []).map((x) => mergeQuoteIntoItem(x, quotes)),
-    confirmedMomentum: (data.confirmedMomentum || []).map((x) =>
-      mergeQuoteIntoItem(x, quotes),
-    ),
     continuousMovers: (data.continuousMovers || []).map((x) =>
       mergeQuoteIntoItem(x, quotes),
     ),
@@ -127,12 +119,6 @@ function normalizeMomentumPayload(json = {}) {
 
     pulse: normalizePulse(json.pulse),
 
-    topAISetup: normalizeAISetup(json.topAISetup),
-
-    aiSetups: normalizeAISetups(json.aiSetups || []),
-
-    confirmedMomentum: normalizeConfirmedMomentum(json.confirmedMomentum || []),
-
     continuousMovers: normalizeMomentumMovers(json.continuousMovers || []),
 
     pullbackWatch: normalizePullbacks(json.pullbackWatch || []),
@@ -154,92 +140,8 @@ function normalizePulse(pulse = {}) {
     topCatalyst: pulse.topCatalyst || "Mixed",
     summary:
       cleanText(pulse.summary) ||
-      "Market momentum is being tracked across movers and AI opportunity sessions.",
+      "Market momentum is being tracked across repeated movers and pullbacks.",
   };
-}
-
-function normalizeAISetup(item = {}) {
-  if (!item?.symbol) return null;
-
-  return {
-    symbol: cleanSymbol(item.symbol),
-    companyName: item.companyName || item.company || item.symbol,
-    logoUrl: item.logoUrl || item.profile?.logoUrl || null,
-    price: toNullableNum(item.price),
-    change: toNullableNum(item.change),
-    changePct: toNullableNum(item.changePct),
-
-    signal: item.signal || "HOLD",
-    confidence: toNum(item.confidence),
-    opportunityScore: toNum(item.opportunityScore),
-    alphaScore: toNum(item.alphaScore),
-    momentumScore: toNum(item.momentumScore),
-
-    setupLabel: item.setupLabel || "AI Momentum Setup",
-    pattern: item.pattern || null,
-    marketRegime: item.marketRegime || null,
-    theme: item.theme || null,
-
-    reason: cleanText(item.reason),
-    whyNow: Array.isArray(item.whyNow) ? item.whyNow.slice(0, 3) : [],
-
-    riskLevel: item.riskLevel || "Controlled",
-    riskFlags: Array.isArray(item.riskFlags) ? item.riskFlags : [],
-
-    factorScores: item.factorScores || {},
-    source: item.source || "alpha_watch",
-    lastUpdated: item.quote_updated_at || item.computed_at || null,
-  };
-}
-
-function normalizeAISetups(items = []) {
-  return dedupeBySymbol(items)
-    .slice(0, 20)
-    .map((item, idx) => {
-      const normalized = normalizeAISetup(item);
-
-      if (!normalized) return null;
-
-      return {
-        rank: idx + 1,
-        ...normalized,
-      };
-    })
-    .filter(Boolean);
-}
-
-function normalizeConfirmedMomentum(items = []) {
-  return dedupeBySymbol(items)
-    .slice(0, 12)
-    .map((item, idx) => ({
-      rank: idx + 1,
-      symbol: cleanSymbol(item.symbol),
-      companyName: item.companyName || item.company || item.symbol,
-      logoUrl: item.logoUrl || item.profile?.logoUrl || null,
-      price: toNullableNum(item.price),
-      change: toNullableNum(item.change),
-      changePct: toNullableNum(item.changePct),
-
-      direction: item.direction || "up",
-      momentumScore: toNum(item.momentumScore),
-      momentumLabel: item.momentumLabel || "Confirmed Momentum",
-
-      dailyMoverAppearances: toNum(item.appearances?.dailyMovers),
-      alphaSessionAppearances: toNum(item.appearances?.aiSetup),
-
-      avgMovePct: toNullableNum(item.avgMovePct),
-      sparkline: normalizeSparkline(item.sparkline),
-
-      sector: item.sector || null,
-      moverQuality: item.moverQuality || null,
-      primaryCatalysts: normalizeCatalysts(item.primaryCatalysts),
-      reason: cleanText(item.reason),
-      riskLevel: item.riskLevel || "Medium",
-      lastSession: item.lastSession || null,
-
-      source: item.source || "confirmed_momentum",
-      lastUpdated: item.quote_updated_at || null,
-    }));
 }
 
 function normalizeMomentumMovers(items = []) {
@@ -323,9 +225,6 @@ function emptyMomentum() {
     updatedAt: null,
     lookbackSnapshots: 12,
     pulse: normalizePulse(),
-    topAISetup: null,
-    aiSetups: [],
-    confirmedMomentum: [],
     continuousMovers: [],
     pullbackWatch: [],
   };
@@ -365,25 +264,6 @@ function normalizeSparkline(values = []) {
     .map((v) => Number(v))
     .filter((v) => Number.isFinite(v))
     .slice(-10);
-}
-
-function normalizeCatalysts(value) {
-  if (Array.isArray(value)) {
-    return value
-      .map((x) => cleanText(x))
-      .filter(Boolean)
-      .slice(0, 4);
-  }
-
-  if (typeof value === "string") {
-    return value
-      .split(/[,|]/)
-      .map((x) => cleanText(x))
-      .filter(Boolean)
-      .slice(0, 4);
-  }
-
-  return [];
 }
 
 function cleanText(text) {
