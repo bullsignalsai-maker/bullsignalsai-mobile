@@ -43,18 +43,6 @@ import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
 
 const AMBER_TAGS = new Set(["AI Conviction", "Sector Strength"]);
 
-// riskLevel only exists on aiSetups/topAISetup items (backend-computed from
-// riskFlags). confirmedMomentum/continuousMovers items never carry it — so
-// this is intentionally a lookup, not a fallback default, to avoid showing
-// a fabricated tier for a stock the backend never actually risk-assessed.
-const RISK_LEVEL_COLOR = {
-  Controlled: BRAND.green,
-  Low: BRAND.green,
-  Moderate: BRAND.amber,
-  Elevated: BRAND.amber,
-  High: BRAND.red,
-};
-
 const MOMENTUM_SCORE_INFO = {
   MARKET: {
     title: "Market Momentum",
@@ -62,11 +50,7 @@ const MOMENTUM_SCORE_INFO = {
   },
   STOCK: {
     title: "Momentum Score",
-    text: "An AI-generated 0–100 score for this stock, built from recent price action, trend persistence, and volume behavior. The exact mix is tailored to the list it appears in (Movers, AI Setups, Confirmed Momentum), so scores aren't directly comparable across sections — read it as how strong and sustained this stock's move looks, not an absolute ranking.",
-  },
-  TIER: {
-    title: "Momentum Score & Tiers",
-    text: "An AI-generated 0–100 score built from recent price action, trend persistence, and volume behavior. ELITE, STRONG, and EMERGING are display tiers on top of that score — ELITE is 85+, STRONG is 70–84, EMERGING is below 70 — meant for a quick scan, not a separately verified rating.",
+    text: "An AI-generated 0–100 score for this stock, built from recent price action, trend persistence, and volume behavior. The exact mix is tailored to the list it appears in (Momentum Movers or Pullback Watch), so scores aren't directly comparable across the two lists — read it as how strong and sustained this stock's move looks, not an absolute ranking.",
   },
   RISING_FADING: {
     title: "Rising / Fading",
@@ -76,16 +60,6 @@ const MOMENTUM_SCORE_INFO = {
     title: "New Entrants",
     text: "Stocks that have only recently started showing up in this momentum list (few tracked sessions so far). It reflects how new the stock is to this list, not whether it recently IPO'd or was newly listed.",
   },
-};
-
-// theme only exists on aiSetups/topAISetup — Sector filtering is scoped to
-// that section for this reason (see MomentumMoversScreen investigation).
-const THEME_LABELS = {
-  AI_Semis: "AI & Semis",
-  Cloud_Software: "Cloud & Software",
-  Consumer_Internet: "Consumer Internet",
-  Financial_Crypto: "Financial & Crypto",
-  Other: "Other",
 };
 
 /* ---------------- Mini sparkline ---------------- */
@@ -183,6 +157,33 @@ function MomentumRing({ score = 0 }) {
   );
 }
 
+// Session-count + net-move sentence built only from fields the backend sends
+// for movers/pullbacks (no reason text exists on these items). Returns null
+// when there's nothing real to say, so callers can hide or fall back.
+// e.g. "Up in 7 of 10 tracked appearances, +44.3% net over the last 12 sessions"
+const buildMoverFacts = (item, fallbackLookback = 12) => {
+  if (!item) return null;
+  const parts = [];
+  const appearances = Number(item.appearances || 0);
+  if (appearances > 0) {
+    const isDown = item.direction === "down";
+    const sessions = Number(
+      (isDown ? item.negativeSessions : item.positiveSessions) || 0,
+    );
+    parts.push(
+      `${isDown ? "Down" : "Up"} in ${sessions} of ${appearances} tracked appearances`,
+    );
+  }
+  if (item.netMovePct != null && Number.isFinite(Number(item.netMovePct))) {
+    const net = Number(item.netMovePct);
+    const lookback = item.lookbackSnapshots || fallbackLookback;
+    parts.push(
+      `${net >= 0 ? "+" : ""}${net.toFixed(1)}% net over the last ${lookback} sessions`,
+    );
+  }
+  return parts.length ? parts.join(", ") : null;
+};
+
 const normalizeMoverForClara = (raw) => {
   const item = raw || {};
   const catalysts = Array.isArray(item.primaryCatalysts)
@@ -193,6 +194,9 @@ const normalizeMoverForClara = (raw) => {
         ? [item.primary_catalysts]
         : [];
 
+  // The backend renders this as "{symbol} is moving because {reason}", so
+  // the data sentence is phrased to follow "because".
+  const facts = buildMoverFacts(item);
   const reason =
     item.reason ||
     item.summary ||
@@ -201,9 +205,7 @@ const normalizeMoverForClara = (raw) => {
     item.primaryCatalyst ||
     item.primary_catalyst ||
     catalysts[0] ||
-    item.momentumLabel ||
-    item.moverQuality ||
-    item.riskLevel ||
+    (facts ? `it has been ${facts.charAt(0).toLowerCase()}${facts.slice(1)}` : null) ||
     "Momentum detected across recent snapshots";
 
   return {
@@ -227,14 +229,14 @@ const normalizeMoverForClara = (raw) => {
     lookbackSnapshots: item.lookbackSnapshots,
     netMovePct: item.netMovePct ?? item.changePct ?? item.avgMovePct ?? null,
     changePct: item.changePct ?? item.netMovePct ?? null,
-    riskLevel:
-      item.riskLevel || item.risk_level || item.momentumLabel || "Momentum",
+    // null (not a label fallback) so the backend skips its risk clause when
+    // the item was never actually risk-assessed.
+    riskLevel: item.riskLevel || item.risk_level || null,
   };
 };
 /* ============================================================ */
 export default function MomentumMoversScreen({ navigation }) {
   const [selected, setSelected] = useState("All");
-  const [selectedTheme, setSelectedTheme] = useState("All");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -302,11 +304,8 @@ export default function MomentumMoversScreen({ navigation }) {
 
     if (result) {
       flashPricesForItems([
-        ...(result.aiSetups || []),
         ...(result.continuousMovers || []),
         ...(result.pullbackWatch || []),
-        ...(result.confirmedMomentum || []),
-        ...(result.topAISetup ? [result.topAISetup] : []),
       ]);
     }
 
@@ -331,11 +330,8 @@ export default function MomentumMoversScreen({ navigation }) {
       const result = await refreshMarketMomentum();
 
       flashPricesForItems([
-        ...(result.aiSetups || []),
         ...(result.continuousMovers || []),
         ...(result.pullbackWatch || []),
-        ...(result.confirmedMomentum || []),
-        ...(result.topAISetup ? [result.topAISetup] : []),
       ]);
 
       setData(result);
@@ -347,10 +343,7 @@ export default function MomentumMoversScreen({ navigation }) {
   }, []);
 
   const pulse = data?.pulse || {};
-  const topAISetup = data?.topAISetup;
-  const confirmed = data?.confirmedMomentum || [];
   const movers = data?.continuousMovers || [];
-  const aiSetups = data?.aiSetups || [];
   const pullbacks = data?.pullbackWatch || [];
   const [showAllMovers, setShowAllMovers] = useState(false);
   const visibleMovers = useMemo(() => {
@@ -430,17 +423,15 @@ export default function MomentumMoversScreen({ navigation }) {
     return movers;
   }, [selected, movers, pullbacks]);
 
-  const visibleAiSetups = useMemo(() => {
-    if (selectedTheme === "All") return aiSetups;
-    return aiSetups.filter((x) => x.theme === selectedTheme);
-  }, [selectedTheme, aiSetups]);
+  // Fixed to the backend's top-ranked mover (not visibleMovers[0]) so the
+  // hero doesn't change when the filter chips change.
+  const leader = movers[0] || null;
+  const leaderLookback =
+    leader?.lookbackSnapshots || data?.lookbackSnapshots || 12;
 
-  const aiSetupThemes = useMemo(
-    () => [...new Set(aiSetups.map((x) => x.theme).filter(Boolean))],
-    [aiSetups],
-  );
-
-  const leader = confirmed[0] || movers[0] || topAISetup;
+  // Hidden rather than replaced with fallback copy when the data is missing.
+  const leaderFacts = buildMoverFacts(leader, leaderLookback);
+  const leaderSummary = leaderFacts ? `${leaderFacts}.` : null;
 
   const normalizedSelectedMover = normalizeMoverForClara(
     selectedMover || leader || null,
@@ -450,7 +441,6 @@ export default function MomentumMoversScreen({ navigation }) {
     contextType: "momentum_movers",
     selectedMover: normalizedSelectedMover,
     movers: visibleMovers.slice(0, 12).map(normalizeMoverForClara),
-    aiSetups: aiSetups.slice(0, 8).map(normalizeMoverForClara),
     pullbacks: pullbacks.slice(0, 8).map(normalizeMoverForClara),
     pulse,
     updatedAt: data?.updatedAt,
@@ -580,14 +570,14 @@ export default function MomentumMoversScreen({ navigation }) {
 
               <View style={styles.statBlock}>
                 <Ionicons
-                  name="pie-chart-outline"
+                  name="trending-down-outline"
                   size={18}
-                  color={BRAND.green}
+                  color={BRAND.red}
                 />
                 <View>
-                  <Text style={styles.statLabel}>Top Sector</Text>
+                  <Text style={styles.statLabel}>Pullbacks</Text>
                   <Text style={styles.statValue}>
-                    {pulse.topTheme || "Mixed"}
+                    {pulse.pullbackNames ?? 0}
                   </Text>
                 </View>
               </View>
@@ -692,11 +682,11 @@ export default function MomentumMoversScreen({ navigation }) {
                 <Text style={styles.metricLabel}>Appeared in movers</Text>
                 <Text style={styles.metricValue}>
                   <Text style={{ color: BRAND.green }}>
-                    {leader?.dailyMoverAppearances || leader?.appearances || 0}
+                    {leader?.appearances || 0}
                   </Text>{" "}
                   of{" "}
                   <Text style={{ color: BRAND.green }}>
-                    {leader?.lookbackSnapshots || data?.lookbackSnapshots || 12}
+                    {leaderLookback}
                   </Text>{" "}
                   sessions
                 </Text>
@@ -720,56 +710,39 @@ export default function MomentumMoversScreen({ navigation }) {
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.metricValueGreen}>
-                  {Math.round(leader?.momentumScore || 92)}/100
+                  {leader?.momentumScore
+                    ? `${Math.round(leader.momentumScore)}/100`
+                    : "--"}
                 </Text>
               </View>
 
               <View style={styles.metricDivider} />
 
               <View style={styles.metricBox}>
-                <Text style={styles.metricLabel}>Risk / Quality</Text>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 5,
-                    marginTop: 3,
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.dotGreen,
-                      {
-                        backgroundColor:
-                          RISK_LEVEL_COLOR[leader?.riskLevel] || BRAND.sub,
-                      },
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      styles.metricValueGreen,
-                      {
-                        color: RISK_LEVEL_COLOR[leader?.riskLevel] || BRAND.sub,
-                      },
-                    ]}
-                  >
-                    {leader?.riskLevel || "Not assessed"}
+                <Text style={styles.metricLabel}>Up / Down</Text>
+                <Text style={styles.metricValue}>
+                  <Text style={{ color: BRAND.green }}>
+                    {leader?.positiveSessions ?? 0}
                   </Text>
-                </View>
+                  {" / "}
+                  <Text style={{ color: BRAND.red }}>
+                    {leader?.negativeSessions ?? 0}
+                  </Text>{" "}
+                  sessions
+                </Text>
               </View>
             </View>
 
-            <View style={styles.aiNote}>
-              <MaterialCommunityIcons
-                name="creation"
-                size={18}
-                color={BRAND.green}
-              />
-              <Text style={styles.aiNoteText}>
-                {leader?.reason ||
-                  "AI detects strong institutional continuation with sustained volume expansion."}
-              </Text>
-            </View>
+            {!!leaderSummary && (
+              <View style={styles.aiNote}>
+                <MaterialCommunityIcons
+                  name="chart-timeline-variant"
+                  size={18}
+                  color={BRAND.green}
+                />
+                <Text style={styles.aiNoteText}>{leaderSummary}</Text>
+              </View>
+            )}
           </LinearGradient>
         )}
 
@@ -1071,241 +1044,6 @@ export default function MomentumMoversScreen({ navigation }) {
             </View>
           </ScrollView>
         </View>
-
-        {/* ---------- AI OPPORTUNITY MEMORY ---------- */}
-        <View style={[styles.sectionHeader, { marginTop: 28 }]}>
-          <View style={styles.sectionTitleRow}>
-            <View style={styles.sectionIconWrap}>
-              <MaterialCommunityIcons
-                name="creation"
-                size={16}
-                color={BRAND.amber}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.sectionTitleLine}>
-                <Text style={styles.sectionTitle}>AI SETUPS</Text>
-              </View>
-              <Text style={styles.sectionSub}>
-                Internal AI-ranked opportunities with momentum confirmation
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {aiSetupThemes.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filters}
-          >
-            {["All", ...aiSetupThemes].map((t) => {
-              const active = selectedTheme === t;
-              return (
-                <TouchableOpacity
-                  key={t}
-                  onPress={() => setSelectedTheme(t)}
-                  style={[
-                    styles.filterPill,
-                    active && styles.filterPillActive,
-                  ]}
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={[
-                      styles.filterText,
-                      active && styles.filterTextActive,
-                    ]}
-                  >
-                    {t === "All" ? "All" : THEME_LABELS[t] || t}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        )}
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          decelerationRate="fast"
-          snapToInterval={262}
-          snapToAlignment="start"
-          contentContainerStyle={styles.alphaMemoryScroll}
-        >
-          {visibleAiSetups.slice(0, 10).map((item, idx) => {
-            const score = Math.round(
-              item.momentumScore ||
-                item.opportunityScore ||
-                item.alphaScore ||
-                0,
-            );
-            const confidence = Math.round(item.confidence || 0);
-            const conviction = Math.min(100, Math.max(8, score));
-            const tier =
-              score >= 85 ? "ELITE" : score >= 70 ? "STRONG" : "EMERGING";
-
-            return (
-              <TouchableOpacity
-                key={item.symbol}
-                activeOpacity={0.9}
-                style={styles.alphaCard}
-                onPress={() => {
-                  navigation.navigate("StockDetailScreen", {
-                    symbol: item.symbol,
-                    name: item.companyName || item.symbol,
-                    source: "ui",
-                  });
-                }}
-              >
-                {/* Base background */}
-                <LinearGradient
-                  colors={["#10151E", "#0A0E15"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-
-                {/* Top-right amber glow */}
-                <LinearGradient
-                  colors={["rgba(254,176,25,0.18)", "transparent"]}
-                  start={{ x: 1, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                  style={styles.alphaGlow}
-                />
-
-                {/* Left accent rail */}
-                <LinearGradient
-                  colors={["#FEB019", "rgba(254,176,25,0)"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                  style={styles.alphaRail}
-                />
-
-                {/* Header */}
-                <View style={styles.alphaTopRow}>
-                  <View style={styles.alphaLogoWrap}>
-                    <LinearGradient
-                      colors={[
-                        "rgba(254,176,25,0.28)",
-                        "rgba(254,176,25,0.08)",
-                      ]}
-                      style={StyleSheet.absoluteFill}
-                    />
-                    {item.logoUrl ? (
-                      <Image
-                        source={{ uri: item.logoUrl }}
-                        style={styles.alphaLogoImage}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      <Text style={styles.alphaLogoText}>
-                        {item.symbol?.slice(0, 1)}
-                      </Text>
-                    )}
-                  </View>
-
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <View style={styles.alphaSymbolRow}>
-                      <Text style={styles.alphaSymbol} numberOfLines={1}>
-                        {item.symbol}
-                      </Text>
-                      <View style={styles.alphaTierPill}>
-                        <Text style={styles.alphaTierText}>{tier}</Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => setInfoModal(MOMENTUM_SCORE_INFO.TIER)}
-                        style={styles.infoBtn}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Ionicons
-                          name="help-circle-outline"
-                          size={13}
-                          color={BRAND.sub}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                    <Text style={styles.alphaSector} numberOfLines={1}>
-                      {item.sector || item.companyName || "AI Opportunity"}
-                    </Text>
-                  </View>
-
-                  <View style={styles.alphaScoreBadge}>
-                    <Text style={styles.alphaScoreLabel}>AI</Text>
-                    <Text style={styles.alphaScoreText}>{score}</Text>
-                  </View>
-                </View>
-
-                {/* Conviction bar */}
-                <View style={styles.alphaBarTrack}>
-                  <LinearGradient
-                    colors={["#FEB019", "#FF8A00"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[styles.alphaBarFill, { width: `${conviction}%` }]}
-                  />
-                </View>
-
-                {/* Metrics */}
-                <View style={styles.alphaMetricsRow}>
-                  <View style={styles.alphaMetric}>
-                    <Animated.Text
-                      style={[
-                        styles.alphaMetricValue,
-                        {
-                          backgroundColor: getPriceFlashBg(
-                            item.symbol,
-                            item.changePct,
-                          ),
-                          paddingHorizontal: 4,
-                          borderRadius: 6,
-                        },
-                      ]}
-                    >
-                      {item.price ? `$${Number(item.price).toFixed(2)}` : "--"}
-                    </Animated.Text>
-                    <Text style={styles.alphaMetricLabel}>Price</Text>
-                  </View>
-                  <View style={styles.alphaDivider} />
-                  <View style={styles.alphaMetric}>
-                    <Text style={styles.alphaMetricValue}>
-                      {item.changePct != null
-                        ? `${Number(item.changePct) >= 0 ? "+" : ""}${Number(item.changePct).toFixed(1)}%`
-                        : "--"}
-                    </Text>
-                    <Text style={styles.alphaMetricLabel}>Move</Text>
-                  </View>
-                  <View style={styles.alphaDivider} />
-                  <View style={styles.alphaMetric}>
-                    <Text
-                      style={[styles.alphaMetricValue, { color: BRAND.amber }]}
-                    >
-                      {confidence}%
-                    </Text>
-                    <Text style={styles.alphaMetricLabel}>Confidence</Text>
-                  </View>
-                </View>
-
-                {/* Footer reason + tag */}
-                <View style={styles.alphaFooter}>
-                  <Text style={styles.alphaReason} numberOfLines={4}>
-                    {item.reason ||
-                      item.primaryCatalysts?.[0] ||
-                      "Repeated AI opportunity signal across sessions"}
-                  </Text>
-                  <View style={styles.alphaTagRow}>
-                    <View style={styles.alphaTag}>
-                      <View style={styles.alphaTagDot} />
-                      <Text style={styles.alphaTagText} numberOfLines={1}>
-                        {item.setupLabel || item.riskLevel || "AI Setup"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
 
         {/* ---------- PULLBACK WATCH - Premium Horizontal Cards ---------- */}
         {/* No "View All" here on purpose — the horizontal scroll below
@@ -1832,13 +1570,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  dotGreen: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: BRAND.green,
-  },
-
   aiNote: {
     marginTop: 8,
     borderRadius: 12,
@@ -2105,245 +1836,6 @@ const styles = StyleSheet.create({
   tagTextAmber: {
     color: BRAND.amber,
   },
-  /* AI Opportunity Memory */
-  sectionIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(254,176,25,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(254,176,25,0.25)",
-  },
-
-  sectionTitleLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-
-  alphaMemoryScroll: {
-    gap: 12,
-    paddingTop: 12,
-    paddingBottom: 8,
-    paddingRight: 18,
-  },
-
-  alphaCard: {
-    width: 262,
-    height: 215, // was 192
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(254,176,25,0.18)",
-    overflow: "hidden",
-    padding: 13, // was 14
-    paddingLeft: 16,
-    backgroundColor: "#0B0F16",
-    shadowColor: "#FEB019",
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
-  },
-
-  alphaGlow: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    width: 160,
-    height: 160,
-    borderTopRightRadius: 20,
-  },
-
-  alphaRail: {
-    position: "absolute",
-    left: 0,
-    top: 14,
-    bottom: 14,
-    width: 2.5,
-    borderRadius: 2,
-  },
-
-  alphaTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 10,
-  },
-
-  alphaLogoWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(254,176,25,0.35)",
-  },
-
-  alphaLogoText: {
-    color: BRAND.amber,
-    fontSize: 18,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
-
-  alphaSymbolRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  alphaSymbol: {
-    color: BRAND.text,
-    fontSize: 16.5,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-  },
-
-  alphaTierPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 5,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-  },
-
-  alphaTierText: {
-    color: "#CBD5E1",
-    fontSize: 8.5,
-    fontWeight: "900",
-    letterSpacing: 0.8,
-  },
-
-  alphaSector: {
-    color: BRAND.sub,
-    fontSize: 10.5,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-
-  alphaScoreBadge: {
-    minWidth: 44,
-    height: 40,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: "rgba(254,176,25,0.55)",
-    backgroundColor: "rgba(254,176,25,0.10)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 6,
-  },
-
-  alphaScoreLabel: {
-    color: "rgba(254,176,25,0.75)",
-    fontSize: 7.5,
-    fontWeight: "900",
-    letterSpacing: 1,
-    marginTop: -1,
-  },
-
-  alphaScoreText: {
-    color: BRAND.amber,
-    fontSize: 15,
-    fontWeight: "900",
-    lineHeight: 17,
-  },
-
-  alphaBarTrack: {
-    height: 4,
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    overflow: "hidden",
-    marginBottom: 10,
-  },
-
-  alphaBarFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-
-  alphaMetricsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-
-  alphaMetric: {
-    flex: 1,
-    alignItems: "center",
-  },
-
-  alphaMetricValue: {
-    color: BRAND.text,
-    fontSize: 13,
-    fontWeight: "900",
-    numberOfLines: 1,
-  },
-
-  alphaMetricLabel: {
-    color: BRAND.sub,
-    fontSize: 9.5,
-    fontWeight: "700",
-    marginTop: 2,
-    letterSpacing: 0.2,
-  },
-
-  alphaDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    marginHorizontal: 6,
-  },
-
-  alphaFooter: {
-    marginTop: 4,
-  },
-
-  alphaReason: {
-    color: "#E5E7EB",
-    fontSize: 11.2,
-    lineHeight: 14.4,
-    fontWeight: "600",
-    marginBottom: 6,
-  },
-
-  alphaTagRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  alphaTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: "rgba(254,176,25,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(254,176,25,0.25)",
-  },
-
-  alphaTagDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: BRAND.amber,
-  },
-
-  alphaTagText: {
-    color: BRAND.amber,
-    fontSize: 9.8,
-    fontWeight: "900",
-    letterSpacing: 0.4,
-  },
-
   /* Pullback Watch */
   pullbackScroll: {
     gap: 12,
@@ -2541,11 +2033,6 @@ const styles = StyleSheet.create({
   logoSmallImage: {
     width: 22,
     height: 22,
-  },
-
-  alphaLogoImage: {
-    width: 26,
-    height: 26,
   },
 
   pullLogoImage: {

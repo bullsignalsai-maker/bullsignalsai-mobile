@@ -383,7 +383,10 @@ export default function AstraChat({ visible, onClose, portfolioData }) {
                               </Text>
                               {!!card.subtitle && (
                                 <Text style={styles.answerCardSubtitle}>
-                                  {card.subtitle}
+                                  {/* Backend may pass a mid-sentence fragment
+                                      (e.g. a mover's reason) as the subtitle */}
+                                  {card.subtitle.charAt(0).toUpperCase() +
+                                    card.subtitle.slice(1)}
                                 </Text>
                               )}
                             </View>
