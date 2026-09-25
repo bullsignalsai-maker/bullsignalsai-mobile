@@ -19,7 +19,7 @@ const firstFinite = (...values) => {
 
 /**
  * positions: [{ symbol, shares, avgCost, profile, ... }] (from getPortfolio)
- * prices:    { [symbol]: { price | c, prevClose | pc } } (from /prices)
+ * prices:    { [symbol]: { price | c, prevClose | pc } } (from quotes-bulk)
  *
  * No avgCost fallback anywhere: a missing price must read as "--", never
  * as a real 0% gain (price = avgCost), and a missing prevClose must never
