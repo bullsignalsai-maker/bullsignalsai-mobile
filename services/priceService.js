@@ -1,17 +1,24 @@
 import { API_BASE_URL } from "../config/apiKeys";
 
-export async function getBatchPrices(symbolsCSV) {
+// Reads the cached Firestore quote via quotes-bulk (same endpoint Home,
+// Watchlist, Market and Momentum use) instead of /prices, which calls
+// Finnhub/FMP live on every request. Keeps Portfolio's prices from ever
+// disagreeing with Home's, and stops a per-user 20s poll from hitting an
+// external quote provider on every tick.
+export async function getPortfolioQuotes(symbols = []) {
   try {
-    const url = `${API_BASE_URL}/prices?symbols=${symbolsCSV}`;
-    const res = await fetch(url);
+    const symbolsParam = [...new Set(symbols.filter(Boolean))].join(",");
+    if (!symbolsParam) return {};
 
-    if (!res.ok) {
-      throw new Error("Bad batch price response");
-    }
+    const res = await fetch(
+      `${API_BASE_URL}/quotes-bulk?scope=portfolio&symbols=${symbolsParam}`,
+    );
+    if (!res.ok) return {};
 
-    return await res.json();
+    const json = await res.json();
+    return json?.quotes || {};
   } catch (err) {
-    console.warn("getBatchPrices error:", err?.message || err);
+    console.warn("getPortfolioQuotes error:", err?.message || err);
     return {};
   }
 }

@@ -19,10 +19,9 @@ import { Swipeable } from "react-native-gesture-handler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 
-import { getBatchPrices } from "../services/priceService";
+import { getPortfolioQuotes } from "../services/priceService";
 import { buildPortfolioView } from "../utils/portfolioMath";
 import { auth, getPortfolio, deletePosition } from "../firebaseConfig";
-import { API_BASE_URL } from "../config/apiKeys";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import AstraChat from "../components/AstraChat";
 import { BRAND } from "../constants/theme";
@@ -42,7 +41,6 @@ export default function PortfolioScreen({ navigation }) {
     lastName: "",
   });
 
-  const [aiState, setAiState] = useState({});
   const [astraVisible, setAstraVisible] = useState(false);
 
   const swipeRefs = useRef({});
@@ -125,8 +123,8 @@ export default function PortfolioScreen({ navigation }) {
       setPortfolio(list);
 
       if (list.length > 0) {
-        const symbols = list.map((x) => x.symbol).join(",");
-        const live = await getBatchPrices(symbols);
+        const symbols = list.map((x) => x.symbol);
+        const live = await getPortfolioQuotes(symbols);
         setPrices(live || {});
       }
     } catch (err) {
@@ -147,8 +145,8 @@ export default function PortfolioScreen({ navigation }) {
 
     const interval = setInterval(async () => {
       try {
-        const symbols = portfolio.map((x) => x.symbol).join(",");
-        const live = await getBatchPrices(symbols);
+        const symbols = portfolio.map((x) => x.symbol);
+        const live = await getPortfolioQuotes(symbols);
         if (live) setPrices(live);
       } catch (e) {
         console.warn("Auto-refresh error:", e);
@@ -229,80 +227,6 @@ export default function PortfolioScreen({ navigation }) {
         ? { label: "Moderate", color: BRAND.amber }
         : { label: "Balanced", color: BRAND.green };
 
-  const handleToggleAIInsight = async (symbol, p, totalValueLocal) => {
-    setAiState((prev) => {
-      const current = prev[symbol] || {};
-      return {
-        ...prev,
-        [symbol]: {
-          ...current,
-          expanded: !current.expanded,
-        },
-      };
-    });
-
-    const current = aiState[symbol];
-    const alreadyLoaded = current && current.ai;
-    const alreadyLoading = current && current.loading;
-
-    if (alreadyLoaded || alreadyLoading) return;
-
-    try {
-      setAiState((prev) => ({
-        ...prev,
-        [symbol]: {
-          ...(prev[symbol] || {}),
-          loading: true,
-          error: null,
-        },
-      }));
-
-      const url =
-        `${API_BASE_URL}/portfolio-ai-insight/${symbol}` +
-        `?allocation_pct=${p.allocationPct}` +
-        `&gain_pct=${p.gainPct}` +
-        `&position_value=${p.currValue}` +
-        `&portfolio_total_value=${totalValueLocal}`;
-
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("AI insight unavailable");
-
-      const json = await res.json();
-
-      const aiData = {
-        trend: json.trend || "",
-        expected_move: json.expected_move || "",
-        risk: json.risk || "",
-        confidence: json.confidence || "",
-        pattern: json.pattern || "",
-        five_day_prob: json.five_day_prob || "",
-        rebalancing: json.rebalancing || "",
-        message: json.message || "",
-      };
-
-      setAiState((prev) => ({
-        ...prev,
-        [symbol]: {
-          ...(prev[symbol] || {}),
-          loading: false,
-          error: null,
-          ai: aiData,
-          text: json.message || "",
-        },
-      }));
-    } catch (err) {
-      console.warn("AI insight error:", err);
-
-      setAiState((prev) => ({
-        ...prev,
-        [symbol]: {
-          ...(prev[symbol] || {}),
-          loading: false,
-          error: "AI insight is temporarily unavailable. Try again later.",
-        },
-      }));
-    }
-  };
   const compactMoney = (n) => {
     const value = Number(n || 0);
     const abs = Math.abs(value);
@@ -393,8 +317,6 @@ export default function PortfolioScreen({ navigation }) {
   }
 
   const renderPosition = (p) => {
-    const insight = aiState[p.symbol] || {};
-
     const renderRightActions = () => (
       <Pressable
         style={({ pressed }) => [
