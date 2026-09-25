@@ -92,22 +92,33 @@ export function buildPortfolioView(positions = [], prices = {}) {
  *
  * Herfindahl-Hirschman Index across ALL positions, not just the top
  * holding — sum of squared allocation percentages (0-10,000 scale).
- * Thresholds (1500/2500) are the standard DOJ/FTC merger-guideline
- * concentration breakpoints, not arbitrary cutoffs. level and
- * diversificationScore both derive from this same hhi value so they can
- * never disagree with each other. The 58/74/88 scores are kept as-is
- * because PortfolioScreen's health-score blend was calibrated around them.
+ * 10,000 / hhi is the portfolio's "effective number of equal positions".
  *
- * Only "Balanced" (hhi < 1500) counts as diversified: "Moderate" is still
- * moderately concentrated, so it isn't presented as a strength.
+ * Thresholds deliberately depart from the DOJ/FTC merger guidelines
+ * (1500/2500): those are calibrated for antitrust market concentration and
+ * would need 7+ equal positions before a portfolio reads as Balanced,
+ * flagging a typical 5-6 stock retail portfolio as a risk. Retail cutoffs:
+ *   Balanced  hhi <= 2000  (behaves like 5+ equal positions)
+ *   Moderate  hhi <= 3333  (3 to 5)
+ *   High      otherwise    (fewer than 3)
+ * Compared on the rounded hhi so float noise in allocations can't push an
+ * exactly-equal portfolio (e.g. 5 x 20% = 2000) across a boundary.
+ *
+ * level and diversificationScore derive from the same cutoffs so they can
+ * never disagree. The 58/74/88 scores are kept as-is because
+ * PortfolioScreen's health-score blend was calibrated around them.
+ * Only "Balanced" counts as diversified, i.e. is shown as a strength.
  */
 export function classifyConcentration(allocationPcts = []) {
   const hhi = allocationPcts.reduce(
     (sum, pct) => sum + Math.pow(pct || 0, 2),
     0,
   );
-  const level = hhi >= 2500 ? "High" : hhi >= 1500 ? "Moderate" : "Balanced";
-  const diversificationScore = hhi >= 2500 ? 58 : hhi >= 1500 ? 74 : 88;
+  const rounded = Math.round(hhi);
+  const level =
+    rounded <= 2000 ? "Balanced" : rounded <= 3333 ? "Moderate" : "High";
+  const diversificationScore =
+    level === "Balanced" ? 88 : level === "Moderate" ? 74 : 58;
   return {
     hhi,
     level,
