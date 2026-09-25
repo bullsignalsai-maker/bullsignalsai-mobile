@@ -51,6 +51,10 @@ import { useResetScrollOnTabPress } from "../hooks/useResetScrollOnTabPress";
 import { useAuthUser } from "../hooks/useAuthUser";
 import { getPortfolio } from "../firebaseConfig";
 import { fetchWatchlist } from "../services/watchlistService";
+import {
+  computePortfolioToday,
+  computeWatchlistPerformance,
+} from "../utils/todayStrip";
 const LOGO = require("../assets/alpha-transparent.png");
 
 const FEAR_INDEX_INFO = {
@@ -844,31 +848,48 @@ C) neither (plain nudge line, no card chrome).
   const watchlistSymbolsArr = [...watchlistedSymbols];
   const hasWatchlist = watchlistSymbolsArr.length > 0;
 
+  // Both are null/hasData:false when quotes are missing (initial render,
+  // or fetchHomeQuotes failing to {}) — shown as "--", never as a real
+  // "+$0.00" or "N up / 0 down" (see utils/todayStrip.js).
   const portfolioToday = hasPositions
-    ? ownedSymbols.reduce((sum, sym) => {
-        const pos = positions[sym];
-        const change = Number(todayQuotes[sym]?.change ?? 0);
-        return sum + pos.shares * change;
-      }, 0)
+    ? computePortfolioToday(ownedSymbols, positions, todayQuotes)
     : null;
 
   const watchlistPerformance = hasWatchlist
-    ? watchlistSymbolsArr.reduce(
-        (acc, sym) => {
-          const pct = Number(todayQuotes[sym]?.changePct ?? 0);
-          if (pct >= 0) acc.up += 1;
-          else acc.down += 1;
-          if (
-            acc.leader === null ||
-            Math.abs(pct) > Math.abs(acc.leader.changePct)
-          ) {
-            acc.leader = { symbol: sym, changePct: pct };
-          }
-          return acc;
-        },
-        { up: 0, down: 0, leader: null },
-      )
+    ? computeWatchlistPerformance(watchlistSymbolsArr, todayQuotes)
     : null;
+
+  const TODAY_TONE = {
+    up: {
+      border: "rgba(0,227,150,0.34)",
+      fill: "rgba(0,227,150,0.12)",
+      color: BRAND.accent,
+    },
+    down: {
+      border: "rgba(239,68,68,0.34)",
+      fill: "rgba(239,68,68,0.12)",
+      color: BRAND.red,
+    },
+    // No real data yet: neither green nor red.
+    neutral: {
+      border: BRAND.border,
+      fill: "rgba(156,163,175,0.12)",
+      color: BRAND.sub,
+    },
+  };
+
+  const portfolioTone =
+    portfolioToday == null
+      ? TODAY_TONE.neutral
+      : portfolioToday >= 0
+        ? TODAY_TONE.up
+        : TODAY_TONE.down;
+
+  const watchlistTone = !watchlistPerformance?.hasData
+    ? TODAY_TONE.neutral
+    : watchlistPerformance.up >= watchlistPerformance.down
+      ? TODAY_TONE.up
+      : TODAY_TONE.down;
 
   return (
     <Animated.View style={[styles.container, { opacity: screenFade }]}>
@@ -985,11 +1006,8 @@ C) neither (plain nudge line, no card chrome).
                 styles.todayCard,
                 hasWatchlist && styles.todayCardHalf,
                 {
-                  borderColor:
-                    portfolioToday >= 0
-                      ? "rgba(0,227,150,0.34)"
-                      : "rgba(239,68,68,0.34)",
-                  shadowColor: portfolioToday >= 0 ? BRAND.accent : BRAND.red,
+                  borderColor: portfolioTone.border,
+                  shadowColor: portfolioTone.color,
                 },
               ]}
             >
@@ -998,17 +1016,14 @@ C) neither (plain nudge line, no card chrome).
                   style={[
                     styles.todayCardIconWrap,
                     {
-                      backgroundColor:
-                        portfolioToday >= 0
-                          ? "rgba(0,227,150,0.12)"
-                          : "rgba(239,68,68,0.12)",
+                      backgroundColor: portfolioTone.fill,
                     },
                   ]}
                 >
                   <Ionicons
                     name="briefcase-outline"
                     size={13}
-                    color={portfolioToday >= 0 ? BRAND.accent : BRAND.red}
+                    color={portfolioTone.color}
                   />
                 </View>
                 <Text style={styles.todayCardLabel}>Portfolio Today</Text>
@@ -1016,11 +1031,14 @@ C) neither (plain nudge line, no card chrome).
               <Text
                 style={[
                   styles.todayCardValue,
-                  { color: portfolioToday >= 0 ? BRAND.accent : BRAND.red },
+                  { color: portfolioTone.color },
                 ]}
               >
-                {portfolioToday >= 0 ? "+" : "-"}$
-                {Math.abs(portfolioToday).toFixed(2)}
+                {portfolioToday == null
+                  ? "--"
+                  : `${portfolioToday >= 0 ? "+" : "-"}$${Math.abs(
+                      portfolioToday,
+                    ).toFixed(2)}`}
               </Text>
               <Text style={styles.todayCardSub}>
                 {ownedSymbols.length} position
@@ -1034,14 +1052,8 @@ C) neither (plain nudge line, no card chrome).
                   styles.todayCard,
                   styles.todayCardHalf,
                   {
-                    borderColor:
-                      watchlistPerformance.up >= watchlistPerformance.down
-                        ? "rgba(0,227,150,0.34)"
-                        : "rgba(239,68,68,0.34)",
-                    shadowColor:
-                      watchlistPerformance.up >= watchlistPerformance.down
-                        ? BRAND.accent
-                        : BRAND.red,
+                    borderColor: watchlistTone.border,
+                    shadowColor: watchlistTone.color,
                   },
                 ]}
               >
@@ -1050,21 +1062,14 @@ C) neither (plain nudge line, no card chrome).
                     style={[
                       styles.todayCardIconWrap,
                       {
-                        backgroundColor:
-                          watchlistPerformance.up >= watchlistPerformance.down
-                            ? "rgba(0,227,150,0.12)"
-                            : "rgba(239,68,68,0.12)",
+                        backgroundColor: watchlistTone.fill,
                       },
                     ]}
                   >
                     <Ionicons
                       name="eye-outline"
                       size={13}
-                      color={
-                        watchlistPerformance.up >= watchlistPerformance.down
-                          ? BRAND.accent
-                          : BRAND.red
-                      }
+                      color={watchlistTone.color}
                     />
                   </View>
                   <Text style={styles.todayCardLabel}>
@@ -1072,19 +1077,29 @@ C) neither (plain nudge line, no card chrome).
                   </Text>
                 </View>
                 <View style={styles.todayUpDownRow}>
-                  <Text style={styles.todayUpDownValue}>
-                    <Text style={{ color: BRAND.accent }}>
-                      {watchlistPerformance.up}
+                  {watchlistPerformance.hasData ? (
+                    <>
+                      <Text style={styles.todayUpDownValue}>
+                        <Text style={{ color: BRAND.accent }}>
+                          {watchlistPerformance.up}
+                        </Text>
+                        <Text style={styles.todayUpDownUnit}> up</Text>
+                      </Text>
+                      <View style={styles.todayUpDownDivider} />
+                      <Text style={styles.todayUpDownValue}>
+                        <Text style={{ color: BRAND.red }}>
+                          {watchlistPerformance.down}
+                        </Text>
+                        <Text style={styles.todayUpDownUnit}> down</Text>
+                      </Text>
+                    </>
+                  ) : (
+                    <Text
+                      style={[styles.todayUpDownValue, { color: BRAND.sub }]}
+                    >
+                      --
                     </Text>
-                    <Text style={styles.todayUpDownUnit}> up</Text>
-                  </Text>
-                  <View style={styles.todayUpDownDivider} />
-                  <Text style={styles.todayUpDownValue}>
-                    <Text style={{ color: BRAND.red }}>
-                      {watchlistPerformance.down}
-                    </Text>
-                    <Text style={styles.todayUpDownUnit}> down</Text>
-                  </Text>
+                  )}
                 </View>
                 {!!watchlistPerformance.leader && (
                   <Text style={styles.todayCardSub}>
@@ -1102,14 +1117,8 @@ C) neither (plain nudge line, no card chrome).
               style={[
                 styles.todayCard,
                 {
-                  borderColor:
-                    watchlistPerformance.up >= watchlistPerformance.down
-                      ? "rgba(0,227,150,0.34)"
-                      : "rgba(239,68,68,0.34)",
-                  shadowColor:
-                    watchlistPerformance.up >= watchlistPerformance.down
-                      ? BRAND.accent
-                      : BRAND.red,
+                  borderColor: watchlistTone.border,
+                  shadowColor: watchlistTone.color,
                 },
               ]}
             >
@@ -1118,21 +1127,14 @@ C) neither (plain nudge line, no card chrome).
                   style={[
                     styles.todayCardIconWrap,
                     {
-                      backgroundColor:
-                        watchlistPerformance.up >= watchlistPerformance.down
-                          ? "rgba(0,227,150,0.12)"
-                          : "rgba(239,68,68,0.12)",
+                      backgroundColor: watchlistTone.fill,
                     },
                   ]}
                 >
                   <Ionicons
                     name="eye-outline"
                     size={13}
-                    color={
-                      watchlistPerformance.up >= watchlistPerformance.down
-                        ? BRAND.accent
-                        : BRAND.red
-                    }
+                    color={watchlistTone.color}
                   />
                 </View>
                 <Text style={styles.todayCardLabel}>
@@ -1140,19 +1142,29 @@ C) neither (plain nudge line, no card chrome).
                 </Text>
               </View>
               <View style={styles.todayUpDownRow}>
-                <Text style={styles.todayUpDownValue}>
-                  <Text style={{ color: BRAND.accent }}>
-                    {watchlistPerformance.up}
+                {watchlistPerformance.hasData ? (
+                  <>
+                    <Text style={styles.todayUpDownValue}>
+                      <Text style={{ color: BRAND.accent }}>
+                        {watchlistPerformance.up}
+                      </Text>
+                      <Text style={styles.todayUpDownUnit}> up</Text>
+                    </Text>
+                    <View style={styles.todayUpDownDivider} />
+                    <Text style={styles.todayUpDownValue}>
+                      <Text style={{ color: BRAND.red }}>
+                        {watchlistPerformance.down}
+                      </Text>
+                      <Text style={styles.todayUpDownUnit}> down</Text>
+                    </Text>
+                  </>
+                ) : (
+                  <Text
+                    style={[styles.todayUpDownValue, { color: BRAND.sub }]}
+                  >
+                    --
                   </Text>
-                  <Text style={styles.todayUpDownUnit}> up</Text>
-                </Text>
-                <View style={styles.todayUpDownDivider} />
-                <Text style={styles.todayUpDownValue}>
-                  <Text style={{ color: BRAND.red }}>
-                    {watchlistPerformance.down}
-                  </Text>
-                  <Text style={styles.todayUpDownUnit}> down</Text>
-                </Text>
+                )}
               </View>
               {!!watchlistPerformance.leader && (
                 <Text style={styles.todayCardSub}>
