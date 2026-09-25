@@ -86,3 +86,32 @@ export function buildPortfolioView(positions = [], prices = {}) {
     dayComplete,
   };
 }
+
+/**
+ * Concentration of a fully-priced portfolio, from allocation percentages.
+ *
+ * Herfindahl-Hirschman Index across ALL positions, not just the top
+ * holding — sum of squared allocation percentages (0-10,000 scale).
+ * Thresholds (1500/2500) are the standard DOJ/FTC merger-guideline
+ * concentration breakpoints, not arbitrary cutoffs. level and
+ * diversificationScore both derive from this same hhi value so they can
+ * never disagree with each other. The 58/74/88 scores are kept as-is
+ * because PortfolioScreen's health-score blend was calibrated around them.
+ *
+ * Only "Balanced" (hhi < 1500) counts as diversified: "Moderate" is still
+ * moderately concentrated, so it isn't presented as a strength.
+ */
+export function classifyConcentration(allocationPcts = []) {
+  const hhi = allocationPcts.reduce(
+    (sum, pct) => sum + Math.pow(pct || 0, 2),
+    0,
+  );
+  const level = hhi >= 2500 ? "High" : hhi >= 1500 ? "Moderate" : "Balanced";
+  const diversificationScore = hhi >= 2500 ? 58 : hhi >= 1500 ? 74 : 88;
+  return {
+    hhi,
+    level,
+    diversificationScore,
+    isDiversified: level === "Balanced",
+  };
+}

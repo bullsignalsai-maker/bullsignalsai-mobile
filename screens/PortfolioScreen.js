@@ -20,7 +20,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 
 import { getPortfolioQuotes } from "../services/priceService";
-import { buildPortfolioView } from "../utils/portfolioMath";
+import {
+  buildPortfolioView,
+  classifyConcentration,
+} from "../utils/portfolioMath";
 import { auth, getPortfolio, deletePosition } from "../firebaseConfig";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
 import AstraChat from "../components/AstraChat";
@@ -209,23 +212,12 @@ export default function PortfolioScreen({ navigation }) {
   const topPerformer = [...withGain].sort((a, b) => b.gain - a.gain)[0];
   const worstPerformer = [...withGain].sort((a, b) => a.gain - b.gain)[0];
 
-  // Herfindahl-Hirschman Index across ALL positions, not just the top
-  // holding — sum of squared allocation percentages (0-10,000 scale).
-  // Thresholds (1500/2500) are the standard DOJ/FTC merger-guideline
-  // concentration breakpoints, not arbitrary cutoffs. riskExposure and
-  // diversificationScore both derive from this same hhi value so they
-  // can never disagree with each other.
-  const hhi = enrichedSorted.reduce(
-    (sum, p) => sum + Math.pow(p.allocationPct || 0, 2),
-    0,
+  // hhi thresholds, level and the 58/74/88 score live in
+  // utils/portfolioMath.js so the Strengths/Risks placement can be tested.
+  const concentration = classifyConcentration(
+    enrichedSorted.map((p) => p.allocationPct),
   );
-
-  const riskExposure =
-    hhi >= 2500
-      ? { label: "High", color: BRAND.red }
-      : hhi >= 1500
-        ? { label: "Moderate", color: BRAND.amber }
-        : { label: "Balanced", color: BRAND.green };
+  const diversificationScore = concentration.diversificationScore;
 
   const compactMoney = (n) => {
     const value = Number(n || 0);
@@ -268,19 +260,16 @@ export default function PortfolioScreen({ navigation }) {
       ? Math.round((winnersCount / withGain.length) * 100)
       : 0;
 
-  // Same hhi/threshold pair as riskExposure above — kept as the
-  // existing 58/74/88 output values since portfolioHealthScore's blend
-  // formula below was already calibrated around them. (A continuous
-  // score was considered and rejected: it wouldn't share riskExposure's
-  // hard cliff at hhi=1500/2500, reintroducing exactly the "High risk
-  // but 83/100 diversified" contradiction this refactor fixes.)
-  const diversificationScore = hhi >= 2500 ? 58 : hhi >= 1500 ? 74 : 88;
-
   const hasHoldings = enrichedSorted.length > 0;
   // hhi/diversification/health all derive from allocation, which only
   // exists when every position is priced — otherwise they'd score an
   // all-zero allocation as "Balanced".
   const canScore = hasHoldings && quotesComplete;
+
+  // Diversification is a strength only when the portfolio is actually
+  // Balanced; Moderate/High concentration is listed under Risks instead.
+  const diversificationStrength = canScore && concentration.isDiversified;
+  const diversificationRisk = canScore && !concentration.isDiversified;
 
   const portfolioHealthScore = canScore
     ? Math.round(
@@ -557,12 +546,11 @@ export default function PortfolioScreen({ navigation }) {
                 </>
               ) : (
                 <>
-                  <Text style={styles.healthBullet}>
-                    ✓ Diversification:{" "}
-                    {canScore
-                      ? `${diversificationScore}/100 (${riskExposure.label})`
-                      : "--"}
-                  </Text>
+                  {diversificationStrength && (
+                    <Text style={styles.healthBullet}>
+                      {`✓ Diversification: ${diversificationScore}/100 (${concentration.level})`}
+                    </Text>
+                  )}
                   <Text style={styles.healthBullet}>
                     ✓ Top holding: {topHolding?.symbol || "--"}
                   </Text>
@@ -592,6 +580,11 @@ export default function PortfolioScreen({ navigation }) {
                 </>
               ) : (
                 <>
+                  {diversificationRisk && (
+                    <Text style={styles.healthBullet}>
+                      {`• Diversification: ${diversificationScore}/100 (${concentration.level} concentration)`}
+                    </Text>
+                  )}
                   <Text style={styles.healthBullet}>
                     • Largest allocation{" "}
                     {pctOrDash(topHolding?.allocationPct)}
