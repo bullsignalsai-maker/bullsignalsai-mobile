@@ -98,11 +98,13 @@ export function buildPortfolioView(positions = [], prices = {}) {
  * (1500/2500): those are calibrated for antitrust market concentration and
  * would need 7+ equal positions before a portfolio reads as Balanced,
  * flagging a typical 5-6 stock retail portfolio as a risk. Retail cutoffs:
- *   Balanced  hhi <= 2000  (behaves like 5+ equal positions)
- *   Moderate  hhi <= 3333  (3 to 5)
+ *   Balanced  hhi <= 2222  (4.5+ effective positions: 5 roughly-equal
+ *                           holdings, not only 5 exactly-equal ones,
+ *                           which sit at exactly 2000)
+ *   Moderate  hhi <= 3333  (3 to 4.5)
  *   High      otherwise    (fewer than 3)
  * Compared on the rounded hhi so float noise in allocations can't push an
- * exactly-equal portfolio (e.g. 5 x 20% = 2000) across a boundary.
+ * exactly-equal portfolio (e.g. 3 x 33.3% = 3333) across a boundary.
  *
  * level and diversificationScore derive from the same cutoffs so they can
  * never disagree. The 58/74/88 scores are kept as-is because
@@ -116,7 +118,7 @@ export function classifyConcentration(allocationPcts = []) {
   );
   const rounded = Math.round(hhi);
   const level =
-    rounded <= 2000 ? "Balanced" : rounded <= 3333 ? "Moderate" : "High";
+    rounded <= 2222 ? "Balanced" : rounded <= 3333 ? "Moderate" : "High";
   const diversificationScore =
     level === "Balanced" ? 88 : level === "Moderate" ? 74 : 58;
   return {
