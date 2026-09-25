@@ -149,7 +149,7 @@ const fmtDateTime = (ts) => {
 };
 const fmtChange = (v) =>
   typeof v === "number" && !Number.isNaN(v)
-    ? `${v >= 0 ? "+" : ""}$${Math.abs(v).toFixed(2)}`
+    ? `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`
     : "--";
 
 // Lots can be fractional (e.g. dollar-based buys), so trim to 4dp and
@@ -701,11 +701,15 @@ export default function WatchlistScreen({ navigation }) {
     // Firestore (loadPositions), gain/loss reuses the live watchlist price
     // already polled for this card (see PortfolioScreen.js for the same
     // cost-basis formula applied to the dedicated Portfolio tab).
+    // No avgCost fallback: without a live price the gain is unknown ("--"),
+    // not a real 0% (see utils/portfolioMath.js for the Portfolio tab).
     const pos = positions[item.symbol];
-    const ownedPrice = price ?? pos?.avgCost ?? 0;
+    const hasOwnedPrice = typeof price === "number" && Number.isFinite(price);
     const ownedCost = pos ? pos.shares * pos.avgCost : 0;
-    const ownedGain = pos ? pos.shares * ownedPrice - ownedCost : 0;
-    const ownedGainPct = pos && ownedCost > 0 ? (ownedGain / ownedCost) * 100 : 0;
+    const ownedGain =
+      pos && hasOwnedPrice ? pos.shares * price - ownedCost : null;
+    const ownedGainPct =
+      ownedGain != null && ownedCost > 0 ? (ownedGain / ownedCost) * 100 : null;
 
     return (
       <Swipeable
@@ -808,8 +812,11 @@ export default function WatchlistScreen({ navigation }) {
                 )}
               </View>
 
+              {/* Not truncated: the note's reconciling half ("However, the
+                  model's forward view leans bearish…") is what keeps it
+                  from reading as a one-sided bullish claim. */}
               {!!item.displayIntelligence?.reconciliationNote && (
-                <Text style={styles.reconciliationNote} numberOfLines={2}>
+                <Text style={styles.reconciliationNote}>
                   {item.displayIntelligence.reconciliationNote}
                 </Text>
               )}
@@ -896,10 +903,19 @@ export default function WatchlistScreen({ navigation }) {
               <Text
                 style={[
                   styles.ownedRowGain,
-                  { color: ownedGain >= 0 ? BRAND.accent : BRAND.red },
+                  {
+                    color:
+                      ownedGain == null
+                        ? BRAND.sub
+                        : ownedGain >= 0
+                          ? BRAND.accent
+                          : BRAND.red,
+                  },
                 ]}
               >
-                {fmtChange(ownedGain)} ({fmtPct(ownedGainPct)})
+                {ownedGain == null
+                  ? "--"
+                  : `${fmtChange(ownedGain)} (${fmtPct(ownedGainPct)})`}
               </Text>
             </View>
           )}

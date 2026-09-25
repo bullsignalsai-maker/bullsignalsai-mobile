@@ -20,6 +20,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 
 import { getBatchPrices } from "../services/priceService";
+import { buildPortfolioView } from "../utils/portfolioMath";
 import { auth, getPortfolio, deletePosition } from "../firebaseConfig";
 import { API_BASE_URL } from "../config/apiKeys";
 import AstraAnimatedIcon from "../components/AstraAnimatedIcon";
@@ -55,14 +56,20 @@ export default function PortfolioScreen({ navigation }) {
     return Number(n).toFixed(2);
   };
 
-  const money = (n) => `$${fmt(n)}`;
+  // null means "no live quote" (see utils/portfolioMath.js) — every
+  // formatter shows "--" and a neutral color rather than $0.00 / green.
+  const money = (n) => (n == null ? "--" : `$${fmt(n)}`);
+
+  const pctOrDash = (n) => (n == null ? "--" : `${fmt(n)}%`);
 
   const signedMoney = (n) => {
-    const value = Number(n || 0);
+    if (n == null) return "--";
+    const value = Number(n);
     return `${value >= 0 ? "+$" : "-$"}${fmt(Math.abs(value))}`;
   };
 
-  const getGainColor = (n) => (Number(n || 0) >= 0 ? BRAND.green : BRAND.red);
+  const getGainColor = (n) =>
+    n == null ? BRAND.sub : Number(n) >= 0 ? BRAND.green : BRAND.red;
 
   const handleDelete = async (symbol) => {
     const userId = auth.currentUser?.uid;
@@ -162,51 +169,29 @@ export default function PortfolioScreen({ navigation }) {
     loadPortfolio();
   };
 
-  let totalValue = 0;
-  let totalCost = 0;
-  let todayGain = 0;
-
-  const enriched = portfolio.map((pos) => {
-    const live = prices[pos.symbol] || {};
-
-    const price = live.price ?? live.c ?? pos.avgCost ?? 0;
-    const prev = live.prevClose ?? live.pc ?? pos.avgCost ?? 0;
-
-    const currValue = pos.shares * price;
-    const cost = pos.shares * pos.avgCost;
-    const gain = currValue - cost;
-    const gainPct = cost > 0 ? (gain / cost) * 100 : 0;
-    const today = pos.shares * (price - prev);
-
-    totalValue += currValue;
-    totalCost += cost;
-    todayGain += today;
-
-    return {
-      ...pos,
-      logoUrl: pos.profile?.logoUrl || null,
-      price,
-      prev,
-      currValue,
-      gain,
-      gainPct,
-      today,
-      allocationPct: 0,
-    };
-  });
-
-  enriched.forEach((p) => {
-    p.allocationPct = totalValue > 0 ? (p.currValue / totalValue) * 100 : 0;
-  });
+  const {
+    rows: enriched,
+    totalValue,
+    totalGain,
+    totalGainPct,
+    todayGain,
+    quotesComplete,
+  } = buildPortfolioView(portfolio, prices);
 
   const applySorting = (list) => {
     switch (sortMode) {
       case "gain":
-        return [...list].sort((a, b) => b.gain - a.gain);
+        return [...list].sort(
+          (a, b) => (b.gain ?? -Infinity) - (a.gain ?? -Infinity) || 0,
+        );
       case "shares":
         return [...list].sort((a, b) => b.shares - a.shares);
       case "allocation":
-        return [...list].sort((a, b) => b.allocationPct - a.allocationPct);
+        return [...list].sort(
+          (a, b) =>
+            (b.allocationPct ?? -Infinity) - (a.allocationPct ?? -Infinity) ||
+            0,
+        );
       case "az":
         return [...list].sort((a, b) => a.symbol.localeCompare(b.symbol));
       default:
@@ -216,15 +201,15 @@ export default function PortfolioScreen({ navigation }) {
 
   const enrichedSorted = applySorting(enriched);
 
-  const totalGain = totalValue - totalCost;
-  const totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
+  const withAllocation = enrichedSorted.filter((p) => p.allocationPct != null);
+  const withGain = enrichedSorted.filter((p) => p.gain != null);
 
-  const topHolding = [...enrichedSorted].sort(
+  const topHolding = [...withAllocation].sort(
     (a, b) => b.allocationPct - a.allocationPct,
   )[0];
 
-  const topPerformer = [...enrichedSorted].sort((a, b) => b.gain - a.gain)[0];
-  const worstPerformer = [...enrichedSorted].sort((a, b) => a.gain - b.gain)[0];
+  const topPerformer = [...withGain].sort((a, b) => b.gain - a.gain)[0];
+  const worstPerformer = [...withGain].sort((a, b) => a.gain - b.gain)[0];
 
   // Herfindahl-Hirschman Index across ALL positions, not just the top
   // holding — sum of squared allocation percentages (0-10,000 scale).
@@ -330,27 +315,33 @@ export default function PortfolioScreen({ navigation }) {
 
     return signedMoney(value);
   };
+  // Clara's /astra-chat requires numbers for every position field, so it
+  // only gets positions with a complete live quote; totals and allocation
+  // are computed over that same set so they stay internally consistent.
+  const claraRows = enrichedSorted.filter(
+    (p) => p.currValue != null && p.today != null,
+  );
+  const claraTotalValue = claraRows.reduce((sum, p) => sum + p.currValue, 0);
   const portfolioData = {
-    total_value: totalValue,
-    total_gain: totalGain,
-    today_gain: todayGain,
-    positions: enrichedSorted.map((p) => ({
+    total_value: claraTotalValue,
+    total_gain: claraRows.reduce((sum, p) => sum + p.gain, 0),
+    today_gain: claraRows.reduce((sum, p) => sum + p.today, 0),
+    positions: claraRows.map((p) => ({
       symbol: p.symbol,
       shares: p.shares,
       avg_cost: p.avgCost,
       price: p.price,
       gain: p.gain,
-      gain_pct: p.gainPct,
-      allocation_pct: p.allocationPct,
+      gain_pct: p.gainPct ?? 0,
+      allocation_pct:
+        claraTotalValue > 0 ? (p.currValue / claraTotalValue) * 100 : 0,
       today: p.today,
     })),
   };
-  const winnersCount = enrichedSorted.filter(
-    (p) => Number(p.gain || 0) >= 0,
-  ).length;
+  const winnersCount = withGain.filter((p) => p.gain >= 0).length;
   const winnerPct =
-    enrichedSorted.length > 0
-      ? Math.round((winnersCount / enrichedSorted.length) * 100)
+    withGain.length > 0
+      ? Math.round((winnersCount / withGain.length) * 100)
       : 0;
 
   // Same hhi/threshold pair as riskExposure above — kept as the
@@ -362,19 +353,25 @@ export default function PortfolioScreen({ navigation }) {
   const diversificationScore = hhi >= 2500 ? 58 : hhi >= 1500 ? 74 : 88;
 
   const hasHoldings = enrichedSorted.length > 0;
+  // hhi/diversification/health all derive from allocation, which only
+  // exists when every position is priced — otherwise they'd score an
+  // all-zero allocation as "Balanced".
+  const canScore = hasHoldings && quotesComplete;
 
-  const portfolioHealthScore = hasHoldings
+  const portfolioHealthScore = canScore
     ? Math.round(
         Math.min(
           95,
           Math.max(45, winnerPct * 0.45 + diversificationScore * 0.55),
         ),
       )
-    : 0;
+    : null;
 
   const healthLabel = !hasHoldings
     ? "No Data"
-    : portfolioHealthScore >= 80
+    : !canScore
+      ? "Awaiting prices"
+      : portfolioHealthScore >= 80
       ? "Excellent"
       : portfolioHealthScore >= 65
         ? "Healthy"
@@ -382,7 +379,7 @@ export default function PortfolioScreen({ navigation }) {
           ? "Watch"
           : "High Risk";
 
-  const allocationLeaders = [...enrichedSorted]
+  const allocationLeaders = [...withAllocation]
     .sort((a, b) => b.allocationPct - a.allocationPct)
     .slice(0, 5);
 
@@ -438,7 +435,11 @@ export default function PortfolioScreen({ navigation }) {
         <TouchableOpacity
           style={[
             styles.holdingRow,
-            p.gain >= 0 ? styles.holdingRowUp : styles.holdingRowDown,
+            p.gain == null
+              ? null
+              : p.gain >= 0
+                ? styles.holdingRowUp
+                : styles.holdingRowDown,
           ]}
           activeOpacity={0.88}
           onPress={() =>
@@ -466,7 +467,7 @@ export default function PortfolioScreen({ navigation }) {
               <View>
                 <Text style={styles.holdingSymbol}>{p.symbol}</Text>
                 <Text style={styles.holdingName}>
-                  {p.shares} shares · {fmt(p.allocationPct)}% allocation
+                  {p.shares} shares · {pctOrDash(p.allocationPct)} allocation
                 </Text>
               </View>
             </View>
@@ -476,7 +477,7 @@ export default function PortfolioScreen({ navigation }) {
               <Text
                 style={[styles.holdingGain, { color: getGainColor(p.gain) }]}
               >
-                {signedMoney(p.gain)} · {fmt(p.gainPct)}%
+                {signedMoney(p.gain)} · {pctOrDash(p.gainPct)}
               </Text>
             </View>
           </View>
@@ -530,7 +531,9 @@ export default function PortfolioScreen({ navigation }) {
             <View style={styles.overviewStat}>
               <Text style={styles.overviewLabel}>Total Value</Text>
               <Text style={styles.overviewValue}>
-                {compactMoney(totalValue).replace("+", "")}
+                {totalValue == null
+                  ? "--"
+                  : compactMoney(totalValue).replace("+", "")}
               </Text>
               <Text
                 style={[
@@ -538,7 +541,7 @@ export default function PortfolioScreen({ navigation }) {
                   { color: getGainColor(totalGain) },
                 ]}
               >
-                {fmt(totalGainPct)}%
+                {pctOrDash(totalGainPct)}
               </Text>
             </View>
 
@@ -576,7 +579,7 @@ export default function PortfolioScreen({ navigation }) {
                 numberOfLines={1}
                 adjustsFontSizeToFit
               >
-                {compactMoney(totalGain)}
+                {totalGain == null ? "--" : compactMoney(totalGain)}
               </Text>
               <Text
                 style={[
@@ -584,7 +587,7 @@ export default function PortfolioScreen({ navigation }) {
                   { color: getGainColor(totalGain) },
                 ]}
               >
-                {fmt(totalGainPct)}%
+                {pctOrDash(totalGainPct)}
               </Text>
             </View>
           </View>
@@ -598,7 +601,11 @@ export default function PortfolioScreen({ navigation }) {
 
           <View style={styles.healthContentRow}>
             <View style={styles.healthRing}>
-              <Text style={styles.healthScore}>{portfolioHealthScore}%</Text>
+              <Text style={styles.healthScore}>
+                {portfolioHealthScore == null
+                  ? "--"
+                  : `${portfolioHealthScore}%`}
+              </Text>
               <Text style={styles.healthLabel}>{healthLabel}</Text>
             </View>
 
@@ -630,7 +637,7 @@ export default function PortfolioScreen({ navigation }) {
                 <>
                   <Text style={styles.healthBullet}>
                     ✓ Diversification:{" "}
-                    {hasHoldings
+                    {canScore
                       ? `${diversificationScore}/100 (${riskExposure.label})`
                       : "--"}
                   </Text>
@@ -665,7 +672,7 @@ export default function PortfolioScreen({ navigation }) {
                 <>
                   <Text style={styles.healthBullet}>
                     • Largest allocation{" "}
-                    {topHolding ? fmt(topHolding.allocationPct) : "--"}%
+                    {pctOrDash(topHolding?.allocationPct)}
                   </Text>
                   <Text style={styles.healthBullet}>
                     • Weakest: {worstPerformer?.symbol || "--"}
